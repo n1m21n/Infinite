@@ -1,0 +1,84 @@
+infinite-patch 1
+# Pulsar Train Formant Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  b en0 1
+  f vel0 0.86
+  i note1 55
+  b en1 1
+  f vel1 0.86
+  i note2 60
+  b en2 1
+  f vel2 0.86
+  i note3 62
+  b en3 1
+  f vel3 0.86
+  i note4 67
+  b en4 1
+  f vel4 0.86
+  i note5 62
+  b en5 1
+  f vel5 0.86
+  i note6 60
+  b en6 1
+  f vel6 0.86
+  i note7 55
+  b en7 1
+  f vel7 0.86
+  i note8 50
+  b en8 1
+  f vel8 0.86
+  i note9 57
+  b en9 1
+  f vel9 0.86
+  i note10 62
+  b en10 1
+  f vel10 0.86
+  i note11 64
+  b en11 1
+  f vel11 0.86
+  i note12 69
+  b en12 1
+  f vel12 0.86
+  i note13 64
+  b en13 1
+  f vel13 0.86
+  i note14 62
+  b en14 1
+  f vel14 0.86
+  i note15 57
+  b en15 1
+  f vel15 0.86
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float formantRatio = 3.4 [1.2, 8.0];\nparam float duty = 0.42 [0.15, 0.85];\nparam float sweepAmt = 1.6 [0.0, 4.0];\nparam float bodyHz = 680.0 [220.0, 1800.0];\nparam float decay = 0.9991 [0.996, 0.9996];\nstate float p0 = 0; state float env = 0; state float formEnv = 0;\nstate float bp1 = 0; state float lp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.025, env * decay);\nformEnv = if(gate > 0.5, formEnv * 0.9988 + 0.0012, 1.0);\n\nf0 = clamp(freq, 55.0, 2200.0);\np0 = (p0 + f0 / sr) % 1.0;\n\n# Windowed pulsar train: raised-cosine window over duty fraction\nu = clamp(p0 / max(0.08, duty), 0.0, 1.0);\nwin = if(p0 < duty, 0.5 - 0.5 * cos(6.2831853 * u), 0.0);\nfRatio = formantRatio + sweepAmt * (1.0 - formEnv);\npulsar = sin(6.2831853 * u * fRatio) * win * env;\nsub = sin(6.2831853 * p0) * 0.42 * env;\n\nsig = pulsar * 0.85 + sub;\ng = clamp(2.0 * sin(3.14159265 * bodyHz / sr), 0.03, 0.78);\nbp1 = bp1 + g * (sig - lp1 - 0.55 * bp1);\nlp1 = lp1 + g * bp1;\n\nout = ((sig * 0.70 + bp1 * 0.45) / (1.0 + abs(sig) * 0.45)) * 0.68;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.30 0.36
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Pulsar Train Formant Synth. Windowed pulsar-train synthesizer with independent formant frequency sweep, variable duty cycle, and warm body resonance.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

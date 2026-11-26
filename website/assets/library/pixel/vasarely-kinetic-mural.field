@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Vasarely Kinetic Mural",
+    "author": "Infinite",
+    "description": "Ceramic architectural tile grid with sweeping kinetic curved cutouts in ochre-gold, burnt sienna, and deep charcoal.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float gridSize = 18.0 [8.0, 32.0];\nparam float curveAmp = 0.42 [0.1, 0.9];\nparam float grout = 0.06 [0.01, 0.15];\nparam float speed = 0.22 [0.0, 1.0];\nparam float warmth = 0.78 [0.2, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\ncellId = floor(uv * gridSize);\ncellUv = fract(uv * gridSize);\ngroutMask = step(grout, cellUv.x) * step(grout, cellUv.y) * step(cellUv.x, 1.0 - grout) * step(cellUv.y, 1.0 - grout);\n\n# Sample center of each ceramic tile for crisp mosaic look\ntc = (cellId + 0.5) / gridSize;\ntp = vec2((tc.x - 0.5) * aspect, tc.y - 0.5);\n\nband1 = sin(tp.x * 7.5 + cos(tp.y * 5.2 + t * speed) * curveAmp * 3.0);\nband2 = cos(tp.y * 6.5 - sin(tp.x * 4.8 - t * speed * 0.7) * curveAmp * 2.6);\nzone = band1 * 0.6 + band2 * 0.4;\n\ncCharcoal = vec3(0.090, 0.082, 0.075);\ncSienna = vec3(0.549, 0.290, 0.153);\ncAmber = vec3(0.722, 0.478, 0.239);\ncGold = vec3(0.875, 0.769, 0.259);\n\ntileCol = mix(cCharcoal, cSienna, smoothstep(-0.35, -0.05, zone));\ntileCol = mix(tileCol, cAmber, smoothstep(0.02, 0.35, zone));\ntileCol = mix(tileCol, cGold, smoothstep(0.32, 0.68, zone) * warmth);\n\n# Subtle ceramic glaze sheen per tile\nsheen = 0.92 + 0.08 * sin(cellId.x * 12.7 + cellId.y * 31.3);\ncol = mix(cCharcoal * 0.65, tileCol * sheen, groutMask);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "gridSize": 18.0,
+      "curveAmp": 0.42,
+      "grout": 0.06,
+      "speed": 0.22,
+      "warmth": 0.78
+    }
+  }
+}

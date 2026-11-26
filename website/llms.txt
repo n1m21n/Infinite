@@ -405,6 +405,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Clavinet D6 Pickup Synth](https://infinitedevices.org/library/clavinet-d6-pickup-synth.html): Physical-modeled Hohner Clavinet D6 with damped string tangent strike, asymmetric dual-coil magnetic pickup comb filtering, and warm preamp grit. (file: https://infinitedevices.org/assets/templates/clavinet-d6-pickup-synth.inf)
 - [Bowed Bar Marimba Synth](https://infinitedevices.org/library/bowed-bar-marimba-synth.html): Modal rosewood bar percussion and bowed-mallet synthesizer with four tuned non-harmonic overtones, tremolo bow excitation, and resonant tube body filter. (file: https://infinitedevices.org/assets/templates/bowed-bar-marimba-synth.inf)
 - [Wavefolder Tape Saturator FX](https://infinitedevices.org/library/wavefolder-tape-saturator-fx.html): Asymmetric triode-tape soft-clipping saturator paired with a Lockhart sine wavefolder stage, pre-emphasis tilt, and dynamic bias sag. (file: https://infinitedevices.org/assets/templates/wavefolder-tape-saturator-fx.inf)
+- [Reed Clarinet Waveguide Synth](https://infinitedevices.org/library/reed-clarinet-waveguide-synth.html): Physical-modeled woodwind synthesizer coupling a nonlinear cubic reed pressure valve to a cylindrical bore delay resonator and breath exciter. (file: https://infinitedevices.org/assets/templates/reed-clarinet-waveguide-synth.inf)
+- [Pulsar Train Formant Synth](https://infinitedevices.org/library/pulsar-train-formant-synth.html): Windowed pulsar-train synthesizer with independent formant frequency sweep, variable duty cycle, and warm body resonance. (file: https://infinitedevices.org/assets/templates/pulsar-train-formant-synth.inf)
+- [Diode Ladder Overdrive FX](https://infinitedevices.org/library/diode-ladder-overdrive-fx.html): Four-stage nonlinear diode ladder lowpass filter with asymmetric input saturation, resonant feedback, and dry-wet blend. (file: https://infinitedevices.org/assets/templates/diode-ladder-overdrive-fx.inf)
+- [Envelope SVF Autofilter FX](https://infinitedevices.org/library/envelope-svf-autofilter-fx.html): Dual-ballistics envelope follower sweeping a resonant state-variable bandpass and lowpass filter with harmonic warmth. (file: https://infinitedevices.org/assets/templates/envelope-svf-autofilter-fx.inf)
 
 ## Library: Community
 
@@ -828,7 +832,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 153 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 155 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -845,4 +849,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 138 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 140 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

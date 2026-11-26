@@ -672,6 +672,14 @@
   "embeds/voronoi-basalt-caustics.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/moire-optical-fringes.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/vasarely-kinetic-mural.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

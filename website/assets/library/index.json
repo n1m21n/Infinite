@@ -13623,7 +13623,227 @@
       "file": "assets/library/pixel/voronoi-basalt-caustics.field",
       "preview": "assets/library/previews/voronoi-basalt-caustics.jpg",
       "bytes": 1740
+    },
+    {
+      "id": "vasarely-sophia-contour-shift",
+      "name": "Vasarely Sophia Contour Shift",
+      "kind": "Generator",
+      "tags": [
+        "vasarely",
+        "op-art",
+        "kinetic",
+        "contour",
+        "relief",
+        "monochrome",
+        "sketch"
+      ],
+      "description": "Kinetic black-on-ivory parallel line relief with stepped diagonal and circular contour displacements framed in brutalist concrete.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/vasarely-sophia-contour-shift.js",
+      "preview": "assets/library/previews/vasarely-sophia-contour-shift.jpg",
+      "bytes": 3040
+    },
+    {
+      "id": "lewitt-polychrome-wall-planes",
+      "name": "LeWitt Polychrome Wall Planes",
+      "kind": "Generator",
+      "tags": [
+        "lewitt",
+        "minimalism",
+        "polychrome",
+        "geometric",
+        "architecture",
+        "wall-drawing",
+        "sketch"
+      ],
+      "description": "Intersecting architectural wall planes in matte vermilion, cobalt, emerald, and violet with fine drafting registration lines.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/lewitt-polychrome-wall-planes.js",
+      "preview": "assets/library/previews/lewitt-polychrome-wall-planes.jpg",
+      "bytes": 3650
+    },
+    {
+      "id": "calatrava-ribbed-skylight-3d",
+      "name": "Calatrava Ribbed Skylight 3D",
+      "kind": "Generator",
+      "tags": [
+        "calatrava",
+        "architecture",
+        "vault",
+        "skylight",
+        "ribs",
+        "3d",
+        "sketch"
+      ],
+      "description": "Sweeping white steel structural arches framing recessed sea-glass skylight coffers over a dark basalt concourse plinth.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/calatrava-ribbed-skylight-3d.js",
+      "preview": "assets/library/previews/calatrava-ribbed-skylight-3d.jpg",
+      "bytes": 1816
+    },
+    {
+      "id": "schroeder-qrd-diffuser-3d",
+      "name": "Schroeder QRD Diffuser 3D",
+      "kind": "Generator",
+      "tags": [
+        "schroeder",
+        "qrd",
+        "acoustics",
+        "diffuser",
+        "timber",
+        "modular",
+        "3d",
+        "sketch"
+      ],
+      "description": "Two-dimensional quadratic residue acoustic diffuser skyline of Baltic birch and walnut timber wells following prime N=17 modular depths.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/schroeder-qrd-diffuser-3d.js",
+      "preview": "assets/library/previews/schroeder-qrd-diffuser-3d.jpg",
+      "bytes": 1137
+    },
+    {
+      "id": "reed-clarinet-waveguide-synth",
+      "name": "Reed Clarinet Waveguide Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "waveguide",
+        "pulsar",
+        "formant",
+        "audio",
+        "dsp"
+      ],
+      "description": "Physical-modeled woodwind synthesizer coupling a nonlinear cubic reed pressure valve to a cylindrical bore delay resonator and breath exciter.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/reed-clarinet-waveguide-synth.inf",
+      "preview": "assets/library/previews/reed-clarinet-waveguide-synth.jpg",
+      "bytes": 2412
+    },
+    {
+      "id": "pulsar-train-formant-synth",
+      "name": "Pulsar Train Formant Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "waveguide",
+        "pulsar",
+        "formant",
+        "audio",
+        "dsp"
+      ],
+      "description": "Windowed pulsar-train synthesizer with independent formant frequency sweep, variable duty cycle, and warm body resonance.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/pulsar-train-formant-synth.inf",
+      "preview": "assets/library/previews/pulsar-train-formant-synth.jpg",
+      "bytes": 2342
+    },
+    {
+      "id": "diode-ladder-overdrive-fx",
+      "name": "Diode Ladder Overdrive FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "diode",
+        "ladder",
+        "svf",
+        "autofilter",
+        "audio",
+        "dsp"
+      ],
+      "description": "Four-stage nonlinear diode ladder lowpass filter with asymmetric input saturation, resonant feedback, and dry-wet blend.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/diode-ladder-overdrive-fx.inf",
+      "preview": "assets/library/previews/diode-ladder-overdrive-fx.jpg",
+      "bytes": 2096
+    },
+    {
+      "id": "envelope-svf-autofilter-fx",
+      "name": "Envelope SVF Autofilter FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "diode",
+        "ladder",
+        "svf",
+        "autofilter",
+        "audio",
+        "dsp"
+      ],
+      "description": "Dual-ballistics envelope follower sweeping a resonant state-variable bandpass and lowpass filter with harmonic warmth.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/envelope-svf-autofilter-fx.inf",
+      "preview": "assets/library/previews/envelope-svf-autofilter-fx.jpg",
+      "bytes": 2131
+    },
+    {
+      "id": "moire-optical-fringes",
+      "name": "Moire Optical Fringes",
+      "kind": "Generator",
+      "tags": [
+        "moire",
+        "interference",
+        "optics",
+        "monochrome",
+        "halide",
+        "pixel",
+        "shader"
+      ],
+      "description": "Concentric silver-halide optical interference fringes with dual-center curvature warp and fine emulsion grain.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/moire-optical-fringes.field",
+      "preview": "assets/library/previews/moire-optical-fringes.jpg",
+      "bytes": 1563
+    },
+    {
+      "id": "vasarely-kinetic-mural",
+      "name": "Vasarely Kinetic Mural",
+      "kind": "Generator",
+      "tags": [
+        "vasarely",
+        "mural",
+        "tiles",
+        "kinetic",
+        "ochre",
+        "sienna",
+        "pixel",
+        "shader"
+      ],
+      "description": "Ceramic architectural tile grid with sweeping kinetic curved cutouts in ochre-gold, burnt sienna, and deep charcoal.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/vasarely-kinetic-mural.field",
+      "preview": "assets/library/previews/vasarely-kinetic-mural.jpg",
+      "bytes": 1760
     }
   ],
-  "count": 659
+  "count": 669
 }

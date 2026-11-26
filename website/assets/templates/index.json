@@ -4066,7 +4066,73 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "reed-clarinet-waveguide-synth",
+      "name": "Reed Clarinet Waveguide Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Physical-modeled woodwind synthesizer coupling a nonlinear cubic reed pressure valve to a cylindrical bore delay resonator and breath exciter.",
+      "price": 0,
+      "preview": "assets/templates/reed-clarinet-waveguide-synth.webp",
+      "file": "assets/templates/reed-clarinet-waveguide-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "pulsar-train-formant-synth",
+      "name": "Pulsar Train Formant Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Windowed pulsar-train synthesizer with independent formant frequency sweep, variable duty cycle, and warm body resonance.",
+      "price": 0,
+      "preview": "assets/templates/pulsar-train-formant-synth.webp",
+      "file": "assets/templates/pulsar-train-formant-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "diode-ladder-overdrive-fx",
+      "name": "Diode Ladder Overdrive FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Four-stage nonlinear diode ladder lowpass filter with asymmetric input saturation, resonant feedback, and dry-wet blend.",
+      "price": 0,
+      "preview": "assets/templates/diode-ladder-overdrive-fx.webp",
+      "file": "assets/templates/diode-ladder-overdrive-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "envelope-svf-autofilter-fx",
+      "name": "Envelope SVF Autofilter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-ballistics envelope follower sweeping a resonant state-variable bandpass and lowpass filter with harmonic warmth.",
+      "price": 0,
+      "preview": "assets/templates/envelope-svf-autofilter-fx.webp",
+      "file": "assets/templates/envelope-svf-autofilter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
-  "count": 248
+  "count": 252
 }

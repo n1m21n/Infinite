@@ -765,6 +765,16 @@
       "slug": "voronoi-basalt-caustics",
       "title": "Voronoi Basalt Caustics",
       "description": "Audio-reactive columnar basalt fracture cells with refracted water caustics. Bass pulses cell relief, mids warp caustics, highs brighten edge glint."
+    },
+    {
+      "slug": "moire-optical-fringes",
+      "title": "Moire Optical Fringes",
+      "description": "Audio-reactive concentric Moire optical interference fringes with silver-halide grain."
+    },
+    {
+      "slug": "vasarely-kinetic-mural",
+      "title": "Vasarely Kinetic Mural",
+      "description": "Audio-reactive Vasarely-inspired kinetic ceramic tile mural in ochre-gold and burnt sienna."
     }
   ]
 }

@@ -5260,6 +5260,213 @@
         "gain": -10.0
       },
       "groove": 0.35
+    },
+    {
+      "id": "reed_clarinet_waveguide",
+      "family": "experimental",
+      "bpm": [
+        84,
+        108
+      ],
+      "swing": 0.04,
+      "scale": [
+        4,
+        1
+      ],
+      "drums": {},
+      "bass": "0.....3.0.....5.",
+      "fx": [
+        "Field Effect",
+        "Reverb",
+        "Delay"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.35,
+      "refs": [
+        "Nonlinear cubic reed pressure table coupled to cylindrical bore waveguide"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 12.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.4,
+        "octave": 2,
+        "gate": 75,
+        "gain": -10.0
+      },
+      "groove": 0.3
+    },
+    {
+      "id": "pulsar_train_formant",
+      "family": "experimental",
+      "bpm": [
+        100,
+        124
+      ],
+      "swing": 0.02,
+      "scale": [
+        6,
+        9
+      ],
+      "drums": {},
+      "bass": "0..2..4.0..5..7.",
+      "fx": [
+        "Field Effect",
+        "Delay",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.05,
+      "mod": 0.45,
+      "refs": [
+        "Curtis Roads pulsar synthesis with windowed formant bursts and duty-cycle sweep"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 8.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.5,
+        "octave": 2,
+        "gate": 65,
+        "gain": -10.0
+      },
+      "groove": 0.4
+    },
+    {
+      "id": "diode_ladder_overdrive",
+      "family": "techno",
+      "bpm": [
+        116,
+        132
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        5
+      ],
+      "drums": {},
+      "bass": "0.0.3.0.5.0.7.3.",
+      "fx": [
+        "Field Effect",
+        "Audio Filter",
+        "Drive"
+      ],
+      "synth": [
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.5,
+      "refs": [
+        "Four-stage nonlinear tanh diode ladder filter with asymmetric drive"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "steps": 4,
+        "strum": 5.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.55,
+        "octave": 1,
+        "gate": 55,
+        "gain": -10.0
+      },
+      "groove": 0.4
+    },
+    {
+      "id": "envelope_svf_autofilter",
+      "family": "house",
+      "bpm": [
+        112,
+        124
+      ],
+      "swing": 0.08,
+      "scale": [
+        4,
+        10
+      ],
+      "drums": {},
+      "bass": "0..0.2..3..5.3..",
+      "fx": [
+        "Field Effect",
+        "Delay",
+        "Chorus"
+      ],
+      "synth": [
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.55,
+      "refs": [
+        "Dual-ballistics envelope follower sweeping resonant state-variable filter"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 10.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.5,
+        "octave": 2,
+        "gate": 60,
+        "gain": -10.0
+      },
+      "groove": 0.45
     }
   ]
 }

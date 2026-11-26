@@ -2910,6 +2910,185 @@
         "Josef Albers Homage to the Square (1950-1976) asymmetrical nested chromatic planes",
         "Cabinet Grotesk (Fontshare) & Fragment Mono (Uncut) Bauhaus gallery type"
       ]
+    },
+    {
+      "id": "vasarely_sophia_relief",
+      "taxonomy": "new",
+      "name": "Vasarely Sophia Kinetic Contour Relief",
+      "palette": [
+        "#8E8B84",
+        "#F2F1EC",
+        "#141517",
+        "#4F4D48"
+      ],
+      "sources": [
+        "Sketch 2D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "bloom",
+        "glitch"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "pulsar_train_formant"
+      ],
+      "refs": [
+        "Victor Vasarely Sophia (1954) UCV architectural black-on-ivory line-shift relief",
+        "Steps Mono (Velvetyne) & Commit Mono (Uncut) brutalist kinetic type"
+      ]
+    },
+    {
+      "id": "lewitt_polychrome_planes",
+      "taxonomy": "new",
+      "name": "LeWitt Polychrome Wall Planes",
+      "palette": [
+        "#E62A14",
+        "#1A82E0",
+        "#14961B",
+        "#58328C"
+      ],
+      "sources": [
+        "Sketch 2D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "bloom",
+        "glitch"
+      ],
+      "motion": 0.15,
+      "pairs": [
+        "reed_clarinet_waveguide"
+      ],
+      "refs": [
+        "Sol LeWitt Wall Drawing 831 (Geometric Forms) matte polychrome wall planes",
+        "Clash Display (Fontshare) & Azeret Mono (Fontshare) architectural exhibition type"
+      ]
+    },
+    {
+      "id": "calatrava_ribbed_vault",
+      "taxonomy": "new",
+      "name": "Calatrava Ribbed Steel & Glass Vault",
+      "palette": [
+        "#14181D",
+        "#F4F5F2",
+        "#5E8894",
+        "#263B44"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "envelope_svf_autofilter"
+      ],
+      "refs": [
+        "Santiago Calatrava Liege-Guillemins station white steel ribs and sea-glass coffers",
+        "Cabinet Grotesk (Fontshare) & Fragment Mono (Uncut) structural engineering type"
+      ]
+    },
+    {
+      "id": "schroeder_qrd_columns",
+      "taxonomy": "new",
+      "name": "Schroeder QRD Timber Acoustic Diffuser",
+      "palette": [
+        "#181412",
+        "#D8B98A",
+        "#8C5E3C",
+        "#3B281A"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "bloom"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "diode_ladder_overdrive"
+      ],
+      "refs": [
+        "Manfred Schroeder quadratic-residue prime N=17 timber acoustic diffuser skyline",
+        "Steps Mono (Velvetyne) & Azeret Mono (Fontshare) studio acoustics type"
+      ]
+    },
+    {
+      "id": "moire_optical_fringes",
+      "taxonomy": "new",
+      "name": "Moire Mirror Curvature Interference",
+      "palette": [
+        "#181A1C",
+        "#6D7175",
+        "#D9DCE0",
+        "#3D4147"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "bloom"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "envelope_svf_autofilter"
+      ],
+      "refs": [
+        "Optical mirror curvature inspection by concentric Moire interference fringes",
+        "Steps Mono (Velvetyne) & Martian Mono (Uncut) metrology optics type"
+      ]
+    },
+    {
+      "id": "vasarely_kinetic_mural",
+      "taxonomy": "new",
+      "name": "Vasarely UCV Kinetic Tile Mural",
+      "palette": [
+        "#171513",
+        "#DFC442",
+        "#8C4A27",
+        "#B87A3D"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.3,
+      "pairs": [
+        "pulsar_train_formant"
+      ],
+      "refs": [
+        "Victor Vasarely UCV ceramic tile mural in ochre-gold, burnt sienna, and charcoal",
+        "Terminal Grotesque (Velvetyne) & Azeret Mono (Fontshare) modernist mural type"
+      ]
     }
   ]
 }
