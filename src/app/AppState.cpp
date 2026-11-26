@@ -1637,6 +1637,11 @@ bool gHeadlessNeedProbe = false;
 
    std::deque<UndoEntry> gRedoStack;
 
+   HistoryOptions gHistoryOptions;
+   std::string gHistoryStartLabel = "New";
+   unsigned long long gHistoryDropped = 0;
+   HistoryRollback gHistoryRollback;
+
    PendingAutoLayout gPendingAutoLayout;
 
    PendingKeyed gPendingKeyed;

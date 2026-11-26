@@ -3,6 +3,8 @@
 // layers; the nodes themselves are only read, so a layer keeps animating under
 // whatever is stacked on top of it. Plan: internal/plans/2d-view/README.md.
 #include "ColorSpace.h"
+#include <ctime>
+#include <filesystem>
 #include "app/AppCommon.h"
 #include "app/ui/design/ColourMath.h"
 #include "app/graph/NodeParams.h"
@@ -50,6 +52,7 @@
 #include "nodes/OutputNode.h"
 #include "nodes/PredictiveColoringNode.h"
 #include "nodes/Scene2DNode.h"
+#include "nodes/ArtHistory.h"
 #include "nodes/SketchNode.h"
 #include "nodes/TextNode.h"
 #include "nodes/ModelSourceNode.h"
@@ -344,6 +347,7 @@ namespace
    float sCropAngle = 0.0f;           // the box's turn about its centre, degrees clockwise on screen (Straighten)
    bool sCropStraighten = false;      // the next crop drag draws a line to level, not a box
    const int kCropStraightenDrag = -2;   // sOp.cropHandle while that line is drawn
+   Scene2DNode::ArtOptions sArt;      // History Brush: Art History (posed dabs from the History source)
    bool sEraseHistory = false;        // eraser: paints back to the History source instead of erasing (Photoshop)
    bool sShapeSnap = true;            // brush and eraser: hold at the end of a stroke to make it a clean shape
    float sVecFillGap = Scene2DNode::kVectorFillGap;   // vector bucket: gaps between lines up to this many px count as closed
@@ -855,7 +859,7 @@ namespace
       bool changed = false;
       const bool linked = doc->LinkLayers(sSel, want, &changed);
       if (!changed)
-         gUndoStack.resize(undo0);
+         RollbackUndoTo(undo0);
       else
          sDirty = true;
       return linked;
@@ -1003,7 +1007,7 @@ namespace
          const size_t undo0 = gUndoStack.size();
          PushUndoCheckpoint("Nudge selection");
          if (!LiftSelection(doc))
-            gUndoStack.resize(undo0);
+            RollbackUndoTo(undo0);
          else
          {
             if (Layer* f = doc->FindLayer(sSel.front()))
@@ -2988,7 +2992,7 @@ namespace
          PushUndoCheckpoint(how == 0 ? "Clear" : "Fill");
          const bool ok = doc->FillFilterMask(fa->id, g);
          if (!ok)
-            gUndoStack.resize(undo0);
+            RollbackUndoTo(undo0);
          Touch();
          return ok;
       }
@@ -3212,7 +3216,7 @@ namespace
          PushUndoCheckpoint("Free transform");
          if (!LiftSelection(doc))
          {
-            gUndoStack.resize(undo0);
+            RollbackUndoTo(undo0);
             return;
          }
       }
@@ -3223,7 +3227,7 @@ namespace
       {
          DropFloat(doc);
          if (lift)
-            gUndoStack.resize(undo0);
+            RollbackUndoTo(undo0);
          return;
       }
       sFreeT.doc = doc;
@@ -3248,8 +3252,8 @@ namespace
             if (Layer* l = doc->FindLayer(b.id))
                *l = b;
          DropFloat(doc);   // back where it was lifted: the layer gets its own pixels back
-         while (sFreeT.undo0 != (size_t)-1 && gUndoStack.size() > sFreeT.undo0)
-            gUndoStack.pop_back();
+         if (sFreeT.undo0 != (size_t)-1)
+            RollbackUndoTo(sFreeT.undo0);
          Touch();
       }
       else
@@ -3271,8 +3275,8 @@ namespace
          if (Layer* l = doc->FindLayer(sOp.l0.id))
             if (std::none_of(sOp.before.begin(), sOp.before.end(), [&](const Layer& b) { return b.id == l->id; }))
                *l = sOp.l0;
-         while (sOp.undo0 != (size_t)-1 && gUndoStack.size() > sOp.undo0)
-            gUndoStack.pop_back();
+         if (sOp.undo0 != (size_t)-1)
+            RollbackUndoTo(sOp.undo0);
          Touch();
       }
       else if (k == 5)
@@ -3534,7 +3538,7 @@ namespace
             PushUndoCheckpoint("Crop document");
             if (!ApplyCrop(doc))
             {
-               gUndoStack.resize(undo0);
+               RollbackUndoTo(undo0);
                return;
             }
             sCropOn = false;
@@ -4050,7 +4054,7 @@ namespace
       PushUndoCheckpoint("Remove Tool");
       if (doc->Remove(a->id, strokes, sAllLayers, sRemoveNewLayer, sRemoveAi) == 0)
       {
-         gUndoStack.resize(undo0);
+         RollbackUndoTo(undo0);
          return;
       }
       Touch();
@@ -4289,9 +4293,59 @@ namespace
       PushUndoCheckpoint("Fill from History");
       const bool ok = doc->FillFromHistory(a->id, opacity);
       if (!ok)
-         gUndoStack.resize(undo0);
+         RollbackUndoTo(undo0);
       Touch();
       return ok;
+   }
+
+   uint64_t UidOf(const Scene2DNode* doc)
+   {
+      for (const GraphNode& gn : gNodes)
+         if (gn.node.get() == doc)
+            return gn.uid;
+      return 0;
+   }
+
+   // History Options > Make Layer Visibility Changes Undoable off: a layer's eye changes the document but is no
+   // step, and stepping through History keeps it. Each such eye is kept here (document uid -> layer -> shown) and laid
+   // back over whatever state Undo or Redo brings back; a snapshot gone to takes its own eyes.
+   std::map<uint64_t, std::map<int, bool>> sUnrecordedVis;
+
+   // The eye of one layer, as a step or not as History Options say. label: the step's name when it is one.
+   void SetLayerVisible(Scene2DNode* doc, Layer* l, bool on, const char* label)
+   {
+      if (l == nullptr || l->visible == on)
+         return;
+      const uint64_t uid = UidOf(doc);
+      if (gHistoryOptions.visibilityUndoable)
+      {
+         if (label != nullptr)
+            PushUndoCheckpoint(label);
+         sUnrecordedVis[uid].erase(l->id);
+      }
+      else
+      {
+         sUnrecordedVis[uid][l->id] = on;
+         gPatchDirty = true;   // the document changed, History did not
+      }
+      l->visible = on;
+      doc->Commit();
+   }
+
+   // The name a document's first snapshot takes: its patch file, as Photoshop names it after the file.
+   std::string DocName()
+   {
+      return gPatchPath.empty() ? std::string(T("Untitled")) : std::filesystem::path(gPatchPath).stem().string();
+   }
+
+   // History Options > Automatically Create First Snapshot: once, when the document is first shown.
+   void EnsureFirstSnapshot(Scene2DNode* doc)
+   {
+      if (doc == nullptr || doc->FirstSnapshotDone())
+         return;
+      doc->MarkFirstSnapshotDone();
+      if (gHistoryOptions.firstSnapshot)
+         doc->SetHistorySource(doc->AddSnapshot(DocName()));   // the History Brush starts from the opened document
    }
 
    // Go To a snapshot: one undoable step, none when the document already is the snapshot.
@@ -4304,9 +4358,28 @@ namespace
       const std::string was = doc->DocText();
       const bool ok = doc->RestoreSnapshot(i);
       if (!ok || doc->DocText() == was)
-         gUndoStack.resize(undo0);
+         RollbackUndoTo(undo0);
+      else
+         sUnrecordedVis.erase(UidOf(doc));   // the snapshot's own eyes now; Undo brings the hidden ones back
       Touch();
       return ok;
+   }
+
+   // New Snapshot: asks for a name first when History Options say so (or Alt is held, as in Photoshop).
+   std::string sSnapName;
+   bool sSnapNameOpen = false, sSnapReplace = false;
+
+   // New Snapshot: straight away, or through the name dialog. True when it was added at once.
+   bool BeginNewSnapshot(Scene2DNode* doc, bool alt)
+   {
+      if (gHistoryOptions.newSnapshotDialog != alt)   // Alt flips it, as Photoshop's Alt-click on the button does
+      {
+         sSnapName = std::string(T("Snapshot")) + " " + std::to_string(doc->Snapshots().size() + 1);
+         sSnapNameOpen = true;
+         return false;
+      }
+      doc->AddSnapshot("");
+      return true;
    }
 
    // History snapshots (Photoshop's History panel top): the document at a moment, for this session.
@@ -4315,7 +4388,7 @@ namespace
       if (!MenuParts::SubMenu(T("Snapshots")))
          return;
       if (MenuParts::Item(T("New Snapshot")))
-         doc->AddSnapshot("");
+         BeginNewSnapshot(doc, ImGui::GetIO().KeyAlt);
       static int sSnapFrame = 1 << 30;
       if (MenuParts::Item(T("New Snapshot of Merged Layers")))
          doc->AddSnapshotFrom("", Scene2DNode::SnapFrom::Merged, 0, ++sSnapFrame);
@@ -4348,6 +4421,34 @@ namespace
          doc->SetHistorySource(src);
       if (del >= 0)
          doc->DeleteSnapshot(del);
+   }
+
+   // The New Snapshot dialog: a name, and Replace for a snapshot already of that name.
+   void SnapshotNameDialog(Scene2DNode* doc)
+   {
+      if (sSnapNameOpen)
+      {
+         ImGui::OpenPopup("##v2dsnapname");
+         sSnapNameOpen = false;
+      }
+      if (!MenuParts::BeginPopup("##v2dsnapname"))
+         return;
+      static char sBuf[sizeof sRenameBuf] = {};
+      if (ImGui::IsWindowAppearing())
+      {
+         std::snprintf(sBuf, sizeof sBuf, "%s", sSnapName.c_str());
+         UiInteract::FocusHere();
+      }
+      ImGui::TextUnformatted(T("New Snapshot"));
+      const bool enter = FieldWell::InputText("##v2dsnapnamefield", sBuf, sizeof sBuf, ImGuiInputTextFlags_EnterReturnsTrue);
+      MenuParts::Check(T("Replace existing"), &sSnapReplace);
+      const bool ok = ActionButton::Draw(T("Save"), ImVec2(0.0f, 0.0f), ActionButton::Kind::Plain);
+      if ((ok || enter) && doc != nullptr)
+      {
+         doc->AddSnapshot(sBuf, sSnapReplace);
+         ImGui::CloseCurrentPopup();
+      }
+      MenuParts::EndPopup();
    }
 
    // Selections kept with the document under a name.
@@ -4563,6 +4664,10 @@ namespace
    // (Photoshop; PhotoCraft erase_locked). The Background Eraser still erases.
    BrushEngine::Brush EraseLocked(Scene2DNode* doc, int id, int target, BrushEngine::Brush b)
    {
+      // Every layer stroke passes here first: the History Brush's Art style applies to its strokes only.
+      Scene2DNode::ArtOptions art = sArt;
+      art.on = sArt.on && sTool == kUndoBrush;
+      doc->SetArtHistory(art);
       const Layer* l = doc->FindLayer(id);
       if (target == 0 && sTool == kEraser && sEraseHistory && b.mode == BrushEngine::kErase && l != nullptr && l->kind == Kind::Paint)
       {
@@ -4617,7 +4722,7 @@ namespace
             Touch();
             return true;
          }
-         gUndoStack.resize(undo0);
+         RollbackUndoTo(undo0);
       }
       Notices::Post(Notices::Level::Warning, "view2d.camove", T("Can't move the selection"), T(err.c_str()));
       return false;
@@ -4816,7 +4921,11 @@ namespace
             const ImVec2 from = line && sHaveLast ? sLastPaint : at;
             const float pen = PenNow(doc);
             if (!doc->BeginPaint(targets[0], 0, EraseLocked(doc, targets[0], 0, b), from.x, from.y, pen))
+            {
+               if (!doc->HistoryRefusal().empty())
+                  Notices::Post(Notices::Level::Warning, "view2d.history", T("Can't paint from History"), doc->HistoryRefusal().c_str());
                return;
+            }
             sOp = Op();
             sOp.kind = 7;
             sOp.docStart = at;
@@ -4944,7 +5053,11 @@ namespace
       b = EraseLocked(doc, id, target, b);
       const ImVec2 from = line && sHaveLast ? sLastPaint : at;
       if (!doc->BeginPaint(id, target, b, from.x, from.y, PenNow(doc)))
+      {
+         if (!doc->HistoryRefusal().empty())
+            Notices::Post(Notices::Level::Warning, "view2d.history", T("Can't paint from History"), doc->HistoryRefusal().c_str());
          return;
+      }
       if (painter && !BrushEngine::LiquifyMode(b.mode))
          NoteColourUsed(sFg);
       sOp = Op();
@@ -5099,7 +5212,7 @@ namespace
          {
             doc->RemoveLayer(id);
             SelectOnly(wasId);
-            gUndoStack.resize(undo0);   // nothing landed: no step
+            RollbackUndoTo(undo0);   // nothing landed: no step
          }
          Touch();
          return;
@@ -5115,7 +5228,7 @@ namespace
          landed = BucketNow(doc, id, at, sAllLayers);
       if (!landed)
       {
-         gUndoStack.resize(undo0);   // off the layer, or hidden by the selection: no step
+         RollbackUndoTo(undo0);   // off the layer, or hidden by the selection: no step
          return;
       }
       NoteColourUsed(sFg);
@@ -5803,7 +5916,7 @@ namespace
          PushUndoCheckpoint(vertical ? "Flip vertical" : "Flip horizontal");
          lift = LiftSelection(doc);
          if (!lift)
-            gUndoStack.resize(undo0);   // nothing lifted: the whole layer turns, under its own step
+            RollbackUndoTo(undo0);   // nothing lifted: the whole layer turns, under its own step
       }
       float lo[2], hi[2];
       if (!PivotBounds(doc, lo, hi))
@@ -5849,7 +5962,7 @@ namespace
          PushUndoCheckpoint("Rotate selection");
          lift = LiftSelection(doc);
          if (!lift)
-            gUndoStack.resize(undo0);   // nothing lifted: the whole layer turns, under its own step
+            RollbackUndoTo(undo0);   // nothing lifted: the whole layer turns, under its own step
       }
       float lo[2], hi[2];
       if (!PivotBounds(doc, lo, hi))
@@ -7643,8 +7756,7 @@ namespace
          PruneSelection(doc);
          // A text box left empty was never made: its undo step goes with it.
          if (sTextNew)
-            while (gUndoStack.size() > sTextUndo0)
-               gUndoStack.pop_back();
+            RollbackUndoTo(sTextUndo0);
       }
       sTextNew = sTextStep = false;
    }
@@ -7905,8 +8017,7 @@ namespace
          Touch();
       if (sLiveDlg == 0 && V2DepthTick(doc))   // an agent's Depth Select whose map was still being made
          Touch();
-      if (doc->Snapshots().empty())
-         doc->AddSnapshot(T("Opened"));   // Photoshop keeps the opened state as the first snapshot
+      EnsureFirstSnapshot(doc);   // Photoshop keeps the opened state as the first snapshot, named after the document
       // A live selection dialog whose bar is gone (another tool, another panel layout) is cancelled.
       if (sLiveDlg != 0 && ImGui::GetFrameCount() - sLiveFrame > 2)
          LiveClose(doc, false);
@@ -8110,6 +8221,7 @@ namespace
       
          }
       }
+      SnapshotNameDialog(doc);   // outside the menu, which has closed by the time it shows
       const ImVec2 mp = ImGui::GetIO().MousePos;
       const bool inEditor = sTextEdit != 0 && mp.x >= sEditMn.x && mp.x <= sEditMx.x && mp.y >= sEditMn.y && mp.y <= sEditMx.y;
       const bool onAsk = sRasterAsk != 0 && mp.x >= sRasterAskMn.x && mp.x <= sRasterAskMx.x && mp.y >= sRasterAskMn.y && mp.y <= sRasterAskMx.y;
@@ -8929,7 +9041,7 @@ namespace
                if (LiftSelection(doc))
                   BeginOp(doc, 1, mouse, nullptr);
                else
-                  gUndoStack.resize(undo0);
+                  RollbackUndoTo(undo0);
             }
             else
             {
@@ -9386,7 +9498,7 @@ namespace
             if (doc->GrowSelection(i == 1, sTolerance, sAllLayers, al != nullptr ? al->id : 0))
                Touch();
             else
-               gUndoStack.resize(undo0);
+               RollbackUndoTo(undo0);
          }
       }
       FormParts::Inline(0.0f, tok::space_1);
@@ -9566,7 +9678,7 @@ namespace
             Touch();
          }
          else
-            gUndoStack.resize(undo0);
+            RollbackUndoTo(undo0);
       }
       MenuParts::EndPopup();
    }
@@ -10118,7 +10230,23 @@ namespace
                b.lockAlpha = !b.lockAlpha;
             next();
             static const char* kUndoBlend[7] = { "Normal", "Multiply", "Screen", "Overlay", "Darken", "Lighten", "Difference" };
-            BarCombo("##v2dublend", &b.sourceBlend, kUndoBlend, 7, kWellM);
+            if (!sArt.on)
+               BarCombo("##v2dublend", &b.sourceBlend, kUndoBlend, 7, kWellM);
+            gap();
+            if (TextChip(L("Art##v2duart"), sArt.on, nullptr))
+               sArt.on = !sArt.on;
+            if (sArt.on)
+            {
+               next();
+               static const char* kArtStyles[ArtHistory::kStyleCount];
+               for (int i = 0; i < ArtHistory::kStyleCount; i++)
+                  kArtStyles[i] = ArtHistory::StyleName((ArtHistory::Style)i);
+               BarCombo("##v2dartstyle", &sArt.style, kArtStyles, ArtHistory::kStyleCount, kWellL);
+               next();
+               BarSlider("##v2dartarea", &sArt.area, 0.0f, Scene2DNode::kArtAreaMax, "Area %.0f px", kWellL);
+               next();
+               BarSlider("##v2darttol", &sArt.tolerance, 0.0f, 1.0f, "Tolerance %.2f", kWellL);
+            }
          }
          if (sTool == kSharpen)
          {
@@ -12019,7 +12147,7 @@ namespace
       const int keep = doc->CombineShapeLayers(sSel, op);
       if (keep == 0)
       {
-         gUndoStack.resize(undo0);
+         RollbackUndoTo(undo0);
          return;
       }
       sSel = { keep };
@@ -12454,7 +12582,7 @@ namespace
                sNeedFit = true;
             }
             else
-               gUndoStack.resize(undo0);
+               RollbackUndoTo(undo0);
          }
          next();
          if (TextChip(L("Cancel##v2dcropno"), false, T("Esc")))
@@ -12741,8 +12869,7 @@ namespace
                doc->soloLayer = doc->soloLayer == id ? 0 : id;
             else
             {
-               PushUndoCheckpoint(l->visible ? "Hide layer" : "Show layer");
-               l->visible = !l->visible;
+               SetLayerVisible(doc, l, !l->visible, l->visible ? "Hide layer" : "Show layer");
                sEyeDrag = l->visible ? 1 : 0;
                Touch();
             }
@@ -12750,7 +12877,7 @@ namespace
          else if (sEyeDrag >= 0 && ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
                   ImGui::IsMouseHoveringRect(ImVec2(p.x + tok::space_1, p.y), ImVec2(p.x + tok::view2d_layer_rows_x_md, p.y + rowH)) && l->visible != (sEyeDrag == 1))
          {
-            l->visible = sEyeDrag == 1;
+            SetLayerVisible(doc, l, sEyeDrag == 1, nullptr);   // the same step as the press that began the drag
             Touch();
          }
          glyph::Draw(dl, ImVec2(p.x + tok::view2d_layer_rows_x_sm, p.y + rowH * 0.5f), tok::icon_control,
@@ -15727,8 +15854,7 @@ namespace
             bool on = l->visible;
             if (CheckBox::Box((base + "on").c_str(), &on))
             {
-               PushUndoCheckpoint(on ? "Show adjustment" : "Hide adjustment");
-               l->visible = on;
+               SetLayerVisible(doc, l, on, on ? "Show adjustment" : "Hide adjustment");
                Touch();
             }
             if (ImGui::IsItemHovered())
@@ -16368,7 +16494,7 @@ namespace
                if (const int nid = doc->MergeLayers({ a->id }, ++sFlatGroupFrame))
                   SelectOnly(nid);
                else
-                  gUndoStack.resize(undo0);
+                  RollbackUndoTo(undo0);
                Touch();
             }
          break;
@@ -16402,7 +16528,7 @@ namespace
          if (const int nid = doc->MergeLayers(ids, ++sMergeFrame))
             SelectOnly(nid);
          else
-            gUndoStack.resize(undo0);   // a refused merge is no step
+            RollbackUndoTo(undo0);   // a refused merge is no step
          Touch();
          break;
       }
@@ -16469,7 +16595,7 @@ namespace
                   doc->FillFilterMask(src, 0.0f);
             }
             else
-               gUndoStack.resize(undo0);
+               RollbackUndoTo(undo0);
             break;
          }
          // The layer the user picked is the one copied. A new selection already picked the layer it covers; re-targeting
@@ -16567,7 +16693,7 @@ namespace
                sEditFxMask = false;
             }
             else
-               gUndoStack.resize(undo0);
+               RollbackUndoTo(undo0);
          }
          break;
       case Pending::HideSel:
@@ -16589,7 +16715,7 @@ namespace
             sEditFxMask = false;
          }
          else
-            gUndoStack.resize(undo0);
+            RollbackUndoTo(undo0);
          break;
       }
       case Pending::MaskObjects:
@@ -16598,7 +16724,7 @@ namespace
             const size_t undo0 = gUndoStack.size();
             PushUndoCheckpoint("Mask all objects");
             if (!doc->MaskAllObjects(a->id))
-               gUndoStack.resize(undo0);   // the mask lands later, through AiSelectPoll
+               RollbackUndoTo(undo0);   // the mask lands later, through AiSelectPoll
          }
          break;
       case Pending::ApplyMask:
@@ -16609,7 +16735,7 @@ namespace
             if (doc->ApplyPixelMask(a->id))
                sEditMask = sEditFxMask = false;
             else
-               gUndoStack.resize(undo0);
+               RollbackUndoTo(undo0);
          }
          break;
       case Pending::AddFxMask:
@@ -16623,7 +16749,7 @@ namespace
                sEditMask = false;
             }
             else
-               gUndoStack.resize(undo0);
+               RollbackUndoTo(undo0);
          }
          break;
       case Pending::RemoveFxMask:
@@ -16640,7 +16766,7 @@ namespace
             const size_t undo0 = gUndoStack.size();
             PushUndoCheckpoint("Blur filter mask");
             if (!doc->BlurFilterMask(a->id, sFxMaskBlur))
-               gUndoStack.resize(undo0);
+               RollbackUndoTo(undo0);
          }
          break;
       case Pending::InvertMask:
@@ -16649,7 +16775,7 @@ namespace
             const size_t undo0 = gUndoStack.size();
             PushUndoCheckpoint("Invert mask");
             if (!doc->InvertPixelMask(a->id))
-               gUndoStack.resize(undo0);
+               RollbackUndoTo(undo0);
          }
          break;
       case Pending::RemoveMask:
@@ -17002,6 +17128,143 @@ namespace
 }
 
 OutputNode* View2DEnsureOutput() { return EnsureOutputImpl(); }
+
+// ---- History across the patch's undo stack -----------------------------------------------------------------------
+namespace
+{
+   std::map<uint64_t, Scene2DNode::Session> sKeptSessions;
+
+   Scene2DNode* DocByUid(uint64_t uid)
+   {
+      for (GraphNode& gn : gNodes)
+         if (gn.uid == uid)
+            return dynamic_cast<Scene2DNode*>(gn.node.get());
+      return nullptr;
+   }
+}
+
+void KeepDocSessions()
+{
+   sKeptSessions.clear();
+   for (GraphNode& gn : gNodes)
+      if (auto* doc = dynamic_cast<Scene2DNode*>(gn.node.get()))
+         sKeptSessions[gn.uid] = doc->TakeSession();
+}
+
+void RestoreDocSessions()
+{
+   for (auto& [uid, session] : sKeptSessions)
+      if (Scene2DNode* doc = DocByUid(uid))
+         doc->PutSession(session);
+   sKeptSessions.clear();
+   if (gHistoryOptions.visibilityUndoable)
+   {
+      sUnrecordedVis.clear();
+      return;
+   }
+   for (auto& [uid, eyes] : sUnrecordedVis)
+      if (Scene2DNode* doc = DocByUid(uid))
+      {
+         bool changed = false;
+         for (auto& [id, on] : eyes)
+            if (Layer* l = doc->FindLayer(id))
+               if (l->visible != on)
+               {
+                  l->visible = on;
+                  changed = true;
+               }
+         if (changed)
+            doc->Commit();
+      }
+}
+
+void HistoryDiscardedStates(unsigned long long fromDepth)
+{
+   for (GraphNode& gn : gNodes)
+      if (auto* doc = dynamic_cast<Scene2DNode*>(gn.node.get()))
+         if (doc->HistorySource() == Scene2DNode::kSourceState && (unsigned long long)doc->HistorySourceDepth() >= fromDepth)
+         {
+            if (fromDepth == 0)
+               doc->SetHistorySource(-1);   // Purge or Clear: every state went, the brush paints from the current one
+            else
+               doc->DropHistorySource();    // Photoshop: the source state was deleted, the History Brush has none
+         }
+}
+
+void SnapshotDocsOnSave()
+{
+   if (!gHistoryOptions.snapshotOnSave)
+      return;
+   const std::time_t t = std::time(nullptr);
+   char name[16] = {};
+   std::strftime(name, sizeof(name), "%H:%M:%S", std::localtime(&t));
+   for (GraphNode& gn : gNodes)
+      if (auto* doc = dynamic_cast<Scene2DNode*>(gn.node.get()))
+         doc->SnapshotOnSave(name);
+}
+
+namespace
+{
+   // The 2D document text a History row holds for the document `uid`; empty when the row has none of it.
+   std::string StateDocText(int undos, int redos, uint64_t uid)
+   {
+      if (undos == 0 && redos == 0)
+         if (Scene2DNode* doc = DocByUid(uid))
+         {
+            doc->Layers();
+            doc->Commit();
+            return doc->DocText();
+         }
+      Patch::Data data;
+      if (!HistoryStatePatch(undos, redos, data))
+         return std::string();
+      for (const Patch::NodeRecord& rec : data.nodes)
+         if (rec.uid == uid)
+            for (const auto& [key, value] : rec.params)
+               if (key == "s doc")
+                  return Patch::UnescapeText(value);
+      return std::string();
+   }
+}
+
+bool View2DHasDocument() { return FindDoc() != nullptr; }
+
+bool SetHistorySourceFromState(int undos, int redos)
+{
+   Scene2DNode* doc = FindDoc();
+   if (doc == nullptr)
+      return false;
+   const std::string text = StateDocText(undos, redos, UidOf(doc));
+   const long long depth = (long long)HistoryCurrentDepth() - undos + redos;
+   return depth >= 0 && doc->SetHistorySourceText(text, depth);
+}
+
+bool HistorySourceIsState(int undos, int redos)
+{
+   Scene2DNode* doc = FindDoc();
+   return doc != nullptr && doc->HistorySource() == Scene2DNode::kSourceState &&
+          doc->HistorySourceDepth() == (long long)HistoryCurrentDepth() - undos + redos;
+}
+
+bool NewDocumentFromState(int undos, int redos, const std::string& name)
+{
+   Scene2DNode* doc = FindDoc();
+   if (doc == nullptr)
+      return false;
+   const std::string text = StateDocText(undos, redos, UidOf(doc));
+   if (text.empty())
+      return false;
+   GraphNode* from = DocGraphNode();
+   const ImVec2 at = from != nullptr ? NodePos(*from) : ImVec2(0.0f, 0.0f);
+   Scene2DNode* made = MakeDoc(at.x + tok::view2d_ensure_doc_span, at.y, text);   // SpawnNode checkpoints the undo
+   if (made == nullptr)
+      return false;
+   made->MarkFirstSnapshotDone();
+   if (gHistoryOptions.firstSnapshot)
+      made->AddSnapshot(name.empty() ? UndoLabelAt((size_t)std::max(0, undos)) : name);
+   Touch();
+   return true;
+}
 
 bool View2DImportSvg(const std::string& path)
 {
@@ -23237,6 +23500,482 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       doc = FindDoc();
       if (doc == nullptr)
          return fails;
+   }
+   // History Options, history states as the History source, non-linear delete, purge, unrecorded visibility
+   // (ledger History rows). The patch's own undo stacks are set aside for the block and put back after it.
+   {
+      const HistoryOptions optWas = gHistoryOptions;
+      const std::string startWas = gHistoryStartLabel;
+      const unsigned long long droppedWas = gHistoryDropped;
+      const uint64_t docUidWas = sDocUid;
+      const bool dirtyWas = gPatchDirty;
+      std::deque<UndoEntry> keptUndo, keptRedo;
+      std::swap(keptUndo, gUndoStack);
+      std::swap(keptRedo, gRedoStack);
+      gHistoryRollback = HistoryRollback();
+      doc->Layers();
+      doc->Commit();
+      const std::string docTextWas = doc->DocText();
+      const Scene2DNode::Session sessionWas = doc->TakeSession();
+      const float red[3] = { 1, 0, 0 }, blue[3] = { 0, 0, 1 }, green[3] = { 0, 1, 0 };
+      const float mx = doc->Doc().w * 0.5f, my = doc->Doc().h * 0.5f;
+      doc->Deselect();
+      const int hl = doc->AddPaintLayer();
+      const uint64_t uid = UidOf(doc);
+      float c[3] = { 0, 0, 0 };
+      auto reDoc = [&]() {
+         doc = FindDoc();
+         if (doc != nullptr)
+            doc->Layers();
+         return doc != nullptr;
+      };
+      auto colourIs = [&](int ch) { return doc != nullptr && doc->Pick(mx, my, c, 1, hl) && c[ch] > 0.9f && c[(ch + 1) % 3] < 0.1f; };
+      auto fresh = [&]() {
+         gUndoStack.clear();
+         gRedoStack.clear();
+         gHistoryRollback = HistoryRollback();
+      };
+
+      // Options: Photoshop's defaults, kept in the workspace prefs.
+      {
+         const HistoryOptions d;
+         const bool defaults = d.firstSnapshot && !d.snapshotOnSave && !d.nonLinear && !d.newSnapshotDialog && d.visibilityUndoable;
+         gHistoryOptions.firstSnapshot = false;
+         gHistoryOptions.snapshotOnSave = true;
+         gHistoryOptions.nonLinear = true;
+         gHistoryOptions.newSnapshotDialog = true;
+         gHistoryOptions.visibilityUndoable = false;
+         SaveWorkspaceSettings();
+         gHistoryOptions = HistoryOptions();
+         LoadWorkspaceSettings();
+         const HistoryOptions r = gHistoryOptions;
+         const bool trip = !r.firstSnapshot && r.snapshotOnSave && r.nonLinear && r.newSnapshotDialog && !r.visibilityUndoable;
+         gHistoryOptions = optWas;
+         SaveWorkspaceSettings();
+         fprintf(stderr, "PROBE history options: defaults %d round trip %d\n", (int)defaults, (int)trip);
+         expect("parity: defaults match photoshop and round trip through prefs", defaults && trip);
+      }
+      // First snapshot: once per document, named after it, and the History Brush's first source.
+      {
+         gHistoryOptions.firstSnapshot = true;
+         Scene2DNode opened;
+         opened.SetDocText(docTextWas);
+         EnsureFirstSnapshot(&opened);
+         EnsureFirstSnapshot(&opened);
+         const bool on = opened.Snapshots().size() == 1 && opened.Snapshots()[0].name == DocName();
+         const bool src = opened.HistorySource() == 0;
+         gHistoryOptions.firstSnapshot = false;
+         Scene2DNode bare;
+         bare.SetDocText(docTextWas);
+         EnsureFirstSnapshot(&bare);
+         const bool off = bare.Snapshots().empty();
+         gHistoryOptions = optWas;
+         fprintf(stderr, "PROBE history first snapshot: on %d off %d source %d\n", (int)on, (int)off, (int)src);
+         expect("parity: a document starts with a first snapshot of itself", on);
+         expect("parity: first snapshot follows the option on new and open", on && off);
+         expect("parity: default source is the oldest state", src);
+         // The start row keeps its name ("New", or "Open" for an opened file) through Undo and Redo.
+         fresh();
+         PushUndoCheckpoint("label step");
+         const std::string before = gHistoryStartLabel;
+         Undo();
+         reDoc();
+         Redo();
+         const bool kept = reDoc() && gHistoryStartLabel == before && (before == "New" || before == "Open");
+         expect("parity: the first state stays new through undo and redo and is the default brush source", kept && src);
+      }
+      // A History row as the source: undo rows, redo rows until a new step discards them, and as states fall off.
+      {
+         fresh();
+         doc->FillPixels(hl, red, 1.0f);
+         PushUndoCheckpoint("hist red to blue");
+         doc->FillPixels(hl, blue, 1.0f);
+         PushUndoCheckpoint("hist blue to green");
+         doc->FillPixels(hl, green, 1.0f);
+         // Rows: u0 green (now), u1 blue, start red.
+         const bool set = SetHistorySourceFromState(1, 0) && HistorySourceIsState(1, 0);
+         const bool paints = doc->FillFromHistory(hl, 1.0f) && colourIs(2);
+         const bool start = SetHistorySourceFromState(2, 0) && doc->FillFromHistory(hl, 1.0f) && colourIs(0);
+         expect("parity: the history brush and fill paint from the set source", set && paints && start);
+         doc->FillPixels(hl, green, 1.0f);
+         Undo();   // now blue; the green it left is redo row 1
+         reDoc();
+         const bool redoSet = SetHistorySourceFromState(0, 1) && HistorySourceIsState(0, 1);
+         const bool redoPaints = doc->FillFromHistory(hl, 1.0f) && colourIs(1);
+         expect("parity: the brush and fill take redo rows", redoSet && redoPaints);
+         PushUndoCheckpoint("hist discards redo");
+         const bool dropped = doc->HistorySource() == Scene2DNode::kSourceNone && !doc->FillFromHistory(hl, 1.0f);
+         fprintf(stderr, "PROBE history source: set %d paints %d start %d redo %d %d dropped %d\n", (int)set, (int)paints,
+                 (int)start, (int)redoSet, (int)redoPaints, (int)dropped);
+         expect("parity: a redo state can be the source until a new step discards it", redoSet && redoPaints && dropped);
+         doc->FillPixels(hl, red, 1.0f);
+         SetHistorySourceFromState(1, 0);   // the green state the last step saved
+         gUndoStack.pop_front();            // the oldest state falls off, as past the limit
+         gHistoryDropped++;
+         const bool follows = HistorySourceIsState(1, 0) && doc->FillFromHistory(hl, 1.0f) && colourIs(1);
+         expect("parity: the source follows its state as older states fall off", follows);
+         // Purge: every state goes, snapshots stay, a state source falls back to the document as it is.
+         const size_t snaps = doc->Snapshots().size();
+         doc->AddSnapshot("purge keeps me");
+         const int freed = PurgeHistories();
+         const bool purged = freed >= 1 && gUndoStack.empty() && gRedoStack.empty() && doc->Snapshots().size() == snaps + 1;
+         const bool reset = doc->HistorySource() == -1;
+         fprintf(stderr, "PROBE history purge: freed %d purged %d reset %d\n", freed, (int)purged, (int)reset);
+         expect("parity: purging histories frees only what no snapshot keeps", purged);
+         expect("parity: purging histories resets a state source", reset);
+      }
+      // Snapshots: replace by name, Clear History leaves them, save snapshots, the name dialog.
+      {
+         fresh();
+         const size_t n0 = doc->Snapshots().size();
+         doc->AddSnapshot("same");
+         doc->FillPixels(hl, blue, 1.0f);
+         const int r = doc->AddSnapshot("same", true);
+         const bool replaced = doc->Snapshots().size() == n0 + 1 && r >= 0 && doc->Snapshots()[(size_t)r].name == "same";
+         PushUndoCheckpoint("before clear");
+         ClearHistory();
+         const bool cleared = doc->Snapshots().size() == n0 + 1;
+         expect("parity: replace existing snapshot and clear history", replaced && cleared);
+         gHistoryOptions.snapshotOnSave = false;
+         const size_t s0 = doc->Snapshots().size();
+         SnapshotDocsOnSave();
+         const bool off = doc->Snapshots().size() == s0;
+         gHistoryOptions.snapshotOnSave = true;
+         SnapshotDocsOnSave();
+         const bool on = doc->Snapshots().size() == s0 + 1;
+         SnapshotDocsOnSave();
+         const bool same = doc->Snapshots().size() == s0 + 1;
+         doc->FillPixels(hl, red, 1.0f);
+         SnapshotDocsOnSave();
+         const bool changed = doc->Snapshots().size() == s0 + 2;
+         gHistoryOptions = optWas;
+         fprintf(stderr, "PROBE history save snapshot: off %d on %d same %d changed %d\n", (int)off, (int)on, (int)same, (int)changed);
+         expect("parity: a save adds a snapshot only with the option", off && on);
+         expect("parity: saving an unchanged document adds no duplicate snapshot", same && changed);
+         const size_t d0 = doc->Snapshots().size();
+         sSnapNameOpen = false;
+         gHistoryOptions.newSnapshotDialog = true;
+         const bool asks = !BeginNewSnapshot(doc, false) && sSnapNameOpen && doc->Snapshots().size() == d0;
+         sSnapNameOpen = false;
+         gHistoryOptions.newSnapshotDialog = false;
+         const bool direct = BeginNewSnapshot(doc, false) && doc->Snapshots().size() == d0 + 1;
+         const bool alt = !BeginNewSnapshot(doc, true) && sSnapNameOpen;
+         sSnapNameOpen = false;
+         gHistoryOptions = optWas;
+         expect("parity: show new snapshot dialog reads the option", asks && direct && alt);
+      }
+      // Non-linear history: another state deletes without touching the document; delete works from the oldest state.
+      {
+         fresh();
+         doc->FillPixels(hl, red, 1.0f);
+         PushUndoCheckpoint("nl a");
+         doc->FillPixels(hl, blue, 1.0f);
+         PushUndoCheckpoint("nl b");
+         doc->FillPixels(hl, green, 1.0f);
+         gPatchDirty = false;
+         gHistoryOptions.nonLinear = true;
+         const bool other = DeleteHistoryState(1, 0) && gUndoStack.size() == 1 && !gPatchDirty && colourIs(1);
+         expect("parity: non linear delete of another state keeps a clean document clean", other);
+         Undo();
+         reDoc();
+         const bool enabled = gUndoStack.empty() && CanDeleteHistoryState();
+         gHistoryOptions.nonLinear = false;
+         const bool linearOff = !CanDeleteHistoryState();
+         gHistoryOptions.nonLinear = true;
+         const bool delRedo = DeleteHistoryState(0, 1) && gRedoStack.empty();
+         gHistoryOptions = optWas;
+         fprintf(stderr, "PROBE history non-linear: other %d enabled %d linear off %d redo %d\n", (int)other, (int)enabled,
+                 (int)linearOff, (int)delRedo);
+         expect("parity: non linear delete is enabled while the oldest state is current", enabled && linearOff && delRedo);
+      }
+      // Layer visibility left out of History: no step, kept through Undo, Redo and a refused edit; a snapshot has its own.
+      {
+         fresh();
+         gHistoryOptions.visibilityUndoable = true;
+         size_t s0 = gUndoStack.size();
+         SetLayerVisible(doc, doc->FindLayer(hl), false, "Hide layer");
+         const bool recOn = gUndoStack.size() == s0 + 1 && !doc->FindLayer(hl)->visible;
+         SetLayerVisible(doc, doc->FindLayer(hl), true, "Show layer");
+         gHistoryOptions.visibilityUndoable = false;
+         PushUndoCheckpoint("vis edit");
+         doc->FillPixels(hl, red, 1.0f);
+         s0 = gUndoStack.size();
+         SetLayerVisible(doc, doc->FindLayer(hl), false, "Hide layer");
+         const bool recOff = gUndoStack.size() == s0 && !doc->FindLayer(hl)->visible;
+         expect("parity: layer visibility is a history state only when undoable", recOn && recOff);
+         Undo();
+         const bool keptUndo = reDoc() && !doc->FindLayer(hl)->visible;
+         Redo();
+         const bool keptRedo = reDoc() && !doc->FindLayer(hl)->visible;
+         expect("parity: stepping through history keeps unrecorded visibility", keptUndo && keptRedo);
+         const size_t u0b = gUndoStack.size();
+         PushUndoCheckpoint("refused edit");
+         RollbackUndoTo(u0b);
+         Undo();
+         const bool keptRb = reDoc() && !doc->FindLayer(hl)->visible && gRedoStack.size() == 1;
+         Redo();
+         reDoc();
+         expect("parity: rollback keeps unrecorded visibility", keptRb);
+         SetLayerVisible(doc, doc->FindLayer(hl), true, nullptr);
+         const int snap = doc->AddSnapshot("eyes open");
+         SetLayerVisible(doc, doc->FindLayer(hl), false, nullptr);
+         const bool went = GoToSnapshot(doc, snap) && doc->FindLayer(hl)->visible && sUnrecordedVis[uid].empty();
+         fprintf(stderr, "PROBE history visibility: on %d off %d undo %d redo %d rollback %d snapshot %d\n", (int)recOn, (int)recOff,
+                 (int)keptUndo, (int)keptRedo, (int)keptRb, (int)went);
+         expect("parity: selecting a snapshot undoes its own visibility change", went);
+         gHistoryOptions = optWas;
+         sUnrecordedVis.clear();
+      }
+      // A step taken back at once at the 200-state limit gives back the oldest state and the Redo list.
+      {
+         fresh();
+         UndoEntry light;
+         light.arrangeOnly = true;
+         while (gUndoStack.size() < kMaxUndoDepth)
+            gUndoStack.push_back(light);
+         gUndoStack.front().label = "limit oldest";
+         gRedoStack.push_back(light);
+         gRedoStack.back().label = "limit redo";
+         const size_t u0c = gUndoStack.size();
+         PushUndoCheckpoint("limit refused");
+         const bool pushed = gUndoStack.size() == u0c + 1 && gRedoStack.empty();
+         RollbackUndoTo(u0c);
+         const bool back = gUndoStack.size() == kMaxUndoDepth && gUndoStack.front().label == "limit oldest" &&
+                           gRedoStack.size() == 1 && gRedoStack.back().label == "limit redo";
+         fprintf(stderr, "PROBE history limit: pushed %d back %d\n", (int)pushed, (int)back);
+         expect("parity: rollback past the state limit restores the list", pushed && back);
+      }
+      // New Document from a state: that state in a document of its own, which opens with a snapshot of it.
+      {
+         fresh();
+         doc->FillPixels(hl, red, 1.0f);
+         PushUndoCheckpoint("newdoc red");
+         doc->FillPixels(hl, blue, 1.0f);
+         const size_t nodes0 = gNodes.size();
+         gHistoryOptions.firstSnapshot = true;
+         const std::string labelBefore = gHistoryStartLabel;   // the purge check above moved it
+         const bool made = NewDocumentFromState(1, 0, "");
+         Scene2DNode* nd = FindDoc();
+         bool copied = false, snapped = false;
+         if (made && nd != nullptr && UidOf(nd) != uid)
+         {
+            nd->Layers();
+            copied = gNodes.size() == nodes0 + 1 && nd->Pick(mx, my, c, 1, hl) && c[0] > 0.9f && c[2] < 0.1f;
+            snapped = nd->Snapshots().size() == 1 && nd->HistorySource() == -1;
+         }
+         gHistoryOptions = optWas;
+         fprintf(stderr, "PROBE history new document: made %d copied %d snapshot %d\n", (int)made, (int)copied, (int)snapped);
+         expect("parity: new document from a state copies it into a fresh document", made && copied);
+         expect("parity: the new document dialogs document has the state new under its snapshot", snapped && gHistoryStartLabel == labelBefore);
+         if (made)
+            Undo();   // the new document goes
+         sDocUid = docUidWas;
+         reDoc();
+      }
+      // Put the patch's history and the document back as they were.
+      gUndoStack = std::move(keptUndo);
+      gRedoStack = std::move(keptRedo);
+      gHistoryRollback = HistoryRollback();
+      gHistoryDropped = droppedWas;
+      gHistoryOptions = optWas;
+      gHistoryStartLabel = startWas;
+      sDocUid = docUidWas;
+      sUnrecordedVis.clear();
+      if (!reDoc())
+         return fails;
+      doc->SetDocText(docTextWas);
+      doc->PutSession(sessionWas);
+      gPatchDirty = dirtyWas;
+   }
+   // Art History (ledger Block B): PhotoCraft's art_history tests, ported (ArtHistory.cpp), then one stroke in the
+   // document: the History Brush with an Art style paints the History source back along the stroke.
+   {
+      int artBad = 0;
+      for (const auto& [name, ok] : ArtHistory::SelfTests())
+      {
+         std::string what = "parity: " + name;
+         std::replace(what.begin(), what.end(), '_', ' ');
+         expect(what.c_str(), ok);
+         artBad += ok ? 0 : 1;
+      }
+      const size_t u0 = gUndoStack.size();
+      PushUndoCheckpoint("Art History test");
+      const int al = doc->AddPaintLayer();
+      const float red[3] = { 1, 0, 0 }, blue[3] = { 0, 0, 1 };
+      const float mx = doc->Doc().w * 0.5f, my = doc->Doc().h * 0.5f;
+      doc->Deselect();
+      doc->FillPixels(al, red, 1.0f);
+      const int snap = doc->AddSnapshot("art red");
+      doc->FillPixels(al, blue, 1.0f);
+      const bool src = doc->SetHistorySource(snap);
+      Scene2DNode::ArtOptions o;
+      o.on = true;
+      o.style = (int)ArtHistory::Style::TightShort;
+      doc->SetArtHistory(o);
+      BrushEngine::Brush b = sRetouch;
+      b.mode = BrushEngine::kUndo;
+      b.size = 40.0f;
+      b.hardness = 1.0f;
+      b.opacity = b.flow = 1.0f;
+      b.lockAlpha = false;
+      bool began = doc->BeginPaint(al, 0, b, mx - 60.0f, my, 1.0f);
+      const bool live = doc->Painting();
+      for (int k = 1; k <= 12; k++)
+         doc->PaintTo(mx - 60.0f + k * 10.0f, my, 1.0f);
+      doc->EndPaint();
+      float on[3] = { 0, 0, 0 }, off[3] = { 0, 0, 0 };
+      const bool pickOn = doc->Pick(mx, my, on, 1, al), pickOff = doc->Pick(mx, my + 120.0f, off, 1, al);
+      const bool reset = !doc->ArtHistoryOptions().on;
+      // Without the option the same brush paints the source the ordinary way (no art dabs).
+      expect("Art History: the stroke paints the History source back", src && began && live && pickOn && on[0] > 0.9f && on[2] < 0.1f);
+      expect("Art History: away from the stroke the layer is untouched", pickOff && off[2] > 0.9f && off[0] < 0.1f);
+      expect("Art History: the option applies to one stroke at a time", reset);
+      fprintf(stderr, "PROBE art history: selftests bad %d src %d began %d live %d on %.2f,%.2f off %.2f,%.2f reset %d\n", artBad,
+              (int)src, (int)began, (int)live, on[0], on[2], off[0], off[2], (int)reset);
+      while (gUndoStack.size() > u0)
+         Undo();
+      doc = FindDoc();
+      if (doc == nullptr)
+         return fails;
+      doc->Layers();
+   }
+   // Erase to History / Fill > History against a state that never held the layer (ledger Block B, PhotoCraft
+   // retouch_cmds and fill_cmds): one layer gives its own pixels, a lone shape its solid colour, anything else white;
+   // with more layers the stroke is refused ("did not exist"). A pixel lock in the state limits edits, not reads.
+   {
+      const size_t u0 = gUndoStack.size();
+      PushUndoCheckpoint("History lack test");
+      const float mx = doc->Doc().w * 0.5f, my = doc->Doc().h * 0.5f;
+      doc->Deselect();
+      // The live document with an empty paint layer; `build` makes the state the source is.
+      auto stateWith = [&](int& target, const std::function<void()>& build) {
+         target = doc->AddPaintLayer();
+         doc->Commit();
+         const std::string keep = doc->DocText();
+         std::vector<int> ids;
+         for (const Layer& l : doc->Layers())
+            ids.push_back(l.id);
+         for (int id : ids)
+            if (doc->FindLayer(id) != nullptr)
+               doc->RemoveLayer(id);
+         build();
+         doc->Commit();
+         const std::string text = doc->DocText();
+         doc->SetDocText(keep);
+         doc->Layers();
+         return text;
+      };
+      const int toolWas = sTool;
+      const bool histWas = sEraseHistory;
+      auto eraseHistory = [&](int id) {
+         sTool = kEraser;
+         sEraseHistory = true;
+         BrushEngine::Brush eb = sEraser;
+         eb.mode = BrushEngine::kErase;
+         eb.size = 12.0f;
+         eb.hardness = 1.0f;
+         eb.opacity = eb.flow = 1.0f;
+         eb.lockAlpha = false;
+         eb = EraseLocked(doc, id, 0, eb);
+         const bool ok = doc->BeginPaint(id, 0, eb, mx - 10.0f, my, 1.0f);
+         if (ok)
+         {
+            doc->PaintTo(mx + 10.0f, my, 1.0f);
+            doc->EndPaint();
+         }
+         sTool = toolWas;
+         sEraseHistory = histWas;
+         return ok;
+      };
+      const float red[3] = { 1, 0, 0 }, white[3] = { 1, 1, 1 };
+      float c[3] = { 0, 0, 0 };
+      int q = 0, lone = 0;
+      // One paint layer at half opacity: its own pixels come back, not its opacity.
+      std::string st = stateWith(q, [&] {
+         lone = doc->AddPaintLayer();
+         doc->FillPixels(lone, red, 1.0f);
+         doc->FindLayer(lone)->opacity = 0.5f;
+      });
+      bool src = lone != q && doc->SetHistorySourceText(st, 1);
+      bool ok = src && eraseHistory(q) && doc->Pick(mx, my, c, 1, q) && c[0] > 0.99f && c[1] < 0.01f && c[2] < 0.01f &&
+                doc->FindLayer(q)->opacity > 0.99f;
+      expect("parity: erase to history paints a new layer with the single layers own pixels not its opacity", ok);
+      fprintf(stderr, "PROBE history lack lone paint: src %d ok %d rgb %.2f %.2f %.2f\n", (int)src, (int)ok, c[0], c[1], c[2]);
+      // One shape with a solid fill: its colour, past its path too; only under the stroke.
+      auto shapeState = [&](int fillType, bool fillOn) {
+         return stateWith(q, [&] {
+            const int v = doc->AddVectorLayer();
+            Scene2DNode::Shape sh;
+            sh.type = Scene2DNode::Shape::kRect;
+            sh.x0 = sh.y0 = 1.0f;
+            sh.x1 = sh.y1 = 5.0f;
+            sh.fillOn = fillOn;
+            sh.fillType = fillType;
+            sh.fillC[0] = sh.fillC[1] = 0.0f;
+            sh.fillC[2] = 1.0f;
+            if (fillType != 0)
+               sh.fillStops = { { 0.0f, { 1, 0, 0, 1 } }, { 1.0f, { 0, 0, 1, 1 } } };
+            sh.strokeOn = !fillOn;
+            doc->FindLayer(v)->shapes.push_back(sh);
+         });
+      };
+      st = shapeState(0, true);
+      src = doc->SetHistorySourceText(st, 1);
+      const bool painted = eraseHistory(q) && doc->Pick(mx, my, c, 1, q);
+      float far[3] = { 0, 0, 0 };
+      const bool farPainted = doc->Pick(mx, my - 40.0f, far, 1, q);
+      expect("parity: erase to history paints a single solid shapes colour past its path",
+             src && painted && c[2] > 0.99f && c[0] < 0.01f && c[1] < 0.01f && !farPainted);
+      fprintf(stderr, "PROBE history lack shape: src %d painted %d rgb %.2f %.2f %.2f far %d\n", (int)src, (int)painted, c[0], c[1], c[2], (int)farPainted);
+      // A gradient shape, or one with no fill: white past its path.
+      bool whiteAll = true;
+      for (int k = 0; k < 2; k++)
+      {
+         st = shapeState(k == 0 ? 1 : 0, k == 0);
+         const bool w = doc->SetHistorySourceText(st, 1) && eraseHistory(q) && doc->Pick(mx, my, c, 1, q) && c[0] > 0.99f && c[1] > 0.99f &&
+                        c[2] > 0.99f && !doc->Pick(mx, my - 40.0f, far, 1, q);
+         whiteAll = whiteAll && w;
+         fprintf(stderr, "PROBE history lack white %d: %d rgb %.2f %.2f %.2f\n", k, (int)w, c[0], c[1], c[2]);
+      }
+      expect("parity: erase to history paints white past the path of a single shape without a solid fill", whiteAll);
+      expect("parity: erase to history paints white past a shapes path in every colour mode", whiteAll);   // RGB is the one document mode
+      // Two layers, neither the target: refused, naming the layer.
+      st = stateWith(q, [&] {
+         doc->FillPixels(doc->AddPaintLayer(), red, 1.0f);
+         doc->FillPixels(doc->AddPaintLayer(), white, 1.0f);
+      });
+      src = doc->SetHistorySourceText(st, 1);
+      const bool refused = !eraseHistory(q) && doc->HistoryRefusal().find("did not exist") != std::string::npos && !doc->Pick(mx, my, c, 1, q);
+      expect("parity: erase to history on a new layer without pixels names the target not the document", src && refused);
+      fprintf(stderr, "PROBE history lack refuse: src %d refused %d why '%s'\n", (int)src, (int)refused, doc->HistoryRefusal().c_str());
+      // Fill > History reads a state whose pixels were locked.
+      const int fl = doc->AddPaintLayer();
+      doc->FillPixels(fl, white, 1.0f);
+      doc->FindLayer(fl)->lock |= Scene2DNode::kLockPixels;
+      doc->Commit();
+      const int lockedSnap = doc->AddSnapshot("locked white");
+      doc->FindLayer(fl)->lock &= ~Scene2DNode::kLockPixels;
+      doc->Commit();
+      doc->FillPixels(fl, red, 1.0f);
+      const bool lockedFill = doc->SetHistorySource(lockedSnap) && doc->FillFromHistory(fl, 1.0f) && doc->Pick(mx, my, c, 1, fl) && c[0] > 0.99f &&
+                              c[1] > 0.99f && c[2] > 0.99f;
+      expect("parity: history fill reads a source when its pixels were locked", lockedFill);
+      // Fill > History with a selection past the canvas edge reads only its part inside the canvas.
+      doc->FillPixels(fl, red, 1.0f);
+      doc->SelectRect(-1000.0f, -1000.0f, 20.0f, 20.0f, 0, 0.0f, false);
+      float in[3] = { 0, 0, 0 }, out[3] = { 0, 0, 0 };
+      const bool selFill = doc->FillFromHistory(fl, 1.0f) && doc->Pick(5.0f, 5.0f, in, 1, fl) && doc->Pick(mx, my, out, 1, fl) && in[1] > 0.99f &&
+                           out[0] > 0.99f && out[1] < 0.01f;
+      doc->Deselect();
+      expect("parity: history fill reads only the selection inside the canvas", selFill);
+      fprintf(stderr, "PROBE history fill: locked %d sel %d in %.2f out %.2f,%.2f\n", (int)lockedFill, (int)selFill, in[1], out[0], out[1]);
+      doc->SetHistorySource(-1);
+      while (gUndoStack.size() > u0)
+         Undo();
+      doc = FindDoc();
+      if (doc == nullptr)
+         return fails;
+      doc->Layers();
    }
    // Wrap around (periodic painting and clone, ledger-gaps Block B): the page tiles, so a dab past one edge comes back
    // on the other and the clone source reads across the seam. Smudge never wraps.

@@ -519,6 +519,16 @@ namespace app
             gPerfPanelHeight = std::max(kPerfPanelMinHeight, std::strtof(val.c_str(), nullptr));
          else if (key == "panelHistoryOpen")
             gHistoryOpen = (val != "0");
+         else if (key == "historyFirstSnapshot")
+            gHistoryOptions.firstSnapshot = (val != "0");
+         else if (key == "historySnapshotOnSave")
+            gHistoryOptions.snapshotOnSave = (val != "0");
+         else if (key == "historyNonLinear")
+            gHistoryOptions.nonLinear = (val != "0");
+         else if (key == "historySnapshotDialog")
+            gHistoryOptions.newSnapshotDialog = (val != "0");
+         else if (key == "historyVisibility")
+            gHistoryOptions.visibilityUndoable = (val != "0");
          else if (key == "panelHistoryW")
             gHistoryWidth = std::max(tok::patch_io_load_workspace_settings_min_sm, std::strtof(val.c_str(), nullptr));
          else if (key == "panelStudioOpen")
@@ -628,6 +638,11 @@ namespace app
       file << "panelPerfH=" << gPerfPanelHeight << "\n";
       file << "panelHistoryOpen=" << (gHistoryOpen ? 1 : 0) << "\n";
       file << "panelHistoryW=" << gHistoryWidth << "\n";
+      file << "historyFirstSnapshot=" << (gHistoryOptions.firstSnapshot ? 1 : 0) << "\n";
+      file << "historySnapshotOnSave=" << (gHistoryOptions.snapshotOnSave ? 1 : 0) << "\n";
+      file << "historyNonLinear=" << (gHistoryOptions.nonLinear ? 1 : 0) << "\n";
+      file << "historySnapshotDialog=" << (gHistoryOptions.newSnapshotDialog ? 1 : 0) << "\n";
+      file << "historyVisibility=" << (gHistoryOptions.visibilityUndoable ? 1 : 0) << "\n";
       file << "panelStudioOpen=" << (gSampleStudioOpen ? 1 : 0) << "\n";
       file << "panelStudioH=" << gSampleStudioHeight << "\n";
       file << "panelStudioDock=" << gSampleStudioDock << "\n";
@@ -1081,6 +1096,7 @@ namespace app
       gPatchPath = path;
       gPatchDirty = false;
       gPatchStatus = "Saved";
+      SnapshotDocsOnSave();   // History Options decide; not a history step, and the patch stays saved
       NotePatchFileStamp(path); // our own write is not an outside change
       LearningLog::PatchSaved(path);
       Patch::NoteRecent(path);
@@ -1261,6 +1277,8 @@ namespace app
       {
          gUndoStack.clear();
          gRedoStack.clear();
+         gHistoryStartLabel = "New";
+         gHistoryRollback = HistoryRollback();
          ClearPatchWatch();
          // A genuine "start a fresh document" also resets the global
          // transport - a loaded patch restores its own bpm/time signature/

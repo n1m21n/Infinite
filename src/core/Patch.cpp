@@ -231,6 +231,8 @@ namespace
    };
 }
 
+std::string UnescapeText(const std::string& raw) { return UnescapeLine(raw); }
+
 void SaveParams(INode* node, std::vector<std::pair<std::string, std::string>>& out)
 {
    if (node == nullptr)

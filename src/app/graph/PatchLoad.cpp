@@ -726,6 +726,8 @@ namespace app
       gRedoStack.clear();
 
       gPatchPath = gOpeningTemplate ? std::string() : path;
+      gHistoryStartLabel = gOpeningTemplate ? "New" : "Open";
+      gHistoryRollback = HistoryRollback();
       gPatchDirty = false;
       gPatchStatus = gOpeningTemplate ? "Opened from a template" : (openNote.empty() ? "Opened" : openNote);
       gRequestFitView = true;
@@ -843,16 +845,128 @@ namespace app
       // callers push *before* the mutation they are checkpointing, and the
       // one that captures its Patch::Data early (the node drag) cannot change
       // a recording in between, so "now" is the pre-mutation state either way.
+      // What this step discards is kept until the next one, so a step taken back at once (RollbackUndoTo) restores
+      // it. Steps pushed back to back with nothing discarded in between join the same record.
+      const bool chain = gRedoStack.empty() && gHistoryRollback.undoSize != 0 && gHistoryRollback.undoSize == gUndoStack.size();
+      if (!chain)
+      {
+         gHistoryRollback = HistoryRollback();
+         gHistoryRollback.base = gUndoStack.size();
+         gHistoryRollback.dirty = gPatchDirty;
+         gHistoryRollback.redo = std::move(gRedoStack);
+      }
+      if (!gHistoryRollback.redo.empty() && !chain)
+         HistoryDiscardedStates(HistoryCurrentDepth() + 1);
       gUndoStack.push_back({ std::move(snapshot), GestureRecorder::Instance().Playbacks() });
       if (label != nullptr)
          gUndoStack.back().label = label;
-      if (gUndoStack.size() > kMaxUndoDepth)
+      // One step past the limit is allowed until the frame ends (TrimHistory), so the step in progress can still be
+      // taken back without losing the oldest state.
+      if (gUndoStack.size() > kMaxUndoDepth + 1)
+      {
          gUndoStack.pop_front();
+         gHistoryDropped++;
+         gHistoryRollback.base = gHistoryRollback.base > 0 ? gHistoryRollback.base - 1 : 0;
+      }
       // A fresh action invalidates whatever redo history pointed at a future
       // that no longer follows from the graph's current state.
       gRedoStack.clear();
+      gHistoryRollback.undoSize = gUndoStack.size();
       NoteGraphEditedForLiveIssues();
       gPatchDirty = true;
+   }
+
+
+   void TrimHistory()
+   {
+      while (gUndoStack.size() > kMaxUndoDepth)
+      {
+         gUndoStack.pop_front();
+         gHistoryDropped++;
+         // A step still open (a drag cancelled frames later) keeps its record, one place lower.
+         if (gHistoryRollback.undoSize > 0)
+         {
+            gHistoryRollback.undoSize--;
+            gHistoryRollback.base = gHistoryRollback.base > 0 ? gHistoryRollback.base - 1 : 0;
+         }
+      }
+   }
+
+
+   unsigned long long HistoryCurrentDepth()
+   {
+      return gHistoryDropped + gUndoStack.size();
+   }
+
+
+   void RollbackUndoTo(size_t undoSize)
+   {
+      if (gUndoStack.size() <= undoSize)
+         return;
+      const bool whole = gHistoryRollback.undoSize == gUndoStack.size() && gHistoryRollback.base == undoSize;
+      gUndoStack.resize(undoSize);
+      if (!whole)
+         return;
+      HistoryRollback rb = std::move(gHistoryRollback);
+      gHistoryRollback = HistoryRollback();
+      gRedoStack = std::move(rb.redo);
+      gPatchDirty = rb.dirty;
+   }
+
+
+   bool CanDeleteHistoryState()
+   {
+      return gHistoryOptions.nonLinear ? !gUndoStack.empty() || !gRedoStack.empty() : !gUndoStack.empty();
+   }
+
+
+   int PurgeHistories()
+   {
+      if (ShowLockBlocks())
+         return 0;
+      const int freed = (int)(gUndoStack.size() + gRedoStack.size());
+      if (freed == 0)
+         return 0;
+      gHistoryStartLabel = UndoLabelAt(0).empty() ? gHistoryStartLabel : UndoLabelAt(0);
+      HistoryDiscardedStates(0);
+      gHistoryDropped += gUndoStack.size();
+      gUndoStack.clear();
+      gRedoStack.clear();
+      gHistoryRollback = HistoryRollback();
+      gPatchStatus = "Purged " + std::to_string(freed) + (freed == 1 ? " history state" : " history states");
+      return freed;
+   }
+
+
+   bool HistoryStatePatch(int undos, int redos, Patch::Data& out)
+   {
+      if (redos > 0)
+      {
+         if ((size_t)redos > gRedoStack.size())
+            return false;
+         const UndoEntry& e = gRedoStack[gRedoStack.size() - (size_t)redos];
+         if (e.arrangeOnly || e.cleared)
+            return false;
+         out = e.patch;
+         return true;
+      }
+      if (undos < 0 || (size_t)undos > gUndoStack.size())
+         return false;
+      // n steps back the document is the patch the n-th entry from the top saved; a timeline-only step changed no
+      // node, so the next newer full patch (or the live graph) holds the same nodes.
+      for (size_t i = gUndoStack.size() - (size_t)undos; i < gUndoStack.size() && undos > 0; i++)
+      {
+         const UndoEntry& e = gUndoStack[i];
+         if (e.cleared)
+            return false;
+         if (!e.arrangeOnly)
+         {
+            out = e.patch;
+            return true;
+         }
+      }
+      out = BuildPatchData();
+      return true;
    }
 
 
@@ -1464,7 +1578,10 @@ namespace app
       e.label = UndoDescribe::ChangeArrange(before, gArrange);
       gUndoStack.push_back(std::move(e));
       if (gUndoStack.size() > kMaxUndoDepth)
+      {
          gUndoStack.pop_front();
+         gHistoryDropped++;
+      }
       gRedoStack.clear();
       gPatchDirty = true;
    }
@@ -1483,7 +1600,10 @@ namespace app
       e.arrange = gArrange;
       gUndoStack.push_back(std::move(e));
       if (gUndoStack.size() > kMaxUndoDepth)
+      {
          gUndoStack.pop_front();
+         gHistoryDropped++;
+      }
       gRedoStack.clear();
       gPatchDirty = true;
    }
@@ -1557,7 +1677,9 @@ namespace app
       gUndoStack.pop_back();
       std::map<int, int> remap;
       const ArrangeViewSettings keepView = ArrangeKeepViewSettings(gArrange); // see ApplyArrangeOnlyEntry
+      KeepDocSessions();
       ApplyPatchData(prev.patch, &remap);
+      RestoreDocSessions();
       ArrangeRestoreViewSettings(gArrange, keepView);
       gArrangeGestureOpen = false;
       gArrangeDrag = ArrangeDragState();
@@ -1607,7 +1729,9 @@ namespace app
       gRedoStack.pop_back();
       std::map<int, int> remap;
       const ArrangeViewSettings keepView = ArrangeKeepViewSettings(gArrange);
+      KeepDocSessions();
       ApplyPatchData(next.patch, &remap);
+      RestoreDocSessions();
       ArrangeRestoreViewSettings(gArrange, keepView);
       gArrangeGestureOpen = false;
       gArrangeDrag = ArrangeDragState();
@@ -1624,6 +1748,8 @@ namespace app
          return;
       if (gUndoStack.empty() && gRedoStack.empty())
          return;
+      HistoryDiscardedStates(0);   // the states are set aside: a state History source goes with them
+      gHistoryRollback = HistoryRollback();
       UndoEntry mark;
       mark.label = "Clear History";
       mark.cleared = std::make_shared<ClearedHistory>();
@@ -1643,11 +1769,53 @@ namespace app
    {
       if (ShowLockBlocks())
          return false;
+      gHistoryRollback = HistoryRollback();
+      // Non-linear history: only that state goes. The document stays where it is unless it was the current state,
+      // so a saved patch stays saved; the states after it stay, and stepping back from them skips it.
+      if (gHistoryOptions.nonLinear)
+      {
+         if (redos > 0)
+         {
+            if ((size_t)redos > gRedoStack.size())
+               return false;
+            gRedoStack.erase(gRedoStack.end() - redos);
+            HistoryDiscardedStates(HistoryCurrentDepth() + (unsigned long long)redos);
+            gPatchStatus = "History: deleted 1 undone state";
+            return true;
+         }
+         if (undos == 0)
+         {
+            if (gUndoStack.empty())
+               return false;
+            Undo();
+            if (!gRedoStack.empty())
+               gRedoStack.pop_back();
+            HistoryDiscardedStates(HistoryCurrentDepth() + 1);
+            gPatchStatus = "History: deleted 1 state";
+            return true;
+         }
+         if (undos < 0 || (size_t)undos >= gUndoStack.size())
+            return false;   // the oldest state itself stays
+         // Row n is the state the entry above saved; the entry above takes this one's "before", this one goes.
+         const size_t top = gUndoStack.size() - 1;
+         UndoEntry& above = gUndoStack[top - (size_t)undos + 1];
+         UndoEntry& at = gUndoStack[top - (size_t)undos];
+         if (above.arrangeOnly != at.arrangeOnly || above.cleared || at.cleared)
+            return false;
+         HistoryDiscardedStates(HistoryCurrentDepth() - (unsigned long long)undos);   // the states after it move down one
+         above.patch = std::move(at.patch);
+         above.arrange = std::move(at.arrange);
+         above.gestures = std::move(at.gestures);
+         gUndoStack.erase(gUndoStack.begin() + (std::ptrdiff_t)(top - (size_t)undos));
+         gPatchStatus = "History: deleted 1 state";
+         return true;
+      }
       if (redos > 0)
       {
          if ((size_t)redos > gRedoStack.size())
             return false;
          gRedoStack.erase(gRedoStack.begin(), gRedoStack.end() - (redos - 1));
+         HistoryDiscardedStates(HistoryCurrentDepth() + (unsigned long long)redos);
          gPatchStatus = "History: deleted " + std::to_string(redos == 1 ? 1 : redos) + " undone state" + (redos == 1 ? "" : "s");
          return true;
       }
@@ -1656,6 +1824,7 @@ namespace app
       for (int i = 0; i <= undos && !gUndoStack.empty(); i++)
          Undo();
       gRedoStack.clear();
+      HistoryDiscardedStates(HistoryCurrentDepth() + 1);
       gPatchStatus = "History: deleted " + std::to_string(undos + 1) + " state" + (undos == 0 ? "" : "s");
       return true;
    }

@@ -305,6 +305,7 @@ void DrawSidePanels(FrameCtx& fc)
       }
       RunFieldGraphUnpackPhase2Tick();
       RunAutoLayoutTick();
+      TrimHistory();
       RunPendingMapLoad();
 
       // Dynamic pins, Phase 1 (build step 11, §5.5): trigger-pin edge

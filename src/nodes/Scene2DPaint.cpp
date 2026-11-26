@@ -1,11 +1,13 @@
 // Scene 2D paint: paint-layer surfaces and their tiles, pixel masks, the
 // document selection, bucket, gradient and pick. Plan: internal/plans/2d-view (Block B).
 #include "Scene2DNode.h"
+#include "ArtHistory.h"
 #include "GLUtil.h"
 
 #include "gl3.h"
 #include <algorithm>
 #include <array>
+#include <climits>
 #include <cmath>
 #include <cstring>
 #include <set>
@@ -1289,7 +1291,7 @@ void Scene2DNode::SyncSurfaces()
       const std::vector<int>& keep = m == &mSurfaces ? paintIds : m == &mMasks ? maskIds : fxIds;
       for (auto it = m->begin(); it != m->end();)
       {
-         if (std::find(keep.begin(), keep.end(), it->first) == keep.end() && !(mStroke.Active() && it->first == mPaintId))
+         if (std::find(keep.begin(), keep.end(), it->first) == keep.end() && !((mStroke.Active() || mArt.on) && it->first == mPaintId))
          {
             GLUtil::RetireFbo(it->second.fbo); // its thumbnail may be queued this frame
             it = m->erase(it);
@@ -1434,7 +1436,7 @@ namespace
 bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, float x, float y, float pressure)
 {
    Layers();
-   if (mStroke.Active())
+   if (mStroke.Active() || mArt.on)
       EndPaint();
    mPaintBrushIn = b;
    BrushEngine::Brush brush = b;
@@ -1547,11 +1549,12 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
    }
    if (target == 0 && brush.mode == BrushEngine::kUndo)
    {
-      auto u = mUndoTiles.find(id);
-      if (u == mUndoTiles.end() || u->second.size() != l->tiles.size())
-         mUndoTiles[id] = l->tiles;
-      if (Surface* us = SyncSurface(mUndoSurf, id, l->pw, l->ph, mUndoTiles[id]))
-         brush.sourceTex = us->fbo.tex;
+      const GLUtil::Fbo* src = HistorySourceSurface(*l);
+      if (src == nullptr)
+         return false;   // no state to paint back to (gone, or it never held this layer)
+      if (mArtOpt.on)
+         return BeginArt(id, brush, sx, sy, *src);
+      brush.sourceTex = src->tex;
    }
    if (brush.mode == BrushEngine::kPatternStamp)
    {
@@ -1596,6 +1599,18 @@ void Scene2DNode::ApplyBrushSources(BrushEngine::Brush& brush, bool snapshot)
 
 void Scene2DNode::PaintTo(float x, float y, float pressure)
 {
+   if (mArt.on)
+   {
+      const Layer* al = FindConst(mArt.id);
+      float sx = 0, sy = 0, scale = 1;
+      if (al != nullptr && DocToSurface(*al, 0, x, y, sx, sy, scale))
+      {
+         mArt.pts.push_back(sx);
+         mArt.pts.push_back(sy);
+         ArtStamp(false);
+      }
+      return;
+   }
    if (!mStroke.Active())
       return;
    const Layer* l = FindConst(mPaintId);
@@ -1639,6 +1654,11 @@ bool Scene2DNode::RepaintStroke(const std::vector<float>& xy)
 void Scene2DNode::EndPaint()
 {
    mSkinStroke.on = false;
+   if (mArt.on)
+   {
+      EndArt();
+      return;
+   }
    if (!mStroke.Active())
       return;
    Layers();
@@ -2830,18 +2850,170 @@ void Scene2DNode::SetUndoSource(int id)
    mUndoTiles[id] = l->tiles;
 }
 
+// ---- Art History brush ---------------------------------------------------
+// The History Brush with an Art style: dabs posed along the stroke (seeded scatter, curl) each paint a rotated copy
+// of the History source under them (ArtHistory.cpp, ported from PhotoCraft). Runs on the CPU over the rectangle the
+// new dabs touch; EndPaint stores the tiles and commits.
+bool Scene2DNode::BeginArt(int id, const BrushEngine::Brush& b, float sx, float sy, const GLUtil::Fbo& src)
+{
+   const Layer* l = FindConst(id);
+   auto it = mSurfaces.find(id);
+   if (l == nullptr || it == mSurfaces.end() || src.w != it->second.fbo.w || src.h != it->second.fbo.h)
+      return false;
+   mArt = ArtStroke();
+   mArt.id = id;
+   mArt.src = src;
+   mArt.w = it->second.fbo.w;
+   mArt.h = it->second.fbo.h;
+   mArt.style = std::clamp(mArtOpt.style, 0, ArtHistory::kStyleCount - 1);
+   mArt.area = std::clamp(mArtOpt.area, 0.0f, kArtAreaMax);
+   mArt.tolerance = std::clamp(mArtOpt.tolerance, 0.0f, 1.0f);
+   mArt.size = b.size;
+   mArt.hardness = b.hardness;
+   mArt.opacity = b.opacity;
+   mArt.flow = b.flow;
+   mArt.lockTransparent = b.lockAlpha;
+   const long long state = mHistorySrc == kSourceState ? mHistorySrcDepth : mHistorySrc;
+   mArt.seed = ArtHistory::kSeed ^ (uint32_t)state;
+   if (mSelAny)
+   {
+      float o[2], ux[2], uy[2], s = 1;
+      if (DocToSurface(*l, 0, 0, 0, o[0], o[1], s) && DocToSurface(*l, 0, 1, 0, ux[0], ux[1], s) && DocToSurface(*l, 0, 0, 1, uy[0], uy[1], s))
+      {
+         const float a = ux[0] - o[0], c = ux[1] - o[1], bb = uy[0] - o[0], d = uy[1] - o[1], det = a * d - bb * c;
+         if (std::fabs(det) >= 1e-9f)
+         {
+            const float inv[6] = { d / det, -bb / det, -(d * o[0] - bb * o[1]) / det, -c / det, a / det, -(-c * o[0] + a * o[1]) / det };
+            SelOnSurface(mSel, mDoc.w, mDoc.h, mArt.w, mArt.h, inv, mArt.sel);
+         }
+      }
+   }
+   mArt.pts = { sx, sy };
+   mArt.dirty[0] = mArt.w;
+   mArt.dirty[1] = mArt.h;
+   mArt.on = true;
+   mPaintId = id;
+   mPaintTarget = 0;
+   return true;
+}
+
+void Scene2DNode::ArtStamp(bool final)
+{
+   // The first dab faces the stroke's first move, so nothing is stamped until there is one (or the stroke ends).
+   if (!mArt.on || (!final && mArt.pts.size() < 4))
+      return;
+   std::vector<ArtHistory::Dab> dabs;
+   ArtHistory::PlaceDabs(mArt.pts, mArt.size, mArt.area, (ArtHistory::Style)mArt.style, mArt.seed, dabs);
+   const size_t end = dabs.size();
+   auto st = mSurfaces.find(mArt.id);
+   if (mArt.stamped >= end || st == mSurfaces.end())
+      return;
+   int x0 = INT_MAX, y0 = INT_MAX, x1 = INT_MIN, y1 = INT_MIN;
+   for (size_t i = mArt.stamped; i < end; i++)
+   {
+      const ArtHistory::Dab& d = dabs[i];
+      const float r = d.radius + 2.0f;
+      x0 = std::min(x0, (int)std::floor(d.x - r));
+      y0 = std::min(y0, (int)std::floor(d.y - r));
+      x1 = std::max(x1, (int)std::ceil(d.x + r));
+      y1 = std::max(y1, (int)std::ceil(d.y + r));
+   }
+   x0 = std::max(x0, 0);
+   y0 = std::max(y0, 0);
+   x1 = std::min(x1, mArt.w);
+   y1 = std::min(y1, mArt.h);
+   const int rw = x1 - x0, rh = y1 - y0;
+   if (rw <= 0 || rh <= 0 || (uint64_t)rw * (uint64_t)rh > ArtHistory::kMaxCoverage)
+   {
+      mArt.stamped = end;
+      return;
+   }
+   std::vector<uint8_t> dst8, src8;
+   ReadRect(st->second.fbo, x0, y0, rw, rh, dst8);
+   ReadRect(mArt.src, x0, y0, rw, rh, src8);
+   std::vector<float> dst(dst8.size()), src(src8.size()), sel;
+   for (size_t i = 0; i < dst8.size(); i++)
+   {
+      dst[i] = dst8[i] / 255.0f;
+      src[i] = src8[i] / 255.0f;
+   }
+   if (!mArt.sel.empty())
+   {
+      sel.resize((size_t)rw * rh);
+      for (int y = 0; y < rh; y++)
+         for (int x = 0; x < rw; x++)
+            sel[(size_t)y * rw + x] = mArt.sel[(size_t)(y0 + y) * mArt.w + x0 + x] / 255.0f;
+   }
+   ArtHistory::StampParams p;
+   p.dest = dst.data();
+   p.destW = rw;
+   p.destH = rh;
+   p.destX = x0;
+   p.destY = y0;
+   p.src = src.data();
+   p.srcW = rw;
+   p.srcH = rh;
+   p.srcX = x0;
+   p.srcY = y0;
+   p.ch = 4;
+   p.alpha = 3;
+   p.dabs = dabs.data() + mArt.stamped;
+   p.dabCount = end - mArt.stamped;
+   p.hardness = mArt.hardness;
+   p.opacity = mArt.opacity;
+   p.flow = mArt.flow;
+   p.tolerance = mArt.tolerance;
+   p.selection = sel.empty() ? nullptr : sel.data();
+   p.lockTransparent = mArt.lockTransparent;
+   uint32_t written = 0;
+   ArtHistory::Stamp(p, written);
+   mArt.stamped = end;
+   if (written == 0)
+      return;
+   for (size_t i = 0; i < dst.size(); i++)
+      dst8[i] = (uint8_t)std::lround(std::clamp(dst[i], 0.0f, 1.0f) * 255.0f);
+   WriteRect(st->second.fbo, x0, y0, rw, rh, dst8.data());
+   mPaintEdits++;   // the picture changed before the text does
+   mArt.dirty[0] = std::min(mArt.dirty[0], x0);
+   mArt.dirty[1] = std::min(mArt.dirty[1], y0);
+   mArt.dirty[2] = std::max(mArt.dirty[2], x1);
+   mArt.dirty[3] = std::max(mArt.dirty[3], y1);
+}
+
+void Scene2DNode::EndArt()
+{
+   if (mArt.stamped == 0)
+      ArtStamp(true);   // a click: the one dab, facing right
+   mArt.on = false;
+   mPaintId = 0;
+   Layer* l = FindLayer(mArt.id);
+   auto st = mSurfaces.find(mArt.id);
+   if (l != nullptr && st != mSurfaces.end() && mArt.dirty[2] > mArt.dirty[0] && mArt.dirty[3] > mArt.dirty[1])
+   {
+      StoreTiles(st->second, l->tiles, mArt.dirty);
+      Commit();
+   }
+   mArt.pts.clear();
+   mArt.sel.clear();
+   mArtOpt.on = false;   // each stroke asks again (the panel sets it per stroke)
+}
+
 // ---- history snapshots ---------------------------------------------------
 
 namespace { constexpr size_t kSnapshotsMax = 64; }
 
-int Scene2DNode::AddSnapshot(const std::string& name)
+int Scene2DNode::AddSnapshot(const std::string& name, bool replace)
 {
    Layers();
    Commit();   // the text must hold the layers as they are now, edits not yet committed included
+   if (replace && !name.empty())
+      for (int i = (int)mSnapshots.size() - 1; i >= 0; i--)
+         if (mSnapshots[(size_t)i].name == name)
+            DeleteSnapshot(i);
    if (mSnapshots.size() >= kSnapshotsMax)
    {
       mSnapshots.erase(mSnapshots.begin());   // the oldest goes, as Photoshop drops the oldest state
-      mHistorySrc = mHistorySrc > 0 ? mHistorySrc - 1 : -1;
+      mHistorySrc = mHistorySrc > 0 ? mHistorySrc - 1 : mHistorySrc == 0 ? -1 : mHistorySrc;   // a state source stays
    }
    return PushSnapshot(name, mText);
 }
@@ -2868,7 +3040,7 @@ int Scene2DNode::AddSnapshotFrom(const std::string& name, SnapFrom from, int lay
    if (mSnapshots.size() >= kSnapshotsMax)
    {
       mSnapshots.erase(mSnapshots.begin());
-      mHistorySrc = mHistorySrc > 0 ? mHistorySrc - 1 : -1;
+      mHistorySrc = mHistorySrc > 0 ? mHistorySrc - 1 : mHistorySrc == 0 ? -1 : mHistorySrc;   // a state source stays
    }
    if (from == SnapFrom::Merged)
    {
@@ -2922,6 +3094,48 @@ int Scene2DNode::AddSnapshotFrom(const std::string& name, SnapFrom from, int lay
    return PushSnapshot(name, text);
 }
 
+int Scene2DNode::SnapshotOnSave(const std::string& name)
+{
+   Layers();
+   Commit();
+   for (const Snapshot& sn : mSnapshots)
+      if (sn.id == mSaveSnapId && sn.text == mText)
+         return -1;   // nothing changed since the last save's snapshot
+   const int i = AddSnapshot(name);
+   mSaveSnapId = mSnapshots[(size_t)i].id;
+   return i;
+}
+
+Scene2DNode::Session Scene2DNode::TakeSession() const
+{
+   Session s;
+   s.snapshots = mSnapshots;
+   s.nextSnapId = mNextSnapId;
+   s.historySrc = mHistorySrc;
+   s.srcDepth = mHistorySrcDepth;
+   s.saveSnapId = mSaveSnapId;
+   s.firstSnapDone = mFirstSnapDone;
+   s.undoTiles = mUndoTiles;
+   s.sourceAll = mSourceAll;
+   s.sourceIds = mSourceIds;
+   s.sourceLack = mSourceLack;
+   return s;
+}
+
+void Scene2DNode::PutSession(const Session& s)
+{
+   mSnapshots = s.snapshots;
+   mNextSnapId = s.nextSnapId;
+   mHistorySrc = s.historySrc;
+   mHistorySrcDepth = s.srcDepth;
+   mSaveSnapId = s.saveSnapId;
+   mFirstSnapDone = s.firstSnapDone;
+   mUndoTiles = s.undoTiles;
+   mSourceAll = s.sourceAll;
+   mSourceIds = s.sourceIds;
+   mSourceLack = s.sourceLack;
+}
+
 bool Scene2DNode::RenameSnapshot(int i, const std::string& name)
 {
    if (i < 0 || i >= (int)mSnapshots.size() || name.empty())
@@ -2966,19 +3180,71 @@ bool Scene2DNode::SetHistorySource(int i)
       for (const Layer& l : mLayers)
          if (l.kind == Kind::Paint)
             mUndoTiles[l.id] = l.tiles;
+      mSourceAll = true;
       mHistorySrc = -1;
+      mHistorySrcDepth = -1;
       return true;
    }
-   Commit();   // parsing the snapshot below re-reads the document from its text afterwards
-   // Read the snapshot's layers by parsing its text, then parse the document back. A layer the snapshot lacks, or
+   SourceFromText(mSnapshots[(size_t)i].text);
+   mHistorySrc = i;
+   mHistorySrcDepth = -1;
+   return true;
+}
+
+bool Scene2DNode::SetHistorySourceText(const std::string& text, long long depth)
+{
+   if (text.empty())
+      return false;
+   Layers();
+   SourceFromText(text);
+   mHistorySrc = kSourceState;
+   mHistorySrcDepth = depth;
+   return true;
+}
+
+void Scene2DNode::DropHistorySource()
+{
+   mHistorySrc = kSourceNone;
+   mHistorySrcDepth = -1;
+}
+
+void Scene2DNode::SourceFromText(const std::string& text)
+{
+   Commit();   // parsing the source below re-reads the document from its text afterwards
+   // Read the source's layers by parsing its text, then parse the document back. A layer the source lacks, or
    // one whose pixel size changed since, keeps its current source (the Undo brush then paints it back to itself).
    std::map<int, std::vector<std::string>> then;
    const std::string now = mText;
-   mText = mSnapshots[(size_t)i].text;
+   mText = text;
    Layers();
+   mSourceAll = false;
+   mSourceIds.clear();
+   mSourceLack = SourceLack();
    for (const Layer& l : mLayers)
+   {
+      mSourceIds.insert(l.id);
       if (l.kind == Kind::Paint)
          then[l.id] = l.tiles;
+   }
+   if (mLayers.size() == 1)
+   {
+      const Layer& lone = mLayers[0];
+      if (lone.kind == Kind::Paint)
+      {
+         mSourceLack.kind = SourceLack::kTiles;
+         mSourceLack.tiles = lone.tiles;
+         mSourceLack.pw = lone.pw;
+         mSourceLack.ph = lone.ph;
+      }
+      else
+      {
+         // A lone shape gives its solid colour, past its path too; any other fill, or none, gives white.
+         mSourceLack.kind = SourceLack::kColour;
+         if (lone.kind == Kind::Vector && lone.shapes.size() == 1 && lone.shapes[0].fillOn && lone.shapes[0].fillType == 0)
+            for (int c = 0; c < 3; c++)
+               mSourceLack.rgba[c] = lone.shapes[0].fillC[c];
+      }
+   }
    mText = now;
    Layers();
    for (const Layer& l : mLayers)
@@ -2988,8 +3254,49 @@ bool Scene2DNode::SetHistorySource(int i)
       auto t = then.find(l.id);
       mUndoTiles[l.id] = t != then.end() && t->second.size() == l.tiles.size() ? t->second : l.tiles;
    }
-   mHistorySrc = i;
-   return true;
+}
+
+const GLUtil::Fbo* Scene2DNode::HistorySourceSurface(const Layer& l)
+{
+   mHistoryRefusal.clear();
+   if (mHistorySrc == kSourceNone)
+   {
+      mHistoryRefusal = "The History source state is gone: set one in History";
+      return nullptr;
+   }
+   if (!mSourceAll && mSourceIds.count(l.id) == 0)
+   {
+      if (mSourceLack.kind == SourceLack::kTiles && mSourceLack.pw == l.pw && mSourceLack.ph == l.ph)
+      {
+         Surface* us = SyncSurface(mUndoSurf, l.id, l.pw, l.ph, mSourceLack.tiles);
+         return us != nullptr ? &us->fbo : nullptr;
+      }
+      if (mSourceLack.kind == SourceLack::kRefuse)
+      {
+         mHistoryRefusal = (l.name.empty() ? std::string("This layer") : "\"" + l.name + "\"") + " did not exist in the History source state";
+         return nullptr;
+      }
+      if (!GLUtil::EnsureFbo(mLackSurf, l.pw, l.ph, GL_RGBA8, "Scene2DHistoryLack"))
+         return nullptr;
+      const float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+      const float* c = mSourceLack.kind == SourceLack::kColour ? mSourceLack.rgba : white;
+      GLint prev = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prev);
+      const GLboolean scissor = glIsEnabled(GL_SCISSOR_TEST);
+      glDisable(GL_SCISSOR_TEST);
+      glBindFramebuffer(GL_FRAMEBUFFER, mLackSurf.fbo);
+      glClearColor(c[0], c[1], c[2], c[3]);
+      glClear(GL_COLOR_BUFFER_BIT);
+      if (scissor)
+         glEnable(GL_SCISSOR_TEST);
+      glBindFramebuffer(GL_FRAMEBUFFER, prev);
+      return &mLackSurf;
+   }
+   auto u = mUndoTiles.find(l.id);
+   if (u == mUndoTiles.end() || u->second.size() != l.tiles.size())
+      mUndoTiles[l.id] = l.tiles;
+   Surface* us = SyncSurface(mUndoSurf, l.id, l.pw, l.ph, mUndoTiles[l.id]);
+   return us != nullptr ? &us->fbo : nullptr;
 }
 
 bool Scene2DNode::SetPattern(const std::vector<uint8_t>& rgba, int w, int h, uint64_t key)

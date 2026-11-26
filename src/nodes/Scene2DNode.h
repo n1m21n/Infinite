@@ -10,6 +10,7 @@
 #include <functional>
 #include <iosfwd>
 #include <map>
+#include <set>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -613,7 +614,19 @@ public:
    // Shape Snap: the stroke so far thrown away and drawn again along xy (doc px), on the same layer and target with
    // the same brush, at full pressure. The stroke stays open (EndPaint on release). False when nothing is painting.
    bool RepaintStroke(const std::vector<float>& xy);
-   bool Painting() const { return mStroke.Active(); }
+   bool Painting() const { return mStroke.Active() || mArt.on; }
+   // Art History: the History Brush paints posed dabs that sample the History source (PhotoCraft art_history).
+   // Set before BeginPaint; it applies to a History Brush stroke on a layer's pixels only.
+   struct ArtOptions
+   {
+      bool on = false;
+      int style = 0;            // ArtHistory::Style
+      float area = 50.0f;       // 0..500 px: how far the dabs spread
+      float tolerance = 0.0f;   // 0..1: how much a spot must have changed before a dab paints it
+   };
+   void SetArtHistory(const ArtOptions& o) { mArtOpt = o; }
+   const ArtOptions& ArtHistoryOptions() const { return mArtOpt; }
+   static constexpr float kArtAreaMax = 500.0f;
    int PaintingLayer() const { return mPaintId; }
    // Bucket fill at a document point, within `tolerance` (0..255) of the
    // clicked colour; contiguous or everywhere; sampled from the layer or the picture.
@@ -673,7 +686,15 @@ public:
    // Fill from History and Erase to History then paint back to each paint layer as it was in that snapshot.
    struct Snapshot { std::string name, text; int id = 0; };   // id: stable while others are renamed or deleted
    const std::vector<Snapshot>& Snapshots() const { return mSnapshots; }
-   int AddSnapshot(const std::string& name);        // the index of the new snapshot
+   // The index of the new snapshot. replace: a snapshot of that name already there goes (Photoshop's New Snapshot >
+   // Replace Existing), the new one is added at the end.
+   int AddSnapshot(const std::string& name, bool replace = false);
+   // History Options > Automatically Create New Snapshot When Saving: a snapshot named `name` (the time), none when
+   // the document has not changed since the last one this made (or that one was deleted). The index, -1 for none.
+   int SnapshotOnSave(const std::string& name);
+   // History Options > Automatically Create First Snapshot: once per document, when it is first shown.
+   bool FirstSnapshotDone() const { return mFirstSnapDone; }
+   void MarkFirstSnapshotDone() { mFirstSnapDone = true; }
    // Photoshop's New Snapshot From: the full document, the visible layers merged into one, or one layer alone (with
    // its groups). The document itself is left as it was. The index of the new snapshot, -1 when it cannot.
    enum class SnapFrom { Document, Merged, Layer };
@@ -682,7 +703,44 @@ public:
    bool DeleteSnapshot(int i);
    bool RestoreSnapshot(int i);                     // the document becomes the snapshot (the caller pushes undo)
    bool SetHistorySource(int i);                    // -1: each layer as it is now
+   // A History panel state as the source: the document text it holds, and its place in the history (counted from
+   // the first state ever, so it stays put as older states fall off). HistorySource() is then kSourceState.
+   static constexpr int kSourceState = -3;
+   // The state the source was is gone (a new step discarded it from Redo): the History brush and Fill > History
+   // refuse until a source is set. HistorySource() is kSourceNone.
+   static constexpr int kSourceNone = -2;
+   bool SetHistorySourceText(const std::string& text, long long depth);
+   long long HistorySourceDepth() const { return mHistorySrc == kSourceState ? mHistorySrcDepth : -1; }
+   void DropHistorySource();
    int HistorySource() const { return mHistorySrc; }
+   // What lives only for this session (snapshots, the History source, the first-snapshot mark), carried across Undo
+   // and Redo, which rebuild the node from its text.
+   // What the History source gives a layer it does not hold (Photoshop): when the state had one layer, that
+   // layer's own pixels (not its opacity), or a lone shape's solid colour (white for any other shape or layer);
+   // with more layers the History Brush and Erase to History refuse ("did not exist").
+   struct SourceLack
+   {
+      enum Kind { kRefuse = 0, kTiles, kColour };
+      int kind = kRefuse;
+      std::vector<std::string> tiles;
+      int pw = 0, ph = 0;
+      float rgba[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+   };
+   // Why the last History Brush / Erase to History stroke was refused (empty: it was not).
+   const std::string& HistoryRefusal() const { return mHistoryRefusal; }
+   struct Session
+   {
+      std::vector<Snapshot> snapshots;
+      int nextSnapId = 1, historySrc = -1, saveSnapId = 0;
+      long long srcDepth = -1;
+      bool firstSnapDone = false;
+      std::map<int, std::vector<std::string>> undoTiles;
+      bool sourceAll = true;
+      std::set<int> sourceIds;
+      SourceLack sourceLack;
+   };
+   Session TakeSession() const;
+   void PutSession(const Session& s);
    bool FillFromHistory(int id, float opacity);
    // The Pattern Stamp's tile (RGBA, rows top first). key names the tile so the same one is not uploaded again.
    bool SetPattern(const std::vector<uint8_t>& rgba, int w, int h, uint64_t key);
@@ -1256,6 +1314,13 @@ private:
    std::map<int, Surface> mSurfaces, mMasks, mFxMasks;
    bool StoreFilterMask(int id, const std::vector<uint8_t>& was, std::vector<uint8_t> next);
    std::map<int, std::vector<std::string>> mUndoTiles;   // the Undo brush's source per paint layer
+   bool mSourceAll = true;          // the source is each layer as it is (no state): every layer has one
+   std::set<int> mSourceIds;        // layers the source state holds
+   SourceLack mSourceLack;          // what a layer the state does not hold paints from
+   GLUtil::Fbo mLackSurf;           // that, laid out on the layer being painted
+   std::string mHistoryRefusal;
+   // The surface the History Brush reads for layer `l`; nullptr refuses (mHistoryRefusal says why).
+   const GLUtil::Fbo* HistorySourceSurface(const Layer& l);
    std::map<int, Surface> mUndoSurf;
    std::map<int, Surface> mWarpMaskFrom;   // mesh warp: each layer's pixel mask as the warp began
    GLUtil::Fbo mWarpSel;                   // mesh warp: the selection laid on the warped surface
@@ -1266,6 +1331,10 @@ private:
    bool RemoveWithAi(std::vector<uint8_t>& px, int w, int h, const std::vector<uint8_t>& hole);
    int PushSnapshot(const std::string& name, const std::string& text);
    int mHistorySrc = -1;
+   long long mHistorySrcDepth = -1;
+   int mSaveSnapId = 0;   // the snapshot the last save made (SnapshotOnSave)
+   bool mFirstSnapDone = false;
+   void SourceFromText(const std::string& text);
    GLUtil::Fbo mPattern;
    uint64_t mPatternKey = 0;
    unsigned mWarpProgram = 0;
@@ -1291,6 +1360,24 @@ private:
    int ShapesLayerFromText(int id, int preW, int preH, std::vector<Shape> shapes);
    std::map<int, TextBox> mTextBoxes;
    BrushEngine::Stroke mStroke;
+   ArtOptions mArtOpt;
+   struct ArtStroke
+   {
+      bool on = false;
+      int id = 0, w = 0, h = 0;
+      int style = 0;
+      float area = 0, tolerance = 0, size = 0, hardness = 1, opacity = 1, flow = 1;
+      bool lockTransparent = false;
+      uint32_t seed = 0;
+      std::vector<float> pts;          // surface px, rows from the bottom
+      std::vector<uint8_t> sel;        // the selection on the surface (empty: none)
+      size_t stamped = 0;              // dabs already painted
+      GLUtil::Fbo src;                 // the History source on this surface
+      int dirty[4] = { 0, 0, 0, 0 };
+   } mArt;
+   bool BeginArt(int id, const BrushEngine::Brush& b, float sx, float sy, const GLUtil::Fbo& src);
+   void ArtStamp(bool final);
+   void EndArt();
    int mPaintId = 0, mPaintTarget = 0;
    BrushEngine::Brush mPaintBrushIn;   // the brush BeginPaint was given (before its own scaling)
    struct SkinStroke

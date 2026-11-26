@@ -22,4 +22,7 @@ namespace StatusDot
       dl->AddCircleFilled(c, r + 1.0f, ImGui::GetColorU32(ImGuiCol_PopupBg, tok::status_dot_on_last_item_im_gui_col_popup_bg_alpha), tok::status_dot_on_last_item_segments);
       dl->AddCircleFilled(c, r, tok::U32(pair, CategoryColors::IsThemeLight()), tok::status_dot_on_last_item_segments);
    }
+
+   // A plain marker dot in the row's own text colour (the History Brush source column).
+   inline void Marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 col) { dl->AddCircleFilled(centre, r, col); }
 }

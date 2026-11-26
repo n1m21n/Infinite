@@ -861,6 +861,7 @@ set(COMMON_SOURCES
     src/nodes/Scene3DNode.cpp
     src/nodes/Scene2DNode.cpp
     src/nodes/Scene2DPaint.cpp
+    src/nodes/ArtHistory.cpp
     src/nodes/Scene2DVector.cpp
     src/nodes/Scene2DVectorTools.cpp
     src/nodes/Scene2DType.cpp

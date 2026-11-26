@@ -3966,7 +3966,7 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    a.nearest = l.nearest || l.aaMode == 2;
    // A paint layer shows only its painted tiles: crop to them (one texel wider, so filtering reads the same), which
    // lets the pass touch only that part of the frame.
-   if (l.kind == Kind::Paint && !(mStroke.Active() && mPaintId == l.id) && l.pw > 0 && l.ph > 0)
+   if (l.kind == Kind::Paint && !((mStroke.Active() || mArt.on) && mPaintId == l.id) && l.pw > 0 && l.ph > 0)
    {
       const int kT = TileStore::kTile, cols = (l.pw + kT - 1) / kT;
       int tx0 = l.pw, ty0 = l.ph, tx1 = 0, ty1 = 0;

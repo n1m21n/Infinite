@@ -5957,6 +5957,55 @@ void JumpInHistory(int undos, int redos);
 // them all back; the patch, its saved/unsaved state and the 2D snapshots are untouched.
 void ClearHistory();
 bool DeleteHistoryState(int undos, int redos);   // the state and every later one; 0,0 = the current state
+// History Options (Photoshop's History panel menu), kept with the workspace settings.
+struct HistoryOptions
+{
+   bool firstSnapshot = true;        // a 2D document starts with a snapshot of itself, named after it
+   bool snapshotOnSave = false;      // each save adds a snapshot named by the time, when the document changed
+   bool nonLinear = false;           // deleting a state keeps the ones after it
+   bool newSnapshotDialog = false;   // New Snapshot asks for a name first
+   bool visibilityUndoable = true;   // a layer's eye is a history step
+};
+extern HistoryOptions gHistoryOptions;
+// The first History row: "New" for a new patch, "Open" for one opened from a file; Purge names it after the state kept.
+extern std::string gHistoryStartLabel;
+// States that fell off the bottom of the list. A state's place counted from the first one ever is this plus the
+// undo steps under it, so a History source state keeps its place as older states go.
+extern unsigned long long gHistoryDropped;
+unsigned long long HistoryCurrentDepth();
+// The last step's own leftovers, so a step taken back at once (a refused edit) leaves History exactly as it was:
+// the Redo states it discarded and whether the patch was saved.
+struct HistoryRollback
+{
+   size_t base = 0;       // the undo stack's size before the step
+   size_t undoSize = 0;   // and right after it; 0 = nothing to roll back
+   std::deque<UndoEntry> redo;
+   bool dirty = false;
+};
+extern HistoryRollback gHistoryRollback;
+// Once a frame, outside any step: the list back to kMaxUndoDepth.
+void TrimHistory();
+// Takes back every step past `undoSize` without redoing them, restoring what the last one discarded.
+void RollbackUndoTo(size_t undoSize);
+// Delete is offered for the current state, or with non-linear history for any state but the oldest.
+bool CanDeleteHistoryState();
+// Edit > Purge > Histories: every state but the current one goes, for good (snapshots stay). The number freed.
+int PurgeHistories();
+// The patch a History row holds: undos 0 = now, n = n steps back (the oldest row is gUndoStack.size()); redos n =
+// the n-th undone state. False for a row with no patch of its own (a timeline-only or Clear History step).
+bool HistoryStatePatch(int undos, int redos, Patch::Data& out);
+// The 2D documents' session state (snapshots, History source) carried across Undo and Redo, which rebuild every
+// node, and the layer eyes History Options left out of the steps; defined with the 2D panel.
+void KeepDocSessions();
+void RestoreDocSessions();
+// A new step discarded the states from `fromDepth` on: a History source that was one of them goes.
+void HistoryDiscardedStates(unsigned long long fromDepth);
+void SnapshotDocsOnSave();
+// History rows for the open 2D document: the History Brush paints from that state; New Document opens it as its own.
+bool View2DHasDocument();
+bool SetHistorySourceFromState(int undos, int redos);
+bool HistorySourceIsState(int undos, int redos);
+bool NewDocumentFromState(int undos, int redos, const std::string& name);
 extern bool gHistoryOpen;
 extern float gHistoryWidth;
 void DrawHistoryDocked(const char* id, const ImVec2& size);

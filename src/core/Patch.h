@@ -131,6 +131,9 @@ class INode;
 // Names may contain spaces, so anything free-form is always last on its line.
 namespace Patch
 {
+   // A saved `s` param's text as the node wrote it (the file escapes newlines and backslashes).
+   std::string UnescapeText(const std::string& raw);
+
    // Highest node index a headless load keeps as written: pin ids are
    // index * GraphNode::kStride (1050) in an int. PatchSchema::Validate
    // reports E_BAD_INDEX outside 1..kMaxNodeIndex.
