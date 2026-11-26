@@ -41,7 +41,18 @@ namespace
    {
       out.clear();
       std::string err;
-      return !text.empty() && Platform::GetTextOutlines(text, font, letter, out, err) && !out.empty();
+      float base = 0.0f;
+      if (text.empty() || !Platform::GetTextOutlines(text, font, letter, out, err, &base) || out.empty())
+         return false;
+      // The OS centres the outlines on their ink; type is laid on its baseline, so put the baseline back at 0.
+      for (Platform::TextContour& c : out)
+      {
+         for (size_t i = 1; i < c.points.size(); i += 2)
+            c.points[i] -= base;
+         for (size_t i = 1; i < c.curve.size(); i += 2)
+            c.curve[i] -= base;
+      }
+      return true;
    }
 
    std::vector<Glyph> Clusters(const std::vector<Platform::TextContour>& cs)

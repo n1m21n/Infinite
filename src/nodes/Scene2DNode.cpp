@@ -2333,6 +2333,8 @@ bool Scene2DNode::PerspectiveCrop(const float qf[8], int w, int h)
 
 void Scene2DNode::Commit()
 {
+   if (mText != mParsedText)
+      Parse();   // never write unparsed state over newer text (a node Undo just rebuilt holds an empty list)
    Serialize();
 }
 
@@ -3640,6 +3642,20 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       }
       a.box[0] = (float)mDoc.w;
       a.box[1] = (float)mDoc.h;
+      // A fill layer's masks sit on the canvas (its box), like Photoshop's solid / gradient fill with a shape mask.
+      if (l.HasPixelMask() && l.pmaskOn)
+      {
+         auto it = mMasks.find(l.id);
+         if (it != mMasks.end())
+            a.pmask = (mStroke.Active() && mPaintId == l.id && mPaintTarget == 1) ? mStroke.DisplayTexture(it->second.fbo) : it->second.fbo.tex;
+      }
+      if (l.hasVMask && l.vmaskOn && !l.vmask.empty())
+         if (Raster* r = SyncRaster(mVMasks, l, true))
+         {
+            a.vmask = r->tex;
+            a.vmaskInvert = l.vmaskInvert;
+            a.vmaskDensity = l.vmaskDensity;
+         }
       Pass(depth, a);
       return;
    }

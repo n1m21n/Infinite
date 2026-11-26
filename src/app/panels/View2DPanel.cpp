@@ -983,6 +983,36 @@ namespace
    const int kBarDistribute[2] = { kDistHCentre, kDistVCentre };
    float sDistSpacing = 0.0f;   // Distribute Spacing with a key object: this gap in px; otherwise the gaps even out
 
+   // What Align and Distribute measure: a shape layer's drawn shapes (Photoshop aligns on content, not the
+   // canvas-sized layer box); any other layer its box.
+   bool ContentBounds(Scene2DNode* doc, int id, float lo[2], float hi[2])
+   {
+      const Layer* l = doc->FindLayer(id);
+      if (l == nullptr)
+         return false;
+      if (l->kind != Kind::Vector || l->shapes.empty())
+         return doc->Bounds(id, lo, hi);
+      lo[0] = lo[1] = std::numeric_limits<float>::max();
+      hi[0] = hi[1] = -std::numeric_limits<float>::max();
+      bool any = false;
+      for (const Scene2DNode::Shape& sh : l->shapes)
+      {
+         float a[2], b[2];
+         if (!Scene2DNode::ShapeBounds(sh, a, b))
+            continue;
+         const float bx[4] = { a[0], b[0], b[0], a[0] }, by[4] = { a[1], a[1], b[1], b[1] };
+         for (int k = 0; k < 4; k++)
+         {
+            float x = 0, y = 0;
+            doc->BoxToDoc(*l, bx[k], by[k], x, y);
+            lo[0] = std::min(lo[0], x), lo[1] = std::min(lo[1], y);
+            hi[0] = std::max(hi[0], x), hi[1] = std::max(hi[1], y);
+         }
+         any = true;
+      }
+      return any || doc->Bounds(id, lo, hi);
+   }
+
    // The box Align lines up on, and the layer that must not move (key object), 0 for none.
    bool AlignTarget(Scene2DNode* doc, float lo[2], float hi[2], int& key)
    {
@@ -994,12 +1024,21 @@ namespace
       if (sAlignTo == 2 && sSel.size() > 1)
       {
          key = sSel.back();
-         return doc->Bounds(key, lo, hi);
+         return ContentBounds(doc, key, lo, hi);
       }
       if (doc->HasSelection() && doc->SelectionBounds(lo, hi))
          return true;
       if (sSel.size() > 1)
-         SelBounds(doc, lo, hi);
+      {
+         lo[0] = lo[1] = std::numeric_limits<float>::max();
+         hi[0] = hi[1] = -std::numeric_limits<float>::max();
+         for (int id : sSel)
+         {
+            float a[2], b[2];
+            if (ContentBounds(doc, id, a, b))
+               lo[0] = std::min(lo[0], a[0]), lo[1] = std::min(lo[1], a[1]), hi[0] = std::max(hi[0], b[0]), hi[1] = std::max(hi[1], b[1]);
+         }
+      }
       return true;
    }
 
@@ -1025,7 +1064,7 @@ namespace
       for (int id : sSel)
       {
          float a[2], b[2];
-         if (id == key || !doc->Bounds(id, a, b))
+         if (id == key || !ContentBounds(doc, id, a, b))
             continue;
          const float want = side == 0 ? lo[axis] : side == 1 ? (lo[axis] + hi[axis]) * 0.5f : hi[axis];
          const float have = side == 0 ? a[axis] : side == 1 ? (a[axis] + b[axis]) * 0.5f : b[axis];
@@ -1049,7 +1088,7 @@ namespace
       for (int id : sSel)
       {
          float a[2], b[2];
-         if (doc->Bounds(id, a, b))
+         if (ContentBounds(doc, id, a, b))
             items.push_back({ id, a[axis], b[axis] });
       }
       const int key = sAlignTo == 2 && !sSel.empty() ? sSel.back() : 0;
@@ -18393,6 +18432,8 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       auto undoBack = [&]() {
          Undo();
          doc = FindDoc();
+         if (doc != nullptr)
+            doc->Layers();   // the rebuilt node parses its text on the next frame; the const getters read the parse
          return doc != nullptr;
       };
       auto about = [](float a, float b) { return std::fabs(a - b) < 2.0f; };
@@ -18492,6 +18533,8 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->ShiftSelection(60, 0);
          Undo();
          doc = FindDoc();
+         if (doc != nullptr)
+            doc->Layers();   // the frame after an undo parses the restored text
          expect("off-canvas: undo brings back the part outside", doc != nullptr && doc->DocText() == t0 && ext(-50, 50, 50, 120) &&
                                                                     gUndoStack.size() == u0);
          if (doc == nullptr)
@@ -18656,6 +18699,7 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->Deselect();
          doc->SelectColorRange({}, cr, false, Scene2DNode::kSelNew, false, p);
          expect("ai: the Reds range takes red, not green", doc->SelectionAt(150, 150) > 0.95f && doc->SelectionAt(50, 50) < 0.05f);
+         doc->Deselect();
          doc->SelectColorRange({}, cr, true, Scene2DNode::kSelNew, false, p);
          expect("ai: inverted range flips it", doc->SelectionAt(150, 150) < 0.05f && doc->SelectionAt(50, 50) > 0.95f);
          doc->SelectRect(0, 0, 150, (float)H, Scene2DNode::kSelNew, 0, false);
@@ -19254,6 +19298,7 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          SelectOnly(s);
          doc->Commit();
          sCamAll = true;
+         const std::vector<uint8_t> comp0 = picture(doc);   // Sample All Layers reads the composite, which the app draws every frame
          ok = CamApply(doc, CamParamsNow(200, 0));
          std::vector<uint8_t> sp;
          ok = ok && doc->ReadPaint(s, sp, pw, ph) && pw == iw;
@@ -19352,9 +19397,13 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
                const size_t i = ((size_t)(ih - 1 - y) * iw + x) * 4;
                kept = kept && out.size() == marked.size() && out[i] == marked[i] && out[i + 1] == marked[i + 1];
             }
+         // A thin red bar on the clean gradient, the stroke along it, a selection over its left half: the left
+         // half takes the gradient, the right half stays red.
+         doc->Gradient(p, 0, 0, W, 0, g0, g1, 1, 1.0f, 0, false);
+         mark(138, 139, 162, 142);
          doc->SelectRect(0, 0, 150, H, Scene2DNode::kSelNew, 0, false);
          const std::vector<uint8_t> before = picture(doc);
-         sRemoveQueue = { line(140, 140, 160, 140, 4.0f) };
+         sRemoveQueue = { line(136, 140, 164, 140, 4.0f) };
          RunRemove(doc);
          out = picture(doc);
          const size_t lI = ((size_t)(ih - 1 - 140) * iw + 145) * 4, rI = ((size_t)(ih - 1 - 140) * iw + 156) * 4;
@@ -20006,9 +20055,9 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          };
          const int a = bar(0, 10), b = bar(30, 20), c = bar(100, 30);
          doc->Commit();
-         auto left = [&](int id) {
+         auto left = [&](int id) {   // the shapes' left edge, as Align and Distribute measure it
             float lo[2] = { -1, -1 }, hi[2];
-            doc->Bounds(id, lo, hi);
+            ContentBounds(doc, id, lo, hi);
             return lo[0];
          };
          auto reset = [&]() {
@@ -20459,6 +20508,7 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          sb.opacity = sb.flow = 1.0f;
          sb.color[0] = 1.0f, sb.color[1] = sb.color[2] = 0.0f;
          const int spl = doc->AddPaintLayer();
+         doc->Commit();   // the panel commits after every edit (Touch); the checkpoint saves the committed text
          const size_t u0 = gUndoStack.size();
          PushUndoCheckpoint("Stroke path");
          const bool stroked = doc->StrokePath("Disc", spl, sb, false);
@@ -20524,6 +20574,7 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
                 svl->shapes.size() == 1 && svl->shapes[0].fillOn && doc->FindPath("Disc") != nullptr);
          expect("paths: convert to shape needs a path", doc->PathToShapeLayer("nope", 0, col) == 0 && doc->Layers().size() == layers0 + 1);
          // Paths are part of the document: undo brings a deleted one back, and its clipping role.
+         doc->Commit();
          PushUndoCheckpoint("Delete path");
          doc->DeletePath("Disc");
          expect("paths: delete clears the clipping path", doc->FindPath("Disc") == nullptr && doc->ClippingPath().empty());
@@ -20571,8 +20622,9 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          float b[4];
          const bool wp = tp > 0 && doc->MakeWorkPathFromText(tp) && bounds(doc->FindPath(SN::kWorkPath), b);
          expect("type: type attaches to a path at a document point", tp > 0 && err == SN::kTypePathOk && tl != nullptr && tl->typeMode == 1);
+         // The baseline is on the path: the cap of the T reaches 0.7 em above it, the y and p descend below it.
          expect("type: work path and shape follow the glyphs on the path",
-                wp && b[3] <= py + 2.0f && b[1] < py - tl->fontSize * 0.4f && b[0] >= W * 0.1f - 2.0f && b[2] <= W * 0.9f + 2.0f);
+                wp && std::fabs(b[1] - (py - tl->fontSize * 0.7f)) <= 3.0f && b[3] > py + 2.0f && b[3] <= py + tl->fontSize * 0.3f && b[0] >= W * 0.1f - 2.0f && b[2] <= W * 0.9f + 2.0f);
          // Editing the type path moves the type with it.
          {
             Layer* el = doc->FindLayer(tp);

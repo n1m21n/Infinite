@@ -1970,6 +1970,7 @@ bool Scene2DNode::Pick(float x, float y, float rgb[3], int size, int layer, floa
    if (layer != 0)
    {
       Layers();
+      SyncSurfaces();   // a document just re-read from its text (undo, a snapshot) reads its new pixels, not the last frame's
       const Layer* l = FindConst(layer);
       auto it = mSurfaces.find(layer);
       float sx = 0, sy = 0, scale = 1;
@@ -2215,6 +2216,7 @@ void Scene2DNode::SelectAll()
 
 void Scene2DNode::Deselect()
 {
+   Layers();   // a node Undo just rebuilt has not parsed yet; committing unparsed would write an empty document
    mSelApron = SelApron();
    mSel.clear();
    mSelAny = false;
@@ -2620,6 +2622,7 @@ namespace { constexpr size_t kSnapshotsMax = 64; }
 int Scene2DNode::AddSnapshot(const std::string& name)
 {
    Layers();
+   Commit();   // the text must hold the layers as they are now, edits not yet committed included
    if (mSnapshots.size() >= kSnapshotsMax)
    {
       mSnapshots.erase(mSnapshots.begin());   // the oldest goes, as Photoshop drops the oldest state
@@ -2653,6 +2656,8 @@ bool Scene2DNode::RestoreSnapshot(int i)
 {
    if (i < 0 || i >= (int)mSnapshots.size())
       return false;
+   Layers();
+   Commit();
    if (mSnapshots[(size_t)i].text == mText)
       return true;
    SetDocText(mSnapshots[(size_t)i].text);
@@ -2674,6 +2679,7 @@ bool Scene2DNode::SetHistorySource(int i)
       mHistorySrc = -1;
       return true;
    }
+   Commit();   // parsing the snapshot below re-reads the document from its text afterwards
    // Read the snapshot's layers by parsing its text, then parse the document back. A layer the snapshot lacks, or
    // one whose pixel size changed since, keeps its current source (the Undo brush then paints it back to itself).
    std::map<int, std::vector<std::string>> then;
@@ -4073,7 +4079,7 @@ namespace
    using WarpGrid = Scene2DNode::WarpGrid;
    const float kThirds[4] = { 0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f };
    const float kLineEps = 1e-4f;    // two grid lines closer than this (in box fractions) are one
-   const float kLossPx = 1e-3f;     // a point this close to where its neighbours put it carries no edit
+   const float kLossPx = 1e-3f;     // a point this close to its rest place carries no edit
 
    bool LinesAre(const std::vector<float>& k, const float* want, int n)
    {
@@ -4146,19 +4152,21 @@ namespace
       g.pts.swap(out);
    }
 
-   // Whether interior line `at` only carries what its neighbours put there (dropping it loses nothing).
-   bool LineIsPlain(const WarpGrid& g, int axis, int at)
+}
+
+namespace
+{
+   // Whether line `at` of the edited grid still sits where the rest grid has it (no point on it was moved).
+   bool LineUnmoved(const Scene2DNode::WarpGrid& moved, const Scene2DNode::WarpGrid& rest, int axis, int at)
    {
-      const std::vector<float>& k = axis == 0 ? g.us : g.vs;
-      const float w = (k[at] - k[at - 1]) / (k[at + 1] - k[at - 1]);
-      const int nx = g.Nx(), n = axis == 0 ? g.Ny() : nx;
+      const int nx = moved.Nx(), n = axis == 0 ? moved.Ny() : nx;
       for (int m = 0; m < n; m++)
+      {
+         const size_t i = axis == 0 ? (size_t)m * nx + at : (size_t)at * nx + m;
          for (int c = 0; c < 2; c++)
-         {
-            auto P = [&](int line) { return axis == 0 ? g.pts[((size_t)m * nx + line) * 2 + c] : g.pts[((size_t)line * nx + m) * 2 + c]; };
-            if (std::fabs(P(at) - ((1 - w) * P(at - 1) + w * P(at + 1))) > kLossPx)
+            if (std::fabs(moved.pts[i * 2 + c] - rest.pts[i * 2 + c]) > kLossPx)
                return false;
-         }
+      }
       return true;
    }
 }
@@ -4204,7 +4212,7 @@ bool Scene2DNode::SplitWarpGrid(WarpGrid& moved, WarpGrid& rest, float s, float 
    {
       const int axis = how == kWarpSplitH ? 1 : 0;
       for (int at = 2; at >= 1; at--)
-         if (LineIsPlain(moved, axis, at) && LineIsPlain(rest, axis, at))
+         if (LineUnmoved(moved, rest, axis, at))
          {
             RemoveLine(moved, axis, at);
             RemoveLine(rest, axis, at);

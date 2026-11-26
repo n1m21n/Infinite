@@ -365,7 +365,7 @@ namespace BrushEngine
          "      vec2 src = (uAnchor + uOff + uSrcM * (px - uAnchor)) * uTexel;\n"
          "      if (uMode == 10) { vec4 s = srcAt(src); if (uSrcBlend > 0) s.rgb = mix(s.rgb, cloneBlend(d.rgb, s.rgb), d.a);\n"
          "         fragColor = mix(d, s, a); return; }\n"
-         "      if (uMode == 30) { vec2 ts = vec2(textureSize(uSrcTex, 0)); ivec2 q = ivec2(mod(floor((px + uPatPhase) / uPatScale), ts));\n"
+         "      if (uMode == 29) { vec2 ts = vec2(textureSize(uSrcTex, 0)); ivec2 q = ivec2(mod(floor((px + uPatPhase) / uPatScale), ts));\n"
          "         vec4 s = uHasSrc == 1 ? texelFetch(uSrcTex, q, 0) : vec4(uColor, 1.0);\n"   // pattern stamp: the tile, repeated
          "         fragColor = uLock == 1 ? vec4(mix(d.rgb, s.rgb, a), d.a) : mix(d, s, a); return; }\n"
          "      if (uMode == 24) { vec4 s = srcAt(vUv); if (uSrcBlend > 0) s.rgb = mix(s.rgb, cloneBlend(d.rgb, s.rgb), d.a);\n"

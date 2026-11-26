@@ -1853,8 +1853,10 @@ namespace Platform
 
    bool GetTextOutlines(const std::string& text, const std::string& fontName,
                         float letterSpacing, std::vector<TextContour>& outContours,
-                        std::string& outError)
+                        std::string& outError, float* outBaselineY)
    {
+      if (outBaselineY != nullptr)
+         *outBaselineY = 0.0f;
       @autoreleasepool
       {
          outContours.clear();
@@ -1969,6 +1971,8 @@ namespace Platform
             }
          }
          const float cx = (lo[0] + hi[0]) * 0.5f, cy = (lo[1] + hi[1]) * 0.5f;
+         if (outBaselineY != nullptr)
+            *outBaselineY = -cy;
          for (TextContour& c : outContours)
          {
             for (size_t i = 0; i + 1 < c.points.size(); i += 2)

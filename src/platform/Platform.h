@@ -299,9 +299,10 @@ namespace Platform
    // text render by its family name, which comes back in `family`. False when the file is not a font.
    bool AddFontFile(const std::string& path, std::string& family);
 
+   // outBaselineY: where the baseline sits in the returned units (the outlines may be centred on their ink).
    bool GetTextOutlines(const std::string& text, const std::string& fontName,
                         float letterSpacing, std::vector<TextContour>& outContours,
-                        std::string& outError);
+                        std::string& outError, float* outBaselineY = nullptr);
 
    struct TextRasterRequest
    {

@@ -1130,8 +1130,18 @@ int Scene2DNode::ConvertTextToShapes(int id)
       Line ln;
       ln.x0 = ln.x1 = 0.0f;
       std::string err;
-      if (!row.empty() && Platform::GetTextOutlines(row, src->font, letter, ln.c, err))
+      float base = 0.0f;
+      if (!row.empty() && Platform::GetTextOutlines(row, src->font, letter, ln.c, err, &base))
       {
+         // Each row comes back centred on its own ink: put every row's baseline at 0 so rows with and without
+         // descenders stack on the leading alike.
+         for (auto& c : ln.c)
+         {
+            for (size_t i = 1; i < c.points.size(); i += 2)
+               c.points[i] -= base;
+            for (size_t i = 1; i < c.curve.size(); i += 2)
+               c.curve[i] -= base;
+         }
          ln.x0 = 1e30f;
          ln.x1 = -1e30f;
          for (const auto& c : ln.c)

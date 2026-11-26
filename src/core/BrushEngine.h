@@ -34,6 +34,7 @@ namespace BrushEngine
                kSpongeMode, kMedian, kUndo, kColourReplace, kBgErase, kRedEye, kInpaint,
                // Pattern Stamp (Photoshop): paints a repeating pattern tile (sourceTex, tiled) instead of a colour.
                kPatternStamp };
+   static_assert(kUndo == 24 && kInpaint == 28 && kPatternStamp == 29, "the brush merge shader tests these mode numbers");
    inline bool RetouchMode(int m) { return (m >= kBlur && m <= kHeal) || m >= kSpongeMode; }
    inline bool MarbleMode(int m) { return m == kDrop || m == kComb || m == kSwirl; }
    inline bool LiquifyMode(int m) { return m == kPush || m == kTwirl || m == kBloat || m == kPinch; }
