@@ -739,6 +739,9 @@ set(COMMON_SOURCES
     src/core/tracking/OrtRuntime.cpp
     src/core/ml/AiSelect.cpp
     src/core/ml/ModelRegistry.cpp
+    src/core/ml/ModNet.cpp
+    src/core/ml/TextOcr.cpp
+    src/core/ml/ObjectDetect.cpp
     src/core/SelectMaths.cpp
     src/core/tracking/HandTracker.cpp
     src/core/tracking/FaceTracker.cpp

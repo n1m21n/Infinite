@@ -136,21 +136,21 @@ namespace Ml
                "MI-GAN (Picsart AI Research, MIT). Trained on Places2 (academic research/education). Opt-in pack.",
                { 1, 3, 512, 512 }, EpPref::CpuOnly, "inpaint" });
 
-         // Block 5A verified clean drop-in models (Phase 0 LICENCES.md)
+         // Block 5A verified clean drop-in models (Phase 0 LICENCES.md + Phase 3 Python ONNX proofs)
          add({ "modnet", "MODNet Portrait Matte", "1.0.0", "select", "models/modnet.onnx",
-               "", 0, "Apache-2.0",
+               "25f165da9bfd30830a575f1f0490f1acd995975cb349bc02f3d79332e1fe5cf6", 12980000, "Apache-2.0",
                "MODNet (ZHKKKe, Apache-2.0 code & weights). Ke et al., AAAI 2022. https://github.com/ZHKKKe/MODNet",
                { 1, 3, 512, 512 }, EpPref::CpuOnly, "modnet" });
-         add({ "ppocr_det", "PP-OCRv4/v5 Mobile Detector", "4.0", "ocr", "models/ppocr_det.onnx",
-               "", 0, "Apache-2.0",
-               "PaddleOCR PP-OCR Mobile / RapidOCR (Apache-2.0 code & weights). https://github.com/PaddlePaddle/PaddleOCR",
+         add({ "ppocr_det", "PP-OCRv4 Mobile Detector", "4.0", "ocr", "models/ppocr_det.onnx",
+               "d2a7720d45a54257208b1e13e36a8479894cb74155a5efe29462512d42f49da9", 4750000, "Apache-2.0",
+               "PaddleOCR PP-OCRv4 Mobile / RapidOCR (Apache-2.0 code & weights). https://github.com/PaddlePaddle/PaddleOCR",
                { 1, 3, 640, 640 }, EpPref::CpuOnly, "ppocr" });
-         add({ "ppocr_rec", "PP-OCRv4/v5 Mobile Recognizer", "4.0", "ocr", "models/ppocr_rec.onnx",
-               "", 0, "Apache-2.0",
-               "PaddleOCR PP-OCR Mobile / RapidOCR (Apache-2.0 code & weights). https://github.com/PaddlePaddle/PaddleOCR",
+         add({ "ppocr_rec", "PP-OCRv4 Mobile Recognizer", "4.0", "ocr", "models/ppocr_rec.onnx",
+               "48fc40f24f6d2a207a2b1091d3437eb3cc3eb6b676dc3ef9c37384005483683b", 10860000, "Apache-2.0",
+               "PaddleOCR PP-OCRv4 Mobile / RapidOCR (Apache-2.0 code & weights). https://github.com/PaddlePaddle/PaddleOCR",
                { 1, 3, 48, 320 }, EpPref::CpuOnly, "ppocr" });
          add({ "dfine_s", "D-FINE-S Object Detector (COCO)", "1.0.0", "select", "models/dfine_s_coco.onnx",
-               "", 0, "Apache-2.0",
+               "cd8a49a945feda6d28c6304ae8ae85c2759ba1d78a5a83a22c5ce8db82ef7238", 41540000, "Apache-2.0",
                "D-FINE-S COCO-only checkpoint (Peterande, Apache-2.0, MS COCO CC-BY-4.0). https://github.com/Peterande/D-FINE",
                { 1, 3, 640, 640 }, EpPref::CpuOnly, "dfine" });
          add({ "p3m_net", "P3M-Net Hair Matte", "1.0.0", "matte", "models/p3m_net.onnx",
