@@ -1,0 +1,68 @@
+infinite-patch 1
+# Gamelan Pelog Bronze Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 60
+  i note1 61
+  i note2 64
+  i note3 67
+  i note4 68
+  i note5 67
+  i note6 64
+  i note7 61
+  i note8 60
+  i note9 64
+  i note10 67
+  i note11 72
+  i note12 68
+  i note13 67
+  i note14 64
+  i note15 61
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float ombakHz = 4.2 [0.5, 12.0];\nparam float malletHard = 0.65 [0.1, 1.0];\nparam float decay = 0.9994 [0.997, 0.9998];\nstate float p1 = 0; state float p1b = 0; state float p2 = 0;\nstate float env = 0; state float bp1 = 0; state float bp2 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.14, env * decay);\nfc = clamp(freq, 60.0, 2400.0);\np1 = (p1 + fc / sr) % 1.0;\np1b = (p1b + (fc + ombakHz) / sr) % 1.0;\np2 = (p2 + clamp(fc * 2.756, 60.0, 9000.0) / sr) % 1.0;\n\nraw = 0.5 * (sin(6.2831853 * p1) + sin(6.2831853 * p1b)) * env + sin(6.2831853 * p2) * (0.28 + 0.35 * malletHard) * env * env;\ng = clamp(2.0 * sin(3.14159265 * clamp(fc * 1.5, 120.0, 4200.0) / sr), 0.04, 0.78);\nbp1 = bp1 + g * (raw - bp1);\nbp2 = bp2 + g * (bp1 - bp2);\ndrv = (raw * 0.65 + (bp1 - bp2) * 0.9) * 1.3;\nout = (drv / (1.0 + abs(drv))) * 0.74;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.78 0.61 0.33
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Gamelan Pelog Bronze Synth. Inharmonic bronze metallophone modes with ombak paired detuning, mallet strike transient, and bamboo tube formant resonance.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

@@ -1,0 +1,73 @@
+infinite-patch 1
+# Leslie Doppler Horn FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 1.0
+  i steps 16
+  i note0 48
+  i note1 52
+  i note2 55
+  i note3 59
+  i note4 60
+  i note5 59
+  i note6 55
+  i note7 52
+  i note8 45
+  i note9 48
+  i note10 52
+  i note11 55
+  i note12 57
+  i note13 55
+  i note14 52
+  i note15 48
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id src
+  pos 340 1024
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 680 1024
+  s code param float hornHz = 5.8 [0.4, 9.0];\nparam float drumHz = 0.85 [0.2, 4.0];\nparam float depth = 0.72 [0.0, 1.0];\nparam float drive = 1.45 [0.8, 3.0];\nparam float mix = 0.75 [0.0, 1.0];\nstate float pH = 0; state float pD = 0; state float lp = 0;\nstate float ap1 = 0; state float ap2 = 0; state float ap3 = 0; state float ap4 = 0;\n\npH = (pH + hornHz / sr) % 1.0;\npD = (pD + drumHz / sr) % 1.0;\nsH = sin(6.2831853 * pH);\nsD = sin(6.2831853 * pD);\n\ngX = clamp(2.0 * sin(3.14159265 * 800.0 / sr), 0.04, 0.80);\nlp = lp + gX * (in - lp);\nhi = in - lp;\n\nk = clamp(0.42 + sH * 0.36 * depth, 0.05, 0.88);\ny1 = -k * hi + ap1; ap1 = hi + k * y1;\ny2 = -k * y1 + ap2; ap2 = y1 + k * y2;\ny3 = -k * y2 + ap3; ap3 = y2 + k * y3;\ny4 = -k * y3 + ap4; ap4 = y3 + k * y4;\n\nhornLobe = y4 * (0.72 + 0.28 * sH * depth);\ndrumLobe = lp * (0.82 + 0.18 * sD * depth);\nwet = (hornLobe + drumLobe) * drive;\nsat = wet / (1.0 + abs(wet));\nout = (in * (1.0 - mix) + sat * mix) * 0.76;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.75 0.45 0.24
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Leslie Doppler Horn FX. Dual-rotor speaker emulator splitting lows and highs across Doppler allpass dispersion, lobe AM sweep, and warm tube overdrive.
+  f width 340
+  f height 120
+end
+note src 0 notes
+aud fx 0 src
+aud speakers 0 fx
+cable out 0 pic

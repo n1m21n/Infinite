@@ -1,0 +1,14 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Kintsugi Lacquer Fracture",
+    "author": "Infinite",
+    "description": "Domain-warped urushi ceramic shard network joined by luminous molten-gold kintsugi seams and warm kiln relief.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "# Kintsugi Lacquer Fracture (Field Pixel)\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 3.2;\n\n# Domain warp for organic ceramic fracture lines\nq = p + 0.24 * vec2(sin(p.y * 2.3 + t * 0.18), cos(p.x * 2.1 - t * 0.15));\nq = q + 0.10 * vec2(cos(q.y * 5.7 - t * 0.22), sin(q.x * 5.1 + t * 0.19));\n\n# Cellular ridge field (sharp fracture valleys)\nv1 = abs(sin(q.x * 2.2 + sin(q.y * 1.9)) + cos(q.y * 2.5 - cos(q.x * 1.7)));\nv2 = abs(sin((q.x + q.y) * 1.85) - cos((q.x - q.y) * 2.15));\ncrack = min(v1, v2);\n\n# Ceramic body glaze texture (dark iron-oxide urushi & stoneware)\nspeck = 0.5 + 0.5 * sin(p.x * 24.0) * cos(p.y * 24.0);\ncUrushi = mix(vec3(0.09, 0.08, 0.08), vec3(0.22, 0.14, 0.11), speck * 0.65);\ncKiln = vec3(0.38, 0.18, 0.12);\nbody = mix(cUrushi, cKiln, smoothstep(0.35, 1.35, v1) * 0.45);\n\n# Molten gold lacquer seam + warm halo\nseam = exp(-crack * 22.0);\ngoldHalo = exp(-crack * 5.5) * 0.45;\nshimmer = 0.85 + 0.15 * sin(p.x * 18.0 + p.y * 14.0 + t * 1.5);\ncGold = vec3(0.95, 0.75, 0.28) * shimmer;\ncAmber = vec3(0.68, 0.44, 0.14);\n\ncol = mix(body, cAmber, goldHalo);\ncol = mix(col, cGold, clamp(seam * 1.25, 0.0, 1.0));\n",
+    "params": {}
+  }
+}

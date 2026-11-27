@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Leslie Doppler Horn FX",
+    "author": "Infinite",
+    "description": "Dual-rotor speaker emulator splitting lows and highs across Doppler allpass dispersion, lobe AM sweep, and warm tube overdrive.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float hornHz = 5.8 [0.4, 9.0];\nparam float drumHz = 0.85 [0.2, 4.0];\nparam float depth = 0.72 [0.0, 1.0];\nparam float drive = 1.45 [0.8, 3.0];\nparam float mix = 0.75 [0.0, 1.0];\nstate float pH = 0; state float pD = 0; state float lp = 0;\nstate float ap1 = 0; state float ap2 = 0; state float ap3 = 0; state float ap4 = 0;\n\npH = (pH + hornHz / sr) % 1.0;\npD = (pD + drumHz / sr) % 1.0;\nsH = sin(6.2831853 * pH);\nsD = sin(6.2831853 * pD);\n\ngX = clamp(2.0 * sin(3.14159265 * 800.0 / sr), 0.04, 0.80);\nlp = lp + gX * (in - lp);\nhi = in - lp;\n\nk = clamp(0.42 + sH * 0.36 * depth, 0.05, 0.88);\ny1 = -k * hi + ap1; ap1 = hi + k * y1;\ny2 = -k * y1 + ap2; ap2 = y1 + k * y2;\ny3 = -k * y2 + ap3; ap3 = y2 + k * y3;\ny4 = -k * y3 + ap4; ap4 = y3 + k * y4;\n\nhornLobe = y4 * (0.72 + 0.28 * sH * depth);\ndrumLobe = lp * (0.82 + 0.18 * sD * depth);\nwet = (hornLobe + drumLobe) * drive;\nsat = wet / (1.0 + abs(wet));\nout = (in * (1.0 - mix) + sat * mix) * 0.76;\n",
+    "params": {
+      "hornHz": 5.8,
+      "drumHz": 0.85,
+      "depth": 0.72,
+      "drive": 1.45,
+      "mix": 0.75
+    }
+  }
+}

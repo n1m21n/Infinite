@@ -1,0 +1,18 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Gamelan Pelog Bronze Synth",
+    "author": "Infinite",
+    "description": "Inharmonic bronze metallophone modes with ombak paired detuning, mallet strike transient, and bamboo tube formant resonance.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float ombakHz = 4.2 [0.5, 12.0];\nparam float malletHard = 0.65 [0.1, 1.0];\nparam float decay = 0.9994 [0.997, 0.9998];\nstate float p1 = 0; state float p1b = 0; state float p2 = 0;\nstate float env = 0; state float bp1 = 0; state float bp2 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.14, env * decay);\nfc = clamp(freq, 60.0, 2400.0);\np1 = (p1 + fc / sr) % 1.0;\np1b = (p1b + (fc + ombakHz) / sr) % 1.0;\np2 = (p2 + clamp(fc * 2.756, 60.0, 9000.0) / sr) % 1.0;\n\nraw = 0.5 * (sin(6.2831853 * p1) + sin(6.2831853 * p1b)) * env + sin(6.2831853 * p2) * (0.28 + 0.35 * malletHard) * env * env;\ng = clamp(2.0 * sin(3.14159265 * clamp(fc * 1.5, 120.0, 4200.0) / sr), 0.04, 0.78);\nbp1 = bp1 + g * (raw - bp1);\nbp2 = bp2 + g * (bp1 - bp2);\ndrv = (raw * 0.65 + (bp1 - bp2) * 0.9) * 1.3;\nout = (drv / (1.0 + abs(drv))) * 0.74;\n",
+    "params": {
+      "ombakHz": 4.2,
+      "malletHard": 0.65,
+      "decay": 0.9994
+    }
+  }
+}

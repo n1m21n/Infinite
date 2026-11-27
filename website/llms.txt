@@ -425,6 +425,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Grotto Quartzite Resonator Synth](https://infinitedevices.org/library/grotto-quartzite-resonator-synth.html): Modal mineral-chamber resonator coupling fundamental, slightly stretched octave, and stone-plate partials with smooth thermal envelope. (file: https://infinitedevices.org/assets/templates/grotto-quartzite-resonator-synth.inf)
 - [Vals Stone Grotto Reverb FX](https://infinitedevices.org/library/vals-stone-grotto-reverb-fx.html): Four-stage staggered allpass stone-chamber diffuser with water-ripple drift and dual-pole quartzite damping. (file: https://infinitedevices.org/assets/templates/vals-stone-grotto-reverb-fx.inf)
 - [Serge Variable-Q Phasor FX](https://infinitedevices.org/library/serge-variable-q-phasor-fx.html): Resonant state-variable bandpass-to-allpass dispersion cascade with LFO sweep and soft asymmetric saturation. (file: https://infinitedevices.org/assets/templates/serge-variable-q-phasor-fx.inf)
+- [Gamelan Pelog Bronze Synth](https://infinitedevices.org/library/gamelan-pelog-bronze-synth.html): Inharmonic bronze metallophone modes with ombak paired detuning and bamboo tube formant resonance. (file: https://infinitedevices.org/assets/templates/gamelan-pelog-bronze-synth.inf)
+- [Trautonium Subharmonic Synth](https://infinitedevices.org/library/trautonium-subharmonic-synth.html): Mixtur-Trautonium subharmonic frequency-divider oscillator blending /2, /3, and /4 subharmonics through twin resonant formants. (file: https://infinitedevices.org/assets/templates/trautonium-subharmonic-synth.inf)
+- [Leslie Doppler Horn FX](https://infinitedevices.org/library/leslie-doppler-horn-fx.html): Dual-rotor speaker emulator splitting lows and highs across Doppler allpass dispersion and warm tube overdrive. (file: https://infinitedevices.org/assets/templates/leslie-doppler-horn-fx.inf)
+- [Karplus Sympathetic Bridge FX](https://infinitedevices.org/library/karplus-sympathetic-bridge-fx.html): Tuned sympathetic string-bridge resonator bank with lowpass bridge damping and nonlinear inter-string feedback. (file: https://infinitedevices.org/assets/templates/karplus-sympathetic-bridge-fx.inf)
 
 ## Library: Community
 
@@ -848,7 +852,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 163 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 165 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -865,4 +869,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 148 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 150 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

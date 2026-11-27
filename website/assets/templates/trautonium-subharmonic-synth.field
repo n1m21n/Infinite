@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Trautonium Subharmonic Synth",
+    "author": "Infinite",
+    "description": "Mixtur-Trautonium subharmonic frequency-divider oscillator blending /2, /3, and /4 subharmonics through twin resonant formants.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float subMix = 0.68 [0.0, 1.0];\nparam float formantHz = 1150.0 [300.0, 3600.0];\nparam float resonance = 0.58 [0.1, 0.88];\nparam float decay = 0.9993 [0.996, 0.9997];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0; state float p4 = 0;\nstate float env = 0; state float lp1 = 0; state float bp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.09, env * decay);\nfc = clamp(freq, 55.0, 3000.0);\n\np1 = (p1 + fc / sr) % 1.0;\np2 = (p2 + (fc * 0.5) / sr) % 1.0;\np3 = (p3 + (fc * 0.333333) / sr) % 1.0;\np4 = (p4 + (fc * 0.25) / sr) % 1.0;\n\ns1 = 2.0 * p1 - 1.0;\ns2 = 2.0 * p2 - 1.0;\ns3 = 2.0 * p3 - 1.0;\ns4 = if(p4 < 0.35, 1.0, -1.0);\n\nmixOsc = s1 * 0.45 + (s2 * 0.42 + s3 * 0.34 + s4 * 0.24) * subMix;\n\ncut = clamp(formantHz * (0.45 + 0.85 * env), 140.0, 7500.0);\ng = clamp(2.0 * sin(3.14159265 * cut / sr), 0.04, 0.82);\nq = 1.0 - resonance * 0.82;\nhp = mixOsc - lp1 - q * bp1;\nbp1 = bp1 + g * hp;\nlp1 = lp1 + g * bp1;\n\nvoice = (lp1 * 0.62 + bp1 * 0.48) * env;\ndrv = voice * 1.45;\nout = (drv / (1.0 + abs(drv))) * 0.68;\n",
+    "params": {
+      "subMix": 0.68,
+      "formantHz": 1150.0,
+      "resonance": 0.58,
+      "decay": 0.9993
+    }
+  }
+}

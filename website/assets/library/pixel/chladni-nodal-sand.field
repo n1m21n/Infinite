@@ -1,0 +1,14 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Chladni Nodal Sand",
+    "author": "Infinite",
+    "description": "Analytical Chladni plate standing-wave eigenmodes with fine quartz sand accumulating along zero-crossing nodal lines.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "# Chladni Nodal Sand (Field Pixel)\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.1;\n\n# Brushed brass plate radial grain and subtle bevel\nr = length(p);\ngrain = 0.5 + 0.5 * sin(p.x * 95.0 + sin(p.y * 42.0) * 1.8);\nplate = mix(vec3(0.24, 0.19, 0.12), vec3(0.36, 0.29, 0.18), grain);\nplate *= smoothstep(1.38, 0.35, r);\n\n# Morphing Chladni eigenmode pair (n, m)\npi = 3.14159265;\nblend = 0.5 + 0.5 * sin(t * 0.32);\nf1 = cos(3.0 * pi * p.x) * cos(5.0 * pi * p.y) - cos(5.0 * pi * p.x) * cos(3.0 * pi * p.y);\nf2 = cos(2.0 * pi * p.x) * cos(7.0 * pi * p.y) - cos(7.0 * pi * p.x) * cos(2.0 * pi * p.y);\nmode = mix(f1, f2, blend);\n\n# Quartz sand settling along zero-crossing nodal ridges\nsandLine = exp(-abs(mode) * 11.5);\nhalo = exp(-abs(mode) * 3.4) * 0.35;\nspeckle = 0.65 + 0.35 * sin(p.x * 140.0 + p.y * 117.0);\n\ncSand = vec3(0.93, 0.90, 0.82);\ncAmber = vec3(0.76, 0.60, 0.34);\n\nmaskPlate = smoothstep(0.92, 0.89, max(abs(p.x), abs(p.y)));\ncol = mix(vec3(0.07, 0.06, 0.05), plate, maskPlate);\ncol = mix(col, cAmber, halo * maskPlate * 0.6);\ncol = mix(col, cSand * speckle, clamp(sandLine * maskPlate * 1.15, 0.0, 1.0));\n",
+    "params": {}
+  }
+}

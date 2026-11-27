@@ -14703,7 +14703,227 @@
       "file": "assets/library/pixel/vals-clerestory-caustics.field",
       "preview": "assets/library/previews/vals-clerestory-caustics.jpg",
       "bytes": 1491
+    },
+    {
+      "id": "nervi-ferrocement-ribs",
+      "name": "Nervi Ferrocement Ribs",
+      "kind": "Generator",
+      "tags": [
+        "nervi",
+        "ferrocement",
+        "architecture",
+        "ribs",
+        "vault",
+        "sketch",
+        "procedural"
+      ],
+      "description": "Corrugated ferrocement vault ribs and transverse diaphragm trusses with clerestory daylight bands.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/nervi-ferrocement-ribs.js",
+      "preview": "assets/library/previews/nervi-ferrocement-ribs.jpg",
+      "bytes": 3621
+    },
+    {
+      "id": "raku-glaze-craquelure",
+      "name": "Raku Glaze Craquelure",
+      "kind": "Generator",
+      "tags": [
+        "raku",
+        "ceramic",
+        "craquelure",
+        "glaze",
+        "stoneware",
+        "sketch",
+        "procedural"
+      ],
+      "description": "Iron-oxide raku glaze pooling inside a raw stoneware rim with carbon-trapped hairline craquelure.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/raku-glaze-craquelure.js",
+      "preview": "assets/library/previews/raku-glaze-craquelure.jpg",
+      "bytes": 2998
+    },
+    {
+      "id": "gaudi-hyperbolic-vault-3d",
+      "name": "Gaudi Hyperbolic Vault 3D",
+      "kind": "Generator",
+      "tags": [
+        "gaudi",
+        "catenary",
+        "hyperbolic",
+        "vault",
+        "architecture",
+        "3d",
+        "sketch-3d"
+      ],
+      "description": "Fluted limestone columns branching into hyperbolic-paraboloid star ribs around an amber-gold oculus.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/gaudi-hyperbolic-vault-3d.js",
+      "preview": "assets/library/previews/gaudi-hyperbolic-vault-3d.jpg",
+      "bytes": 1719
+    },
+    {
+      "id": "gamelan-pelog-bronze-synth",
+      "name": "Gamelan Pelog Bronze Synth",
+      "kind": "Template",
+      "tags": [
+        "gamelan",
+        "pelog",
+        "metallophone",
+        "modal",
+        "ombak",
+        "synth",
+        "dsp"
+      ],
+      "description": "Inharmonic bronze metallophone modes with ombak paired detuning and bamboo tube formant resonance.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 3,
+      "file": "assets/templates/gamelan-pelog-bronze-synth.inf",
+      "preview": "assets/library/previews/gamelan-pelog-bronze-synth.jpg",
+      "bytes": 1902
+    },
+    {
+      "id": "trautonium-subharmonic-synth",
+      "name": "Trautonium Subharmonic Synth",
+      "kind": "Template",
+      "tags": [
+        "trautonium",
+        "subharmonic",
+        "divider",
+        "formant",
+        "analog",
+        "synth",
+        "dsp"
+      ],
+      "description": "Mixtur-Trautonium subharmonic frequency-divider oscillator blending /2, /3, and /4 subharmonics through twin resonant formants.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 4,
+      "file": "assets/templates/trautonium-subharmonic-synth.inf",
+      "preview": "assets/library/previews/trautonium-subharmonic-synth.jpg",
+      "bytes": 2130
+    },
+    {
+      "id": "leslie-doppler-horn-fx",
+      "name": "Leslie Doppler Horn FX",
+      "kind": "Template",
+      "tags": [
+        "leslie",
+        "doppler",
+        "rotary",
+        "allpass",
+        "overdrive",
+        "fx",
+        "effect"
+      ],
+      "description": "Dual-rotor speaker emulator splitting lows and highs across Doppler allpass dispersion and warm tube overdrive.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/leslie-doppler-horn-fx.inf",
+      "preview": "assets/library/previews/leslie-doppler-horn-fx.jpg",
+      "bytes": 2098
+    },
+    {
+      "id": "karplus-sympathetic-bridge-fx",
+      "name": "Karplus Sympathetic Bridge FX",
+      "kind": "Template",
+      "tags": [
+        "karplus",
+        "sympathetic",
+        "bridge",
+        "resonator",
+        "strings",
+        "fx",
+        "effect"
+      ],
+      "description": "Tuned sympathetic string-bridge resonator bank with lowpass bridge damping and nonlinear inter-string feedback.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/karplus-sympathetic-bridge-fx.inf",
+      "preview": "assets/library/previews/karplus-sympathetic-bridge-fx.jpg",
+      "bytes": 2070
+    },
+    {
+      "id": "chladni-nodal-sand",
+      "name": "Chladni Nodal Sand",
+      "kind": "Generator",
+      "tags": [
+        "chladni",
+        "cymatics",
+        "standing-wave",
+        "brass",
+        "shader",
+        "pixel",
+        "audioreactive"
+      ],
+      "description": "Analytical Chladni plate standing-wave eigenmodes with fine quartz sand accumulating along zero-crossing nodal lines.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 0,
+      "file": "assets/library/pixel/chladni-nodal-sand.field",
+      "preview": "assets/library/previews/chladni-nodal-sand.jpg",
+      "bytes": 1475
+    },
+    {
+      "id": "kintsugi-lacquer-fracture",
+      "name": "Kintsugi Lacquer Fracture",
+      "kind": "Generator",
+      "tags": [
+        "kintsugi",
+        "urushi",
+        "gold",
+        "ceramic",
+        "shader",
+        "pixel",
+        "audioreactive"
+      ],
+      "description": "Domain-warped urushi ceramic shard network joined by luminous molten-gold kintsugi seams and warm kiln relief.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 0,
+      "file": "assets/library/pixel/kintsugi-lacquer-fracture.field",
+      "preview": "assets/library/previews/kintsugi-lacquer-fracture.jpg",
+      "bytes": 1484
+    },
+    {
+      "id": "munich-olympic-cable-net-3d",
+      "name": "Munich Olympic Cable-Net 3D",
+      "kind": "Generator",
+      "tags": [
+        "frei-otto",
+        "tensile",
+        "anticlastic",
+        "architecture",
+        "cable-net",
+        "3d",
+        "sketch-3d"
+      ],
+      "description": "Anticlastic hyperbolic-paraboloid cable-net canopy suspended from tilted steel compression masts and clevis rings.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 3,
+      "file": "assets/library/sketch/munich-olympic-cable-net-3d.js",
+      "preview": "assets/library/previews/munich-olympic-cable-net-3d.jpg",
+      "bytes": 1811
     }
   ],
-  "count": 689
+  "count": 719
 }

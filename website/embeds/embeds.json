@@ -815,6 +815,16 @@
       "slug": "vals-clerestory-caustics",
       "title": "Vals Clerestory Caustics",
       "description": "Layered Valser quartzite strata cut by narrow clerestory light slits over audio-reactive thermal water caustics."
+    },
+    {
+      "slug": "chladni-nodal-sand",
+      "title": "Chladni Nodal Sand",
+      "description": "Analytical Chladni plate standing-wave eigenmodes with audio-reactive quartz sand accumulating along zero-crossing nodal lines."
+    },
+    {
+      "slug": "kintsugi-lacquer-fracture",
+      "title": "Kintsugi Lacquer Fracture",
+      "description": "Domain-warped urushi ceramic shard network joined by audio-reactive molten-gold kintsugi seams and warm kiln relief."
     }
   ]
 }

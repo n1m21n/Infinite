@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Karplus Sympathetic Bridge FX",
+    "author": "Infinite",
+    "description": "Tuned sympathetic string-bridge resonator bank with lowpass bridge damping and nonlinear inter-string feedback.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float bridgeFreq = 420.0 [120.0, 1800.0];\nparam float coupling = 0.64 [0.0, 0.88];\nparam float dampHz = 2800.0 [600.0, 7500.0];\nparam float driftHz = 0.45 [0.05, 3.0];\nparam float mix = 0.62 [0.0, 1.0];\nstate float lfo = 0; state float fb = 0;\nstate float z1 = 0; state float z2 = 0; state float z3 = 0; state float z4 = 0;\nstate float lp1 = 0; state float lp2 = 0;\n\nlfo = (lfo + driftHz / sr) % 1.0;\nsig = in + fb * coupling;\n\nk1 = clamp(0.65 + 0.12 * sin(6.2831853 * lfo), 0.1, 0.88);\ngB = clamp(2.0 * sin(3.14159265 * bridgeFreq / sr), 0.04, 0.82);\n\nz1 = z1 + gB * (sig - z1);\nz2 = z2 + (gB * 1.498) * (z1 - z2);\ny3 = -k1 * z2 + z3; z3 = z2 + k1 * y3;\ny4 = -0.68 * y3 + z4; z4 = y3 + 0.68 * y4;\n\ngD = clamp(2.0 * sin(3.14159265 * dampHz / sr), 0.04, 0.85);\nlp1 = lp1 + gD * (y4 - lp1);\nlp2 = lp2 + (gD * 0.72) * (lp1 - lp2);\ndrv = lp2 * 1.35;\nfb = drv / (1.0 + abs(drv));\n\nout = (in * (1.0 - mix) + fb * mix) * 0.78;\n",
+    "params": {
+      "bridgeFreq": 420.0,
+      "coupling": 0.64,
+      "dampHz": 2800.0,
+      "driftHz": 0.45,
+      "mix": 0.62
+    }
+  }
+}
