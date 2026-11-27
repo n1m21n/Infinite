@@ -745,6 +745,66 @@
       "slug": "ebru-battal-marbling",
       "title": "Ebru Battal Marbling",
       "description": "Turkish Battal Ebru floating pigment marbling. Bass swells the pigment cells, mids drive combed fluid advection, highs crisp the carbon ink veins."
+    },
+    {
+      "slug": "phosphor-lissajous-scope",
+      "title": "Phosphor Lissajous Scope",
+      "description": "Tektronix P31 phosphor CRT oscilloscope Lissajous trace. Bass drives harmonic knot scale, mids modulate phase ratio, highs sharpen phosphor beam bloom."
+    },
+    {
+      "slug": "voronoi-basalt-fracture",
+      "title": "Voronoi Basalt Fracture",
+      "description": "Polygonal Voronoi columnar basalt fracture field. Bass pulses tectonic elevation, mids shift mineral lighting angle, highs ignite ember fissure seams."
+    },
+    {
+      "slug": "faraday-standing-waves",
+      "title": "Faraday Standing Waves",
+      "description": "Audio-reactive Faraday standing-wave fluid lattice. Bass drives harmonic wave amplitude, mids shift symmetry, highs sharpen meniscus speculars."
+    },
+    {
+      "slug": "voronoi-basalt-caustics",
+      "title": "Voronoi Basalt Caustics",
+      "description": "Audio-reactive columnar basalt fracture cells with refracted water caustics. Bass pulses cell relief, mids warp caustics, highs brighten edge glint."
+    },
+    {
+      "slug": "moire-optical-fringes",
+      "title": "Moire Optical Fringes",
+      "description": "Audio-reactive concentric Moire optical interference fringes with silver-halide grain."
+    },
+    {
+      "slug": "vasarely-kinetic-mural",
+      "title": "Vasarely Kinetic Mural",
+      "description": "Audio-reactive Vasarely-inspired kinetic ceramic tile mural in ochre-gold and burnt sienna."
+    },
+    {
+      "slug": "poincare-hyperbolic-tessellation",
+      "title": "Poincare Hyperbolic Tessellation",
+      "description": "Conformal Poincare disk hyperbolic tessellation. Bass pulses the hyperbolic curvature, mids drift the conformal fold, highs sharpen the ink borders."
+    },
+    {
+      "slug": "max-bill-mobius-raymarch",
+      "title": "Max Bill Mobius Raymarch",
+      "description": "Raymarched Max Bill Endless Loop granite sculpture. Bass pulses the ribbon thickness, mids twist the torsion, highs catch the bronze rim."
+    },
+    {
+      "slug": "eliasson-sodium-fog-orb",
+      "title": "Eliasson Sodium Fog Orb",
+      "description": "Audio-reactive monofrequency sodium-vapor light chamber inspired by Olafur Eliasson."
+    },
+    {
+      "slug": "soto-kinetic-penetrable-moire",
+      "title": "Soto Kinetic Penetrable Moire",
+      "description": "Audio-reactive kinetic rod-array moire interference inspired by Jesus Rafael Soto."
+    },
+    {
+      "slug": "art-deco-sunburst-relief",
+      "title": "Art Deco Sunburst Relief",
+      "description": "Stepped Streamline Moderne brass and stainless-steel sunburst arches with audio-reactive radial louvers and specular rim sheen."
+    },
+    {
+      "slug": "urushi-raden-iridescence",
+      "title": "Urushi Raden Iridescence",
+      "description": "Obsidian urushi lacquer with domain-warped gold maki-e stream contours and audio-reactive iridescent raden mother-of-pearl arcs."
     }
   ]
 }

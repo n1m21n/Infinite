@@ -1,0 +1,68 @@
+infinite-patch 1
+# Formant Pulsar Grain Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 50
+  i note1 52
+  i note2 54
+  i note3 57
+  i note4 59
+  i note5 57
+  i note6 54
+  i note7 52
+  i note8 50
+  i note9 57
+  i note10 59
+  i note11 62
+  i note12 59
+  i note13 57
+  i note14 54
+  i note15 52
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float formant1 = 4.2 [1.2, 12.0];\nparam float formant2 = 7.6 [2.0, 18.0];\nparam float duty = 0.42 [0.12, 0.95];\nparam float tilt = 0.55 [0.0, 1.0];\nparam float decay = 0.9992 [0.996, 0.9997];\nstate float p0 = 0; state float vib = 0;\nstate float env = 0; state float lp1 = 0; state float lp2 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.18, env * decay);\nvib = (vib + 4.8 / sr) % 1.0;\n\nf0 = clamp(freq * (1.0 + 0.004 * sin(6.2831853 * vib)), 45.0, 2400.0);\np0 = (p0 + f0 / sr) % 1.0;\n\n# Raised-cosine pulsar window inside fundamental period\ndPhase = min(1.0, p0 / max(0.08, duty));\nwin = 0.5 - 0.5 * cos(6.2831853 * dPhase);\n\nc1 = sin(6.2831853 * p0 * formant1);\nc2 = sin(6.2831853 * p0 * formant2 + 0.7);\npulsar = win * (c1 * (1.0 - tilt * 0.45) + c2 * tilt * 0.65);\n\n# Fundamental sub-anchor + body filter\nraw = pulsar * 0.78 + sin(6.2831853 * p0) * 0.34;\ng = clamp(2.0 * sin(3.14159265 * (650.0 + env * 2800.0) / sr), 0.05, 0.85);\nlp1 = lp1 + g * (raw - lp1);\nlp2 = lp2 + g * (lp1 - lp2);\n\ndrv = lp2 * 1.45;\nsat = drv / (1.0 + abs(drv));\nout = sat * env * 0.78;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.30 0.36
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Formant Pulsar Grain Synth. Curtis Roads-inspired pulsar synthesis with raised-cosine Hann windowing, dual vocal formant carriers, and warm soft-clipped resonance.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

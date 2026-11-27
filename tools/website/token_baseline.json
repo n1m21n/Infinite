@@ -656,6 +656,46 @@
   "embeds/ebru-battal-marbling.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/phosphor-lissajous-scope.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/voronoi-basalt-fracture.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/faraday-standing-waves.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/voronoi-basalt-caustics.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/moire-optical-fringes.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/vasarely-kinetic-mural.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/poincare-hyperbolic-tessellation.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/max-bill-mobius-raymarch.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/eliasson-sodium-fog-orb.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/soto-kinetic-penetrable-moire.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

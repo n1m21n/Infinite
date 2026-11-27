@@ -5059,6 +5059,1031 @@
         "gain": -11.0
       },
       "groove": 0.25
+    },
+    {
+      "id": "modal_vibraphone_mallet",
+      "family": "experimental",
+      "bpm": [
+        96,
+        118
+      ],
+      "swing": 0.08,
+      "scale": [
+        6,
+        4
+      ],
+      "drums": {},
+      "bass": "0...4...2...7...",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.45,
+      "refs": [
+        "Modal struck vibraphone bar overtones (1:3.99:9.96) with motor tremolo"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 18.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.55,
+        "octave": 2,
+        "gate": 65,
+        "gain": -9.0
+      },
+      "groove": 0.35
+    },
+    {
+      "id": "polivoks_dual_opamp_synth",
+      "family": "techno",
+      "bpm": [
+        126,
+        136
+      ],
+      "swing": 0.04,
+      "scale": [
+        5,
+        1
+      ],
+      "drums": {},
+      "bass": "0.0.3.0.5.0.7.0.",
+      "fx": [
+        "Field Effect",
+        "Drive"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [],
+      "glitch": 0.05,
+      "mod": 0.6,
+      "refs": [
+        "Dual-oscillator detuned saw/pulse with Soviet op-amp resonant filter & wavefolder"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          2
+        ],
+        "beats": 2.0,
+        "steps": 2,
+        "strum": 0.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.7,
+        "octave": 1,
+        "gate": 55,
+        "gain": -8.5
+      },
+      "groove": 0.5
+    },
+    {
+      "id": "dub_tape_pingpong_fx",
+      "family": "dub",
+      "bpm": [
+        110,
+        128
+      ],
+      "swing": 0.1,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {},
+      "bass": "0..0..3.0..5..2.",
+      "fx": [
+        "Field Effect",
+        "Delay"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.4,
+      "refs": [
+        "Asymmetric tape saturation, wow/flutter drift, damped dub ping-pong echo"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 12.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.4,
+        "octave": 2,
+        "gate": 55,
+        "gain": -10.0
+      },
+      "groove": 0.45
+    },
+    {
+      "id": "bode_frequency_shifter_fx",
+      "family": "experimental",
+      "bpm": [
+        100,
+        122
+      ],
+      "swing": 0.05,
+      "scale": [
+        4,
+        12
+      ],
+      "drums": {},
+      "bass": "0...2...4...6...",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.05,
+      "mod": 0.5,
+      "refs": [
+        "Single-sideband Hilbert frequency shifter with metallic inharmonic detune & feedback"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 15.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.45,
+        "octave": 2,
+        "gate": 65,
+        "gain": -10.0
+      },
+      "groove": 0.35
+    },
+    {
+      "id": "reed_clarinet_waveguide",
+      "family": "experimental",
+      "bpm": [
+        84,
+        108
+      ],
+      "swing": 0.04,
+      "scale": [
+        4,
+        1
+      ],
+      "drums": {},
+      "bass": "0.....3.0.....5.",
+      "fx": [
+        "Field Effect",
+        "Reverb",
+        "Delay"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.35,
+      "refs": [
+        "Nonlinear cubic reed pressure table coupled to cylindrical bore waveguide"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 12.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.4,
+        "octave": 2,
+        "gate": 75,
+        "gain": -10.0
+      },
+      "groove": 0.3
+    },
+    {
+      "id": "pulsar_train_formant",
+      "family": "experimental",
+      "bpm": [
+        100,
+        124
+      ],
+      "swing": 0.02,
+      "scale": [
+        6,
+        9
+      ],
+      "drums": {},
+      "bass": "0..2..4.0..5..7.",
+      "fx": [
+        "Field Effect",
+        "Delay",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.05,
+      "mod": 0.45,
+      "refs": [
+        "Curtis Roads pulsar synthesis with windowed formant bursts and duty-cycle sweep"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 8.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.5,
+        "octave": 2,
+        "gate": 65,
+        "gain": -10.0
+      },
+      "groove": 0.4
+    },
+    {
+      "id": "diode_ladder_overdrive",
+      "family": "techno",
+      "bpm": [
+        116,
+        132
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        5
+      ],
+      "drums": {},
+      "bass": "0.0.3.0.5.0.7.3.",
+      "fx": [
+        "Field Effect",
+        "Audio Filter",
+        "Drive"
+      ],
+      "synth": [
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.5,
+      "refs": [
+        "Four-stage nonlinear tanh diode ladder filter with asymmetric drive"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "steps": 4,
+        "strum": 5.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.55,
+        "octave": 1,
+        "gate": 55,
+        "gain": -10.0
+      },
+      "groove": 0.4
+    },
+    {
+      "id": "envelope_svf_autofilter",
+      "family": "house",
+      "bpm": [
+        112,
+        124
+      ],
+      "swing": 0.08,
+      "scale": [
+        4,
+        10
+      ],
+      "drums": {},
+      "bass": "0..0.2..3..5.3..",
+      "fx": [
+        "Field Effect",
+        "Delay",
+        "Chorus"
+      ],
+      "synth": [
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.55,
+      "refs": [
+        "Dual-ballistics envelope follower sweeping resonant state-variable filter"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 10.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.5,
+        "octave": 2,
+        "gate": 60,
+        "gain": -10.0
+      },
+      "groove": 0.45
+    },
+    {
+      "id": "formant_pulsar_grain",
+      "family": "experimental",
+      "bpm": [
+        108,
+        124
+      ],
+      "swing": 0.04,
+      "scale": [
+        4,
+        6
+      ],
+      "drums": {},
+      "bass": "0...0...3...5...",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.05,
+      "mod": 0.45,
+      "refs": [
+        "Curtis Roads pulsar synthesis & dual-formant windowed impulse trains"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 18.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.4,
+        "octave": 2,
+        "gate": 65,
+        "gain": -10.0
+      },
+      "groove": 0.35
+    },
+    {
+      "id": "modal_marimba_bar",
+      "family": "ambient",
+      "bpm": [
+        96,
+        116
+      ],
+      "swing": 0.08,
+      "scale": [
+        9,
+        6
+      ],
+      "drums": {},
+      "bass": "0..2.4..0..5.4..",
+      "fx": [
+        "Reverb",
+        "Delay"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Distortion"
+      ],
+      "glitch": 0.0,
+      "mod": 0.3,
+      "refs": [
+        "Euler-Bernoulli stiff-bar modal resonator bank with mallet strike excitation"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "steps": 4,
+        "strum": 28.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.55,
+        "octave": 3,
+        "gate": 50,
+        "gain": -9.0
+      },
+      "groove": 0.5
+    },
+    {
+      "id": "studer_tape_head_bump",
+      "family": "downtempo",
+      "bpm": [
+        84,
+        102
+      ],
+      "swing": 0.1,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {
+        "kick": "x.......x..o....",
+        "snare": "....x.......x...",
+        "chat": "x.o.x.o.x.o.x.o."
+      },
+      "bass": "0...0..23...5...",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.35,
+      "refs": [
+        "Studer B67 analog tape head-bump LF resonance, hysteresis saturation & wow/flutter"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 22.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.35,
+        "octave": 2,
+        "gate": 70,
+        "gain": -10.0
+      },
+      "groove": 0.45
+    },
+    {
+      "id": "granular_pitch_cloud",
+      "family": "ambient",
+      "bpm": [
+        78,
+        94
+      ],
+      "swing": 0.0,
+      "scale": [
+        6,
+        4
+      ],
+      "drums": {},
+      "bass": "0.......4.......",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Stutter"
+      ],
+      "glitch": 0.05,
+      "mod": 0.4,
+      "refs": [
+        "Stereo Hann-windowed granular micro-delay cloud with pitch-shifted feedback"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 25.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.3,
+        "octave": 2,
+        "gate": 80,
+        "gain": -11.0
+      },
+      "groove": 0.25
+    },
+    {
+      "id": "shakuhachi_bamboo_breath",
+      "family": "ambient",
+      "bpm": [
+        64,
+        88
+      ],
+      "swing": 0.0,
+      "scale": [
+        9,
+        10
+      ],
+      "drums": {},
+      "bass": "0...............",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Distortion"
+      ],
+      "glitch": 0.0,
+      "mod": 0.28,
+      "refs": [
+        "Shakuhachi end-blown bamboo flute jet-edge breath noise & overblown octave chiff"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 30.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.35,
+        "octave": 3,
+        "gate": 75,
+        "gain": -10.0
+      },
+      "groove": 0.2
+    },
+    {
+      "id": "sho_mouth_organ_cluster",
+      "family": "ambient",
+      "bpm": [
+        60,
+        80
+      ],
+      "swing": 0.0,
+      "scale": [
+        0,
+        6
+      ],
+      "drums": {},
+      "bass": "0.......7.......",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.22,
+      "refs": [
+        "Gagaku Sho free-reed bamboo pipe aitake harmonic clusters with beating fifths"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 40.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.25,
+        "octave": 3,
+        "gate": 90,
+        "gain": -11.0
+      },
+      "groove": 0.15
+    },
+    {
+      "id": "solenoid_spring_resonator",
+      "family": "experimental",
+      "bpm": [
+        96,
+        120
+      ],
+      "swing": 0.04,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {},
+      "bass": "0...3...5...7...",
+      "fx": [
+        "Field Effect",
+        "Delay"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.05,
+      "mod": 0.42,
+      "refs": [
+        "Electro-mechanical solenoid spring-coil dispersion & metallic allpass-comb chime"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "steps": 4,
+        "strum": 12.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.45,
+        "octave": 3,
+        "gate": 45,
+        "gain": -9.0
+      },
+      "groove": 0.35
+    },
+    {
+      "id": "binaural_haas_room_slit",
+      "family": "ambient",
+      "bpm": [
+        80,
+        108
+      ],
+      "swing": 0.02,
+      "scale": [
+        1,
+        6
+      ],
+      "drums": {},
+      "bass": "0.......5.......",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.3,
+      "refs": [
+        "Architectural concrete slit-aperture Haas early reflections & air-absorption damping"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 18.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.3,
+        "octave": 3,
+        "gate": 70,
+        "gain": -10.0
+      },
+      "groove": 0.25
+    },
+    {
+      "id": "buchla_wavefolder_complex",
+      "family": "experimental",
+      "bpm": [
+        98,
+        124
+      ],
+      "swing": 0.08,
+      "scale": [
+        3,
+        6
+      ],
+      "drums": {},
+      "bass": "0..3..5.0..7..a.",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.45,
+      "refs": [
+        "Buchla 259 complex oscillator linear FM & multi-stage trigonometric wavefolder"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "steps": 4,
+        "strum": 10.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.4,
+        "octave": 3,
+        "gate": 60,
+        "gain": -8.0
+      },
+      "groove": 0.35
+    },
+    {
+      "id": "metallic_gong_inharmonic",
+      "family": "ambient",
+      "bpm": [
+        68,
+        92
+      ],
+      "swing": 0.0,
+      "scale": [
+        9,
+        10
+      ],
+      "drums": {},
+      "bass": "0.......4.......",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.25,
+      "refs": [
+        "Inharmonic bronze gong & gamelan metallophone partial ratios (1, 2.756, 5.404, 8.93)"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 24.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.25,
+        "octave": 3,
+        "gate": 80,
+        "gain": -10.0
+      },
+      "groove": 0.2
+    },
+    {
+      "id": "quadrature_allpass_phaser",
+      "family": "downtempo",
+      "bpm": [
+        88,
+        112
+      ],
+      "swing": 0.06,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {},
+      "bass": "0.0.3.5.0.0.7.5.",
+      "fx": [
+        "Field Effect"
+      ],
+      "synth": [
+        "Analog",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.4,
+      "refs": [
+        "6-stage quadrature-LFO allpass phaser-chorus with compander warmth"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 2.0,
+        "steps": 4,
+        "strum": 12.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.35,
+        "octave": 3,
+        "gate": 65,
+        "gain": -8.0
+      },
+      "groove": 0.3
+    },
+    {
+      "id": "twin_peak_formant_filter",
+      "family": "house",
+      "bpm": [
+        114,
+        126
+      ],
+      "swing": 0.05,
+      "scale": [
+        1,
+        10
+      ],
+      "drums": {},
+      "bass": "0..0.3.50..7.5.3",
+      "fx": [
+        "Field Effect"
+      ],
+      "synth": [
+        "Analog"
+      ],
+      "ban": [
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.5,
+      "refs": [
+        "Parallel dual-SVF vowel formant resonator with envelope & LFO morphing"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "steps": 4,
+        "strum": 8.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.4,
+        "octave": 3,
+        "gate": 55,
+        "gain": -8.0
+      },
+      "groove": 0.4
     }
   ]
 }

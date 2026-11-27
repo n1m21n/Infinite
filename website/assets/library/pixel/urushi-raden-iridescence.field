@@ -1,0 +1,18 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Urushi Raden Iridescence",
+    "author": "Infinite",
+    "description": "Deep obsidian urushi lacquer with domain-warped gold maki-e stream contours and thin-film iridescent raden mother-of-pearl inlay.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "# Urushi Raden Iridescence (Field Pixel)\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n\n# Domain-warped fluid stream coordinates\nq = p + 0.12 * vec2(sin(p.y * 5.2 + t * 0.35), cos(p.x * 4.8 - t * 0.28));\nq2 = q + 0.07 * vec2(cos(q.y * 9.5 - t * 0.4), sin(q.x * 8.7 + t * 0.3));\n\n# Gold maki-e stream contours\nstream = abs(sin(q2.y * 14.0 + q2.x * 5.0));\ngoldLine = smoothstep(0.18, 0.02, stream);\n\n# Submerged raden mother-of-pearl crescent arcs\nr1 = length(p - vec2(-0.14, 0.08));\nr2 = length(p - vec2(0.18, -0.10));\narc1 = smoothstep(0.018, 0.002, abs(r1 - 0.19)) * step(0.0, p.y - 0.02);\narc2 = smoothstep(0.018, 0.002, abs(r2 - 0.16)) * step(0.0, -p.y - 0.04);\nnacreMask = clamp(arc1 + arc2, 0.0, 1.0);\n\n# Thin-film abalone iridescence\nphase = q2.x * 7.0 + q2.y * 5.0 + t * 0.5;\nnacreCol = 0.58 + 0.32 * cos(phase + vec3(0.0, 2.094, 4.188));\n\ncUrushi = vec3(0.065, 0.052, 0.045);\ncGold = vec3(0.788, 0.635, 0.302);\n\ncol = cUrushi;\ncol = mix(col, cGold, goldLine * 0.72);\ncol = mix(col, nacreCol, nacreMask * 0.92);\n",
+    "params": {
+      "warp": 0.12,
+      "stream_freq": 14.0,
+      "iridescence": 0.92
+    }
+  }
+}

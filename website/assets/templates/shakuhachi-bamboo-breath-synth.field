@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Shakuhachi Bamboo Breath Synth",
+    "author": "Infinite",
+    "description": "End-blown bamboo flute model combining deterministic jet-edge breath noise, phase-modulated bore resonance, overblown octave chiff, and soft saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float breath = 0.32 [0.05, 0.75];\nparam float chiff = 0.45 [0.0, 1.0];\nparam float vibratoHz = 4.6 [0.5, 8.5];\nparam float brightHz = 2600.0 [700.0, 6500.0];\nparam float decay = 0.9993 [0.996, 0.9997];\nstate float p0 = 0; state float vib = 0;\nstate float env = 0; state float atk = 0;\nstate float rng = 17325.0; state float bp1 = 0; state float lp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.06, env * decay);\natk = if(gate > 0.5, atk * 0.996, 1.0);\nvib = (vib + vibratoHz / sr) % 1.0;\n\nf0 = clamp(freq * (1.0 + 0.008 * sin(6.2831853 * vib) * env), 80.0, 2600.0);\np0 = (p0 + f0 / sr) % 1.0;\n\nrng = (rng * 16807.0) % 2147483647.0;\nnz = (rng / 1073741823.5) - 1.0;\nbp1 = bp1 + 0.25 * (nz - bp1);\n\nph = 6.2831853 * p0;\nbore = sin(ph + 0.25 * sin(ph)) * 0.76 + sin(ph * 2.0) * (0.22 + atk * 0.32 * chiff);\nraw = (bore + (nz - bp1) * breath * (0.4 + atk * 0.6)) * env;\n\ngLp = clamp(2.0 * sin(3.14159265 * brightHz / sr), 0.05, 0.85);\nlp1 = lp1 + gLp * (raw - lp1);\n\ndrv = lp1 * 1.35;\nout = (drv / (1.0 + abs(drv))) * 0.68;\n",
+    "params": {
+      "breath": 0.32,
+      "chiff": 0.45,
+      "vibratoHz": 4.6,
+      "brightHz": 2600.0,
+      "decay": 0.9993
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

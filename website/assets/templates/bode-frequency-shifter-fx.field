@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Bode Frequency Shifter FX",
+    "author": "Infinite",
+    "description": "Single-sideband Hilbert quadrature frequency shifter with dual allpass phase-splitting network, carrier detune, and metallic feedback.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float shiftHz = 18.5 [-120.0, 120.0];\nparam float feedback = 0.28 [0.0, 0.65];\nparam float toneHz = 3600.0 [800.0, 8000.0];\nparam float mix = 0.65 [0.0, 1.0];\nstate float pCar = 0;\nstate float i1 = 0; state float i2 = 0;\nstate float q1 = 0; state float q2 = 0;\nstate float lp = 0; state float fb = 0;\n\npCar = (pCar + abs(shiftHz) / sr) % 1.0;\nang = 6.2831853 * pCar * if(shiftHz >= 0.0, 1.0, -1.0);\n\nx = in + fb * feedback;\n\n# Quadrature allpass Hilbert approximation pair\ncI1 = 0.6923; cI2 = 0.9360;\ncQ1 = 0.4021; cQ2 = 0.8561;\n\nyi1 = -cI1 * x + i1; i1 = x + cI1 * yi1;\nsigI = -cI2 * yi1 + i2; i2 = yi1 + cI2 * sigI;\n\nyq1 = -cQ1 * x + q1; q1 = x + cQ1 * yq1;\nsigQ = -cQ2 * yq1 + q2; q2 = yq1 + cQ2 * sigQ;\n\n# Single-sideband modulation: I*cos - Q*sin\nssb = sigI * cos(ang) - sigQ * sin(ang);\n\ng = clamp(2.0 * sin(3.14159265 * toneHz / sr), 0.05, 0.88);\nlp = lp + g * (ssb - lp);\nfb = clamp(lp, -1.0, 1.0);\n\nout = (in * (1.0 - mix) + lp * mix) * 0.62;\n",
+    "params": {
+      "shiftHz": 18.5,
+      "feedback": 0.28,
+      "toneHz": 3600.0,
+      "mix": 0.65
+    }
+  }
+}

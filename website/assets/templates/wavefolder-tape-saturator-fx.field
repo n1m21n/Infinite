@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Wavefolder Tape Saturator FX",
+    "author": "Infinite",
+    "description": "Asymmetric triode-tape soft-clipping saturator paired with a Lockhart sine wavefolder stage, pre-emphasis tilt, and dynamic bias sag.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float foldDrive = 2.4 [1.0, 6.0];\nparam float biasSym = 0.24 [0.0, 0.6];\nparam float tapeWarmth = 2800.0 [700.0, 7500.0];\nparam float sag = 0.35 [0.0, 0.8];\nparam float mix = 0.72 [0.0, 1.0];\nstate float env = 0; state float lp1 = 0; state float dc = 0;\n\nenv = env * 0.996 + abs(in) * 0.004;\ndynDrive = foldDrive / (1.0 + env * sag * 2.2);\n\npre = in * dynDrive + biasSym;\nfolded = sin(pre * 1.45) * 0.65 + (pre / (1.0 + abs(pre) * 0.85)) * 0.45;\ndc = dc * 0.998 + folded * 0.002;\ncleanFold = folded - dc;\n\ng = clamp(2.0 * sin(3.14159265 * tapeWarmth / sr), 0.04, 0.85);\nlp1 = lp1 + g * (cleanFold - lp1);\n\nout = (in * (1.0 - mix) + lp1 * mix) * 0.66;\n",
+    "params": {
+      "foldDrive": 2.4,
+      "biasSym": 0.24,
+      "tapeWarmth": 2800.0,
+      "sag": 0.35,
+      "mix": 0.72
+    }
+  }
+}

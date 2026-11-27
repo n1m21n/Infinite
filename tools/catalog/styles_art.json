@@ -2760,6 +2760,664 @@
         "Traditional Turkish Battal Ebru floating pigment droplets and combed marbling",
         "Grotesk (Velvetyne) & Azeret Mono (Fontshare) editorial pigment type"
       ]
+    },
+    {
+      "id": "brutalist_anechoic_vault",
+      "taxonomy": "new",
+      "name": "Brutalist Anechoic & Coffered Vault",
+      "palette": [
+        "#232A30",
+        "#7A8284",
+        "#4E5146",
+        "#D9A84E"
+      ],
+      "sources": [
+        "Field Element"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "dub_tape_pingpong_fx"
+      ],
+      "refs": [
+        "Salford University anechoic wedge chamber & brutalist coffered concrete vaults",
+        "Steps Mono (Velvetyne) & Azeret Mono (Fontshare) architectural type"
+      ]
+    },
+    {
+      "id": "phosphor_lissajous_scope",
+      "taxonomy": "new",
+      "name": "Tektronix P31 Phosphor Lissajous Scope",
+      "palette": [
+        "#062B47",
+        "#3AFFA8",
+        "#187B6C",
+        "#C8C3B3"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "pixelate"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "bode_frequency_shifter_fx"
+      ],
+      "refs": [
+        "Analog CRT oscilloscope P31 phosphor Lissajous harmonic trace & graticule",
+        "Steps Mono (Velvetyne) & Azeret Mono (Fontshare) instrument type"
+      ]
+    },
+    {
+      "id": "voronoi_basalt_fracture",
+      "taxonomy": "new",
+      "name": "Voronoi Columnar Basalt Fracture",
+      "palette": [
+        "#1C1E22",
+        "#3A3D42",
+        "#696D73",
+        "#FF6B35"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "polivoks_dual_opamp_synth"
+      ],
+      "refs": [
+        "Devils Postpile hexagonal columnar basalt jointing & glowing mineral seams",
+        "Terminal Grotesque (Velvetyne) & Azeret Mono (Fontshare) geological type"
+      ]
+    },
+    {
+      "id": "faraday_standing_waves",
+      "taxonomy": "new",
+      "name": "Faraday Standing-Wave Hydrodynamics",
+      "palette": [
+        "#1E1915",
+        "#5C4F44",
+        "#B8A48E",
+        "#F2E9DA"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.4,
+      "pairs": [
+        "minimal_techno",
+        "ambient"
+      ],
+      "refs": [
+        "Michael Faraday (1831) subharmonic standing-wave lattices in vertically vibrated fluid",
+        "Steps Mono (Velvetyne) & Azeret Mono (Fontshare) hydrodynamic lab type"
+      ]
+    },
+    {
+      "id": "albers_color_interaction",
+      "taxonomy": "new",
+      "name": "Albers Interaction of Color",
+      "palette": [
+        "#115E4B",
+        "#C86D1F",
+        "#0D4A8C",
+        "#8C2816"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "bloom",
+        "pixelate"
+      ],
+      "motion": 0.1,
+      "pairs": [
+        "ambient_piano",
+        "minimal_techno"
+      ],
+      "refs": [
+        "Josef Albers Homage to the Square (1950-1976) asymmetrical nested chromatic planes",
+        "Cabinet Grotesk (Fontshare) & Fragment Mono (Uncut) Bauhaus gallery type"
+      ]
+    },
+    {
+      "id": "vasarely_sophia_relief",
+      "taxonomy": "new",
+      "name": "Vasarely Sophia Kinetic Contour Relief",
+      "palette": [
+        "#8E8B84",
+        "#F2F1EC",
+        "#141517",
+        "#4F4D48"
+      ],
+      "sources": [
+        "Sketch 2D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "bloom",
+        "glitch"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "pulsar_train_formant"
+      ],
+      "refs": [
+        "Victor Vasarely Sophia (1954) UCV architectural black-on-ivory line-shift relief",
+        "Steps Mono (Velvetyne) & Commit Mono (Uncut) brutalist kinetic type"
+      ]
+    },
+    {
+      "id": "lewitt_polychrome_planes",
+      "taxonomy": "new",
+      "name": "LeWitt Polychrome Wall Planes",
+      "palette": [
+        "#E62A14",
+        "#1A82E0",
+        "#14961B",
+        "#58328C"
+      ],
+      "sources": [
+        "Sketch 2D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "bloom",
+        "glitch"
+      ],
+      "motion": 0.15,
+      "pairs": [
+        "reed_clarinet_waveguide"
+      ],
+      "refs": [
+        "Sol LeWitt Wall Drawing 831 (Geometric Forms) matte polychrome wall planes",
+        "Clash Display (Fontshare) & Azeret Mono (Fontshare) architectural exhibition type"
+      ]
+    },
+    {
+      "id": "calatrava_ribbed_vault",
+      "taxonomy": "new",
+      "name": "Calatrava Ribbed Steel & Glass Vault",
+      "palette": [
+        "#14181D",
+        "#F4F5F2",
+        "#5E8894",
+        "#263B44"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "envelope_svf_autofilter"
+      ],
+      "refs": [
+        "Santiago Calatrava Liege-Guillemins station white steel ribs and sea-glass coffers",
+        "Cabinet Grotesk (Fontshare) & Fragment Mono (Uncut) structural engineering type"
+      ]
+    },
+    {
+      "id": "schroeder_qrd_columns",
+      "taxonomy": "new",
+      "name": "Schroeder QRD Timber Acoustic Diffuser",
+      "palette": [
+        "#181412",
+        "#D8B98A",
+        "#8C5E3C",
+        "#3B281A"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "bloom"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "diode_ladder_overdrive"
+      ],
+      "refs": [
+        "Manfred Schroeder quadratic-residue prime N=17 timber acoustic diffuser skyline",
+        "Steps Mono (Velvetyne) & Azeret Mono (Fontshare) studio acoustics type"
+      ]
+    },
+    {
+      "id": "moire_optical_fringes",
+      "taxonomy": "new",
+      "name": "Moire Mirror Curvature Interference",
+      "palette": [
+        "#181A1C",
+        "#6D7175",
+        "#D9DCE0",
+        "#3D4147"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "bloom"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "envelope_svf_autofilter"
+      ],
+      "refs": [
+        "Optical mirror curvature inspection by concentric Moire interference fringes",
+        "Steps Mono (Velvetyne) & Martian Mono (Uncut) metrology optics type"
+      ]
+    },
+    {
+      "id": "vasarely_kinetic_mural",
+      "taxonomy": "new",
+      "name": "Vasarely UCV Kinetic Tile Mural",
+      "palette": [
+        "#171513",
+        "#DFC442",
+        "#8C4A27",
+        "#B87A3D"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.3,
+      "pairs": [
+        "pulsar_train_formant"
+      ],
+      "refs": [
+        "Victor Vasarely UCV ceramic tile mural in ochre-gold, burnt sienna, and charcoal",
+        "Terminal Grotesque (Velvetyne) & Azeret Mono (Fontshare) modernist mural type"
+      ]
+    },
+    {
+      "id": "max_bill_concrete_art",
+      "taxonomy": "new",
+      "name": "Max Bill Swiss Concrete Art",
+      "palette": [
+        "#F2EFE9",
+        "#8C3B2B",
+        "#1B498A",
+        "#E0A526",
+        "#181A20"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "bloom"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "formant_pulsar_grain"
+      ],
+      "refs": [
+        "Max Bill Unendliche Schleife (Essen, 1974) & Concrete Art chromatic progressions",
+        "Steps Mono (Velvetyne) & Overused Grotesk (UNCUT) Swiss grid typography"
+      ]
+    },
+    {
+      "id": "jansen_strandbeest_linkage",
+      "taxonomy": "new",
+      "name": "Theo Jansen Strandbeest Linkage",
+      "palette": [
+        "#E6DEC8",
+        "#C8B89A",
+        "#23262E",
+        "#8B4513"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.45,
+      "pairs": [
+        "modal_marimba_bar"
+      ],
+      "refs": [
+        "Theo Jansen Strandbeest crank-rocker PVC linkage trusses",
+        "Fragment Mono (UNCUT) technical kinematic notation"
+      ]
+    },
+    {
+      "id": "aalto_viipuri_acoustic",
+      "taxonomy": "new",
+      "name": "Alvar Aalto Viipuri Acoustic Wave",
+      "palette": [
+        "#F4F1EA",
+        "#D4A373",
+        "#E9C46A",
+        "#264653"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "studer_tape_head_bump"
+      ],
+      "refs": [
+        "Alvar Aalto Viipuri Library laminated birch acoustic wave ceiling",
+        "Overused Grotesk (UNCUT) Nordic functionalist signage"
+      ]
+    },
+    {
+      "id": "poincare_hyperbolic_tiling",
+      "taxonomy": "new",
+      "name": "Poincare Hyperbolic Tessellation",
+      "palette": [
+        "#F4F1EA",
+        "#D9381E",
+        "#1B498A",
+        "#E0A526",
+        "#181A20"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "granular_pitch_cloud"
+      ],
+      "refs": [
+        "Conformal Poincare disk {4,3,3} hyperbolic circle-inversion tiling",
+        "Steps Mono (Velvetyne) mathematical plate captions"
+      ]
+    },
+    {
+      "id": "karesansui_zen_contours",
+      "taxonomy": "new",
+      "name": "Karesansui Raked Gravel & Moss Islands",
+      "palette": [
+        "#D8D4C9",
+        "#585D2A",
+        "#968166",
+        "#232320"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.14,
+      "pairs": [
+        "shakuhachi_bamboo_breath"
+      ],
+      "refs": [
+        "Ryoan-ji Kyoto dry garden raked limestone gravel contours and moss-rimmed rock islands",
+        "Steps Mono (Velvetyne) & Fragment Mono (Uncut) quiet architectural index type"
+      ]
+    },
+    {
+      "id": "brutalist_waffle_coffers",
+      "taxonomy": "new",
+      "name": "Brutalist Coffered Waffle Vaults",
+      "palette": [
+        "#B8B3A8",
+        "#6E6A61",
+        "#262421",
+        "#F2EFE9"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [
+        "bloom"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "kaleidoscope"
+      ],
+      "motion": 0.18,
+      "pairs": [
+        "binaural_haas_room_slit"
+      ],
+      "refs": [
+        "National Theatre Terrace & Regenstein Library cantilevered concrete waffle-slab coffers",
+        "Sligoil (Velvetyne) & Azeret Mono (Fontshare) structural grid typography"
+      ]
+    },
+    {
+      "id": "eliasson_sodium_monofrequency",
+      "taxonomy": "new",
+      "name": "Eliasson Monofrequency Sodium Chamber",
+      "palette": [
+        "#FFCC00",
+        "#E86A00",
+        "#6B1D00",
+        "#120602"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "pixelate",
+        "invert"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "sho_mouth_organ_cluster"
+      ],
+      "refs": [
+        "Olafur Eliasson Tate Modern Weather Project monofrequency sodium-vapor disc & mirror ceiling",
+        "Azeret Mono (Fontshare) & Fragment Mono (Uncut) atmospheric exhibition labels"
+      ]
+    },
+    {
+      "id": "soto_kinetic_penetrable",
+      "taxonomy": "new",
+      "name": "Soto Kinetic Penetrable Moire",
+      "palette": [
+        "#163C6E",
+        "#EEF1FA",
+        "#0A1426",
+        "#7AA6D6"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "solenoid_spring_resonator"
+      ],
+      "refs": [
+        "Jesus Rafael Soto suspended vertical rod array optical parallax and kinetic moire interference",
+        "Steps Mono (Velvetyne) & Azeret Mono (Fontshare) kinetic exhibition typography"
+      ]
+    },
+    {
+      "id": "art_deco_moderne",
+      "taxonomy": "new",
+      "name": "Art Deco Streamline Brass & Sunburst",
+      "palette": [
+        "#0D1528",
+        "#C8CED6",
+        "#D4A84F",
+        "#4A5A70"
+      ],
+      "sources": [
+        "Sketch 3D",
+        "Field Pixel"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "buchla_wavefolder_complex"
+      ],
+      "refs": [
+        "Chrysler Building stainless-steel sunburst crown & stepped Art Deco fenestration",
+        "Bifur, Broadway, Grotesk (Velvetyne) & Geom (Uncut) display typography"
+      ]
+    },
+    {
+      "id": "de_stijl_neoplasticism",
+      "taxonomy": "new",
+      "name": "De Stijl Neoplastic Grid & Counter-Composition",
+      "palette": [
+        "#F3EFE6",
+        "#141414",
+        "#D92B20",
+        "#124E9B",
+        "#EBC328"
+      ],
+      "sources": [
+        "Sketch",
+        "Sketch 3D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "blur"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "quadrature_allpass_phaser"
+      ],
+      "refs": [
+        "Piet Mondrian Composition II & Theo van Doesburg Counter-Composition V",
+        "Architype Van Doesburg, Architype Aubette & Poca geometric typography"
+      ]
+    },
+    {
+      "id": "urushi_raden_lacquer",
+      "taxonomy": "new",
+      "name": "Japanese Urushi Lacquer & Raden Mother-of-Pearl",
+      "palette": [
+        "#120F0D",
+        "#C9A24D",
+        "#EAE6DF",
+        "#9BD4C9"
+      ],
+      "sources": [
+        "Sketch",
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.22,
+      "pairs": [
+        "metallic_gong_inharmonic"
+      ],
+      "refs": [
+        "Ogata Korin Yatsuhashi & Heian Katawaguruma urushi maki-e & raden inlay",
+        "Format 1452, Sporting Grotesque & Getai Grotesk Display"
+      ]
     }
   ]
 }

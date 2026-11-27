@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dub Tape Dispersion FX",
+    "author": "Infinite",
+    "description": "Asymmetric tape-saturated dub resonator with capstan wow drift, 4-stage allpass phase dispersion, and damped bandpass feedback.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float wowHz = 0.52 [0.1, 2.2];\nparam float drive = 1.9 [0.8, 3.8];\nparam float dispersion = 0.62 [0.1, 0.9];\nparam float dubHz = 1350.0 [350.0, 4500.0];\nparam float mix = 0.72 [0.0, 1.0];\nstate float pWow = 0;\nstate float ap1 = 0; state float ap2 = 0; state float ap3 = 0; state float ap4 = 0;\nstate float bp = 0; state float lp = 0; state float fb = 0;\n\npWow = (pWow + wowHz / sr) % 1.0;\nc = clamp(dispersion + 0.18 * sin(6.2831853 * pWow), 0.12, 0.88);\n\nx = in + fb * 0.42;\n# Asymmetric magnetic tape saturation\nasym = x + 0.12 * x * x;\nsat = (asym * drive) / (1.0 + abs(asym * drive) * 0.72);\n\n# 4-stage allpass dispersion network\ny1 = -c * sat + ap1; ap1 = sat + c * y1;\ny2 = -c * y1 + ap2; ap2 = y1 + c * y2;\ny3 = -c * y2 + ap3; ap3 = y2 + c * y3;\ny4 = -c * y3 + ap4; ap4 = y3 + c * y4;\n\n# Damped dub bandpass feedback tone\ng = clamp(2.0 * sin(3.14159265 * dubHz / sr), 0.03, 0.82);\nbp = bp + g * (y4 - lp - 0.62 * bp);\nlp = lp + g * bp;\nfb = clamp(lp * 0.55 + bp * 0.45, -1.0, 1.0);\n\nwet = y4 * 0.55 + lp * 0.45;\nout = (in * (1.0 - mix) + wet * mix) * 0.64;\n",
+    "params": {
+      "wowHz": 0.52,
+      "drive": 1.9,
+      "dispersion": 0.62,
+      "dubHz": 1350.0,
+      "mix": 0.72
+    }
+  }
+}

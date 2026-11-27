@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Phosphor Lissajous Scope",
+    "author": "Infinite",
+    "description": "Tektronix P31 phosphor CRT oscilloscope tracing harmonic Lissajous knots with exponential beam bloom, graticule ticks, and CRT glass vignette.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float ratioX = 3.0 [1.0, 7.0];\nparam float ratioY = 4.0 [1.0, 8.0];\nparam float beamGlow = 0.018 [0.005, 0.045];\nparam float phaseDrift = 0.42 [0.0, 1.5];\nparam float graticule = 0.35 [0.0, 0.8];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.25;\n\n# CRT graticule grid and center axis ticks\ngx = abs(fract(p.x * 2.5 + 0.5) - 0.5);\ngy = abs(fract(p.y * 2.5 + 0.5) - 0.5);\ngrid = (1.0 - smoothstep(0.0, 0.014, min(gx, gy))) * 0.22;\naxis = (1.0 - smoothstep(0.0, 0.012, min(abs(p.x), abs(p.y)))) * 0.45;\ntickX = (1.0 - smoothstep(0.0, 0.012, abs(p.y))) * (1.0 - smoothstep(0.0, 0.06, abs(fract(p.x * 10.0 + 0.5) - 0.5))) * 0.35;\ntickY = (1.0 - smoothstep(0.0, 0.012, abs(p.x))) * (1.0 - smoothstep(0.0, 0.06, abs(fract(p.y * 10.0 + 0.5) - 0.5))) * 0.35;\n\n# Analytical Lissajous curve branches (3:4 harmonic knot, zero-loop)\nr = 0.76;\nnx = clamp(p.x / r, -0.999, 0.999);\nth = atan2(nx, sqrt(max(1.0 - nx * nx, 0.0001)));\nph = t * phaseDrift + 0.65;\nmask = step(abs(p.x), r);\n\na0 = (th + ph) / ratioX;\na1 = (3.14159265 - th + ph) / ratioX;\na2 = (th + 6.2831853 + ph) / ratioX;\na3 = (3.14159265 - th + 6.2831853 + ph) / ratioX;\na4 = (th + 12.5663706 + ph) / ratioX;\na5 = (3.14159265 - th + 12.5663706 + ph) / ratioX;\n\nd0 = abs(p.y - r * sin(ratioY * a0));\nd1 = abs(p.y - r * sin(ratioY * a1));\nd2 = abs(p.y - r * sin(ratioY * a2));\nd3 = abs(p.y - r * sin(ratioY * a3));\nd4 = abs(p.y - r * sin(ratioY * a4));\nd5 = abs(p.y - r * sin(ratioY * a5));\nminD = min(min(min(d0, d1), min(d2, d3)), min(d4, d5)) + (1.0 - mask) * 5.0;\n\n# Secondary harmonic envelope ring\nringD = abs(length(p) - 0.88) * 1.4;\nminD = min(minD, ringD + 0.012);\n\ncore = exp(-minD / (beamGlow * 0.55));\nhalo = exp(-minD / (beamGlow * 3.4)) * 0.65;\nbeam = clamp(core + halo, 0.0, 1.4);\n\ncBg = vec3(0.024, 0.169, 0.278);\ncGrid = vec3(0.094, 0.482, 0.424);\ncBeam = vec3(0.227, 1.000, 0.659);\ncHot = vec3(0.880, 1.000, 0.940);\n\ncol = cBg + cGrid * (grid + axis + tickX + tickY) * graticule;\ncol = col + cBeam * halo + cHot * core * 0.85;\nvig = smoothstep(1.35, 0.35, length(p * 0.65));\ncol = clamp(col * (0.45 + 0.55 * vig), 0.0, 1.0);\n",
+    "params": {
+      "ratioX": 3.0,
+      "ratioY": 4.0,
+      "beamGlow": 0.018,
+      "phaseDrift": 0.42,
+      "graticule": 0.35
+    }
+  }
+}

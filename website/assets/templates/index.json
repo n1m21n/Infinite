@@ -3951,7 +3951,386 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "modal-vibraphone-mallet-synth",
+      "name": "Modal Vibraphone Mallet Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Struck modal vibraphone resonator with inharmonic bar overtones (1:3.99:9.96), mallet hardness transient, and motor-driven tremolo.",
+      "price": 0,
+      "preview": "assets/templates/modal-vibraphone-mallet-synth.webp",
+      "file": "assets/templates/modal-vibraphone-mallet-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "polivoks-dual-opamp-synth",
+      "name": "Polivoks Dual Op-Amp Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Detuned dual-oscillator saw/pulse synth with Soviet op-amp resonant state-variable filter sweep, wavefolder grit, and sub-octave drive.",
+      "price": 0,
+      "preview": "assets/templates/polivoks-dual-opamp-synth.webp",
+      "file": "assets/templates/polivoks-dual-opamp-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "dub-tape-dispersion-fx",
+      "name": "Dub Tape Dispersion FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Asymmetric tape-saturated dub resonator with capstan wow drift, 4-stage allpass phase dispersion, and damped bandpass feedback.",
+      "price": 0,
+      "preview": "assets/templates/dub-tape-dispersion-fx.webp",
+      "file": "assets/templates/dub-tape-dispersion-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "bode-frequency-shifter-fx",
+      "name": "Bode Frequency Shifter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Single-sideband Hilbert quadrature frequency shifter with dual allpass phase-splitting network, carrier detune, and metallic feedback.",
+      "price": 0,
+      "preview": "assets/templates/bode-frequency-shifter-fx.webp",
+      "file": "assets/templates/bode-frequency-shifter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "clavinet-d6-pickup-synth",
+      "name": "Clavinet D6 Pickup Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Physical-modeled Hohner Clavinet D6 with damped string tangent strike, asymmetric dual-coil magnetic pickup comb filtering, and warm preamp grit.",
+      "price": 0,
+      "preview": "assets/templates/clavinet-d6-pickup-synth.webp",
+      "file": "assets/templates/clavinet-d6-pickup-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "bowed-bar-marimba-synth",
+      "name": "Bowed Bar Marimba Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Modal rosewood bar percussion and bowed-mallet synthesizer with four tuned non-harmonic overtones, tremolo bow excitation, and resonant tube body filter.",
+      "price": 0,
+      "preview": "assets/templates/bowed-bar-marimba-synth.webp",
+      "file": "assets/templates/bowed-bar-marimba-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "wavefolder-tape-saturator-fx",
+      "name": "Wavefolder Tape Saturator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Asymmetric triode-tape soft-clipping saturator paired with a Lockhart sine wavefolder stage, pre-emphasis tilt, and dynamic bias sag.",
+      "price": 0,
+      "preview": "assets/templates/wavefolder-tape-saturator-fx.webp",
+      "file": "assets/templates/wavefolder-tape-saturator-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "reed-clarinet-waveguide-synth",
+      "name": "Reed Clarinet Waveguide Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Physical-modeled woodwind synthesizer coupling a nonlinear cubic reed pressure valve to a cylindrical bore delay resonator and breath exciter.",
+      "price": 0,
+      "preview": "assets/templates/reed-clarinet-waveguide-synth.webp",
+      "file": "assets/templates/reed-clarinet-waveguide-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "pulsar-train-formant-synth",
+      "name": "Pulsar Train Formant Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Windowed pulsar-train synthesizer with independent formant frequency sweep, variable duty cycle, and warm body resonance.",
+      "price": 0,
+      "preview": "assets/templates/pulsar-train-formant-synth.webp",
+      "file": "assets/templates/pulsar-train-formant-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "diode-ladder-overdrive-fx",
+      "name": "Diode Ladder Overdrive FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Four-stage nonlinear diode ladder lowpass filter with asymmetric input saturation, resonant feedback, and dry-wet blend.",
+      "price": 0,
+      "preview": "assets/templates/diode-ladder-overdrive-fx.webp",
+      "file": "assets/templates/diode-ladder-overdrive-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "envelope-svf-autofilter-fx",
+      "name": "Envelope SVF Autofilter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-ballistics envelope follower sweeping a resonant state-variable bandpass and lowpass filter with harmonic warmth.",
+      "price": 0,
+      "preview": "assets/templates/envelope-svf-autofilter-fx.webp",
+      "file": "assets/templates/envelope-svf-autofilter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "formant-pulsar-grain-synth",
+      "name": "Formant Pulsar Grain Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Curtis Roads-inspired pulsar synthesis with raised-cosine Hann windowing, dual vocal formant carriers, and warm soft-clipped resonance.",
+      "price": 0,
+      "preview": "assets/templates/formant-pulsar-grain-synth.webp",
+      "file": "assets/templates/formant-pulsar-grain-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "modal-marimba-bar-synth",
+      "name": "Modal Marimba Bar Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Euler-Bernoulli stiff-bar modal resonator bank with inharmonic bar modes, cosine mallet strike transient, and wooden resonator body.",
+      "price": 0,
+      "preview": "assets/templates/modal-marimba-bar-synth.webp",
+      "file": "assets/templates/modal-marimba-bar-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "studer-tape-head-bump-fx",
+      "name": "Studer Tape Head Bump FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Analog reel-to-reel tape path with low-frequency head-bump resonance, asymmetric hysteresis saturation, and subtle wow/flutter allpass drift.",
+      "price": 0,
+      "preview": "assets/templates/studer-tape-head-bump-fx.webp",
+      "file": "assets/templates/studer-tape-head-bump-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "granular-pitch-cloud-fx",
+      "name": "Granular Pitch Cloud FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-window Hann-enveloped granular micro-delay cloud with modulated allpass pitch drift, resonant feedback diffusion, and warm damping.",
+      "price": 0,
+      "preview": "assets/templates/granular-pitch-cloud-fx.webp",
+      "file": "assets/templates/granular-pitch-cloud-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "shakuhachi-bamboo-breath-synth",
+      "name": "Shakuhachi Bamboo Breath Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "End-blown bamboo flute model combining deterministic jet-edge breath noise, phase-modulated bore resonance, overblown octave chiff, and soft saturation.",
+      "price": 0,
+      "preview": "assets/templates/shakuhachi-bamboo-breath-synth.webp",
+      "file": "assets/templates/shakuhachi-bamboo-breath-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "sho-mouth-organ-cluster-synth",
+      "name": "Sho Mouth Organ Cluster Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Gagaku free-reed harmonic cluster synthesizer with beating detuned fifths, slow breath-swell envelope, and warm reed-pipe formant filtering.",
+      "price": 0,
+      "preview": "assets/templates/sho-mouth-organ-cluster-synth.webp",
+      "file": "assets/templates/sho-mouth-organ-cluster-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "solenoid-spring-resonator-fx",
+      "name": "Solenoid Spring Resonator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Electro-mechanical spring-coil dispersion effect with staggered allpass tanks, resonant metallic chime feedback, and gentle saturation.",
+      "price": 0,
+      "preview": "assets/templates/solenoid-spring-resonator-fx.webp",
+      "file": "assets/templates/solenoid-spring-resonator-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "binaural-haas-room-slit-fx",
+      "name": "Binaural Haas Room Slit FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Architectural concrete slit-aperture spatializer using micro-delayed allpass early reflections, air-absorption damping, and warm saturation.",
+      "price": 0,
+      "preview": "assets/templates/binaural-haas-room-slit-fx.webp",
+      "file": "assets/templates/binaural-haas-room-slit-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "buchla-wavefolder-complex-synth",
+      "name": "Buchla Wavefolder Complex Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "West-coast complex oscillator pairing linear FM modulation with a multi-stage trigonometric wavefolder and vactrol-style lowpass gate.",
+      "price": 0,
+      "preview": "assets/templates/buchla-wavefolder-complex-synth.webp",
+      "file": "assets/templates/buchla-wavefolder-complex-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "metallic-gong-inharmonic-synth",
+      "name": "Metallic Gong Inharmonic Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Four-partial inharmonic bronze gong and metallophone synthesizer with mallet strike transient, shimmer beating, and warm nonlinear saturation.",
+      "price": 0,
+      "preview": "assets/templates/metallic-gong-inharmonic-synth.webp",
+      "file": "assets/templates/metallic-gong-inharmonic-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "quadrature-allpass-phaser-fx",
+      "name": "Quadrature Allpass Phaser FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Six-stage staggered allpass phaser-chorus driven by quadrature LFOs with resonant feedback and soft compander saturation.",
+      "price": 0,
+      "preview": "assets/templates/quadrature-allpass-phaser-fx.webp",
+      "file": "assets/templates/quadrature-allpass-phaser-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "twin-peak-formant-filter-fx",
+      "name": "Twin Peak Formant Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Parallel dual-SVF vowel formant resonator swept by an envelope follower and slow LFO morphing with warm nonlinear drive.",
+      "price": 0,
+      "preview": "assets/templates/twin-peak-formant-filter-fx.webp",
+      "file": "assets/templates/twin-peak-formant-filter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
-  "count": 241
+  "count": 260
 }

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Twin Peak Formant Filter FX",
+    "author": "Infinite",
+    "description": "Parallel dual-SVF vowel formant resonator swept by an envelope follower and slow LFO morphing with warm nonlinear drive.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float morph = 0.45 [0.0, 1.0];\nparam float lfoHz = 0.42 [0.05, 3.5];\nparam float envAmt = 0.55 [0.0, 1.0];\nparam float qRes = 0.24 [0.08, 0.65];\nparam float mix = 0.78 [0.0, 1.0];\nstate float lfo = 0; state float env = 0;\nstate float lp1 = 0; state float bp1 = 0;\nstate float lp2 = 0; state float bp2 = 0;\n\nlfo = (lfo + lfoHz / sr) % 1.0;\nenv = env + 0.003 * (abs(in) - env);\nm = clamp(morph + 0.28 * sin(6.2831853 * lfo) + env * envAmt * 2.5, 0.0, 1.0);\n\nf1 = 360.0 + m * 460.0;\nf2 = 950.0 + m * 1450.0;\ng1 = clamp(2.0 * sin(3.14159265 * f1 / sr), 0.02, 0.85);\ng2 = clamp(2.0 * sin(3.14159265 * f2 / sr), 0.02, 0.85);\n\nhp1 = in - lp1 - qRes * bp1;\nbp1 = bp1 + g1 * hp1;\nlp1 = lp1 + g1 * bp1;\n\nhp2 = in - lp2 - qRes * bp2;\nbp2 = bp2 + g2 * hp2;\nlp2 = lp2 + g2 * bp2;\n\nwet = (bp1 * 0.75 + bp2 * 0.65) * 1.4;\ndrv = wet / (1.0 + abs(wet) * 0.45);\nout = (in * (1.0 - mix) + drv * mix) * 0.78;\n",
+    "params": {
+      "morph": 0.45,
+      "lfoHz": 0.42,
+      "envAmt": 0.55,
+      "qRes": 0.24,
+      "mix": 0.78
+    }
+  }
+}

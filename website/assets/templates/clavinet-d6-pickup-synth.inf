@@ -1,0 +1,68 @@
+infinite-patch 1
+# Clavinet D6 Pickup Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 40
+  i note1 43
+  i note2 47
+  i note3 52
+  i note4 47
+  i note5 43
+  i note6 40
+  i note7 45
+  i note8 48
+  i note9 52
+  i note10 55
+  i note11 52
+  i note12 48
+  i note13 45
+  i note14 43
+  i note15 47
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float pickupPos = 0.28 [0.08, 0.48];\nparam float bite = 0.72 [0.1, 1.0];\nparam float damp = 0.9991 [0.997, 0.9997];\nparam float preamp = 0.45 [0.0, 1.0];\nparam float bodyHz = 1650.0 [600.0, 3800.0];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0;\nstate float env = 0; state float strikeEnv = 1.0;\nstate float lp1 = 0; state float bp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.28, env * damp);\nstrikeEnv = if(gate > 0.5, strikeEnv * 0.988, 1.0);\n\nf0 = clamp(freq, 45.0, 3200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 2.001) / sr) % 1.0;\np3 = (p3 + (f0 * 3.003) / sr) % 1.0;\n\nh1 = sin(6.2831853 * p1) * sin(3.14159265 * pickupPos);\nh2 = sin(6.2831853 * p2) * sin(6.2831853 * pickupPos) * (0.65 + strikeEnv * 0.45);\nh3 = sin(6.2831853 * p3) * sin(9.424778 * pickupPos) * (0.35 + bite * 0.55) * strikeEnv;\n\ndriven = (h1 + h2 + h3) * (1.2 + preamp * 2.2) * env;\nsat = driven / (1.0 + abs(driven) * 0.65);\n\ng = clamp(6.2831853 * bodyHz / sr, 0.04, 0.72);\nbp1 = bp1 + g * (sat - lp1 - 0.58 * bp1);\nlp1 = lp1 + g * bp1;\n\nout = (sat * 0.55 + bp1 * 0.48) * 0.58;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.30 0.36
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Clavinet D6 Pickup Synth. Physical-modeled Hohner Clavinet D6 with damped string tangent strike, asymmetric dual-coil magnetic pickup comb filtering, and warm preamp grit.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

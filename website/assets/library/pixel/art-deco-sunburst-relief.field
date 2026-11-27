@@ -1,0 +1,18 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Art Deco Sunburst Relief",
+    "author": "Infinite",
+    "description": "Stepped Streamline Moderne brass and stainless-steel sunburst arches with fluted radial louvers and anisotropic metallic rim light.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "# Art Deco Sunburst Relief (Field Pixel)\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\na = atan2(p.y, p.x);\n\n# Stepped Art Deco ziggurat arch SDFs\narch1 = abs(r - (0.14 + 0.015 * sin(t * 0.6))) - 0.018;\narch2 = abs(r - (0.26 + 0.012 * cos(t * 0.5))) - 0.022;\narch3 = abs(r - 0.39) - 0.026;\ndArch = min(arch1, min(arch2, arch3));\nring = smoothstep(0.012, -0.004, dArch);\n\n# Radial fluted sunburst louvers & triangular lancets\nfan = cos(a * 18.0 + t * 0.25);\nlancet = smoothstep(0.15, 0.85, fan) * smoothstep(0.06, 0.44, r) * (1.0 - smoothstep(0.42, 0.54, r));\n\n# Stepped vertical architectural fins at base\nfins = 0.5 + 0.5 * cos(p.x * 42.0);\nbaseMask = smoothstep(0.1, -0.18, p.y) * fins * 0.45;\n\n# Anisotropic brass/steel specular sheen\nsheen = pow(max(0.0, 0.5 + 0.5 * cos(a * 2.0 - t * 0.7)), 3.0);\n\ncNavy = vec3(0.045, 0.075, 0.145);\ncSteel = vec3(0.76, 0.80, 0.85);\ncBrass = vec3(0.831, 0.659, 0.310);\n\ncol = cNavy;\ncol = mix(col, cSteel * (0.55 + 0.45 * sheen), clamp(lancet * 0.85 + baseMask * 0.5, 0.0, 1.0));\ncol = mix(col, cBrass * (0.85 + 0.35 * sheen), clamp(ring, 0.0, 1.0));\n",
+    "params": {
+      "louvers": 18.0,
+      "brass_sheen": 0.75,
+      "speed": 0.6
+    }
+  }
+}

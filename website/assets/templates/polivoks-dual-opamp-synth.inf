@@ -1,0 +1,68 @@
+infinite-patch 1
+# Polivoks Dual Op-Amp Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 45
+  i note1 45
+  i note2 48
+  i note3 45
+  i note4 50
+  i note5 45
+  i note6 52
+  i note7 48
+  i note8 45
+  i note9 57
+  i note10 55
+  i note11 52
+  i note12 50
+  i note13 48
+  i note14 45
+  i note15 43
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float detune = 0.012 [0.001, 0.04];\nparam float fold = 1.45 [0.5, 3.2];\nparam float cutoffHz = 950.0 [180.0, 4200.0];\nparam float res = 0.62 [0.1, 0.88];\nparam float envAmt = 2200.0 [200.0, 5000.0];\nstate float p1 = 0; state float p2 = 0; state float pSub = 0;\nstate float env = 0; state float bp = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.18, env * 0.9980);\n\nf0 = clamp(freq, 40.0, 2200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * (1.0 + detune)) / sr) % 1.0;\npSub = (pSub + (f0 * 0.5) / sr) % 1.0;\n\nraw = ((2.0 * p1 - 1.0) * 0.48 + if(p2 < 0.42, 0.36, -0.36) + sin(6.2831853 * pSub) * 0.52) * fold;\nfolded = sin(raw * 1.35) * 0.72 + (raw / (1.0 + abs(raw))) * 0.28;\n\ng = clamp(2.0 * sin(3.14159265 * clamp(cutoffHz + env * envAmt, 120.0, 9500.0) / sr), 0.02, 0.84);\nq = clamp(1.15 - res * 0.95, 0.14, 1.1);\nbp = clamp(bp + g * (folded - lp - q * bp), -1.6, 1.6);\nbp = bp / (1.0 + abs(bp) * 0.18);\nlp = lp + g * bp;\n\nout = (lp * env / (1.0 + abs(lp * env) * 0.45)) * 0.64;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.30 0.36
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Polivoks Dual Op-Amp Synth. Detuned dual-oscillator saw/pulse synth with Soviet op-amp resonant state-variable filter sweep, wavefolder grit, and sub-octave drive.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

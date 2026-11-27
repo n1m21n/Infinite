@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Diode Ladder Overdrive FX",
+    "author": "Infinite",
+    "description": "Four-stage nonlinear diode ladder lowpass filter with asymmetric input saturation, resonant feedback, and dry-wet blend.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float cutoffHz = 1450.0 [220.0, 5500.0];\nparam float resonance = 0.48 [0.0, 0.88];\nparam float drive = 2.2 [0.8, 5.0];\nparam float bias = 0.14 [0.0, 0.4];\nparam float mix = 0.82 [0.0, 1.0];\nstate float s1 = 0; state float s2 = 0; state float s3 = 0; state float s4 = 0;\n\ng = clamp(2.0 * sin(3.14159265 * cutoffHz / sr), 0.02, 0.72);\nk = resonance * 3.1;\n\nx = in * drive + bias - k * s4;\nsatX = x / (1.0 + abs(x) * 0.65);\n\ns1 = s1 + g * (satX - s1);\ns2 = s2 + g * (s1 / (1.0 + abs(s1) * 0.25) - s2);\ns3 = s3 + g * (s2 / (1.0 + abs(s2) * 0.25) - s3);\ns4 = s4 + g * (s3 - s4);\n\nwet = s4 / (1.0 + abs(s4) * 0.4);\nout = (in * (1.0 - mix) + wet * mix) * 0.72;\n",
+    "params": {
+      "cutoffHz": 1450.0,
+      "resonance": 0.48,
+      "drive": 2.2,
+      "bias": 0.14,
+      "mix": 0.82
+    }
+  }
+}

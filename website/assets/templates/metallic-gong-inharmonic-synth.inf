@@ -1,0 +1,68 @@
+infinite-patch 1
+# Metallic Gong Inharmonic Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 1.0
+  i steps 16
+  i note0 43
+  i note1 50
+  i note2 55
+  i note3 57
+  i note4 62
+  i note5 57
+  i note6 55
+  i note7 50
+  i note8 43
+  i note9 55
+  i note10 62
+  i note11 64
+  i note12 57
+  i note13 55
+  i note14 50
+  i note15 48
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float shimmer = 1.4 [0.1, 5.0];\nparam float inharm = 1.0 [0.7, 1.35];\nparam float strike = 0.55 [0.0, 1.0];\nparam float dampHz = 3800.0 [800.0, 7500.0];\nparam float decay = 0.9995 [0.997, 0.9998];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0; state float p4 = 0;\nstate float env = 0; state float atk = 0; state float lp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.12, env * decay);\natk = if(gate > 0.5, atk * 0.993, 1.0);\n\nf0 = clamp(freq, 40.0, 2400.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 2.756 * inharm + shimmer) / sr) % 1.0;\np3 = (p3 + (f0 * 5.404 * inharm - shimmer * 0.6) / sr) % 1.0;\np4 = (p4 + (f0 * 8.93 * inharm) / sr) % 1.0;\n\nm1 = sin(6.2831853 * p1 + 0.35 * atk * strike * sin(6.2831853 * p2));\nm2 = sin(6.2831853 * p2) * 0.48 * env;\nm3 = sin(6.2831853 * p3) * 0.24 * env * env;\nm4 = sin(6.2831853 * p4) * (0.14 + 0.22 * strike) * atk;\n\nraw = (m1 * 0.68 + m2 + m3 + m4) * env;\ng = clamp(2.0 * sin(3.14159265 * dampHz / sr), 0.05, 0.85);\nlp1 = lp1 + g * (raw - lp1);\n\ndrv = lp1 * 1.3;\nout = (drv / (1.0 + abs(drv))) * 0.62;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.30 0.36
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Metallic Gong Inharmonic Synth. Four-partial inharmonic bronze gong and metallophone synthesizer with mallet strike transient, shimmer beating, and warm nonlinear saturation.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

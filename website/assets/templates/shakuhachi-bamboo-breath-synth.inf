@@ -1,0 +1,68 @@
+infinite-patch 1
+# Shakuhachi Bamboo Breath Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 62
+  i note1 64
+  i note2 67
+  i note3 69
+  i note4 71
+  i note5 69
+  i note6 67
+  i note7 64
+  i note8 62
+  i note9 69
+  i note10 72
+  i note11 74
+  i note12 71
+  i note13 69
+  i note14 67
+  i note15 64
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float breath = 0.32 [0.05, 0.75];\nparam float chiff = 0.45 [0.0, 1.0];\nparam float vibratoHz = 4.6 [0.5, 8.5];\nparam float brightHz = 2600.0 [700.0, 6500.0];\nparam float decay = 0.9993 [0.996, 0.9997];\nstate float p0 = 0; state float vib = 0;\nstate float env = 0; state float atk = 0;\nstate float rng = 17325.0; state float bp1 = 0; state float lp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.06, env * decay);\natk = if(gate > 0.5, atk * 0.996, 1.0);\nvib = (vib + vibratoHz / sr) % 1.0;\n\nf0 = clamp(freq * (1.0 + 0.008 * sin(6.2831853 * vib) * env), 80.0, 2600.0);\np0 = (p0 + f0 / sr) % 1.0;\n\nrng = (rng * 16807.0) % 2147483647.0;\nnz = (rng / 1073741823.5) - 1.0;\nbp1 = bp1 + 0.25 * (nz - bp1);\n\nph = 6.2831853 * p0;\nbore = sin(ph + 0.25 * sin(ph)) * 0.76 + sin(ph * 2.0) * (0.22 + atk * 0.32 * chiff);\nraw = (bore + (nz - bp1) * breath * (0.4 + atk * 0.6)) * env;\n\ngLp = clamp(2.0 * sin(3.14159265 * brightHz / sr), 0.05, 0.85);\nlp1 = lp1 + gLp * (raw - lp1);\n\ndrv = lp1 * 1.35;\nout = (drv / (1.0 + abs(drv))) * 0.68;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.30 0.36
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Shakuhachi Bamboo Breath Synth. End-blown bamboo flute model combining deterministic jet-edge breath noise, phase-modulated bore resonance, overblown octave chiff, and soft saturation.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

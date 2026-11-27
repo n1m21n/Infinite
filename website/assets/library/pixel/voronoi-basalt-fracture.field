@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Voronoi Basalt Fracture",
+    "author": "Infinite",
+    "description": "Polygonal Voronoi columnar basalt fracture field with faceted stone bevels, mineral shadow relief, and glowing ember fissure seams.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float scale = 4.8 [2.0, 9.0];\nparam float seamWidth = 0.065 [0.02, 0.16];\nparam float emberGlow = 0.85 [0.1, 1.5];\nparam float drift = 0.18 [0.0, 0.6];\nparam float bevel = 0.75 [0.2, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * scale;\n# Subtle geological warp\npw = p + vec2(0.14 * sin(p.y * 1.9 + t * drift), 0.14 * cos(p.x * 1.7 - t * drift));\n\n# Hexagonal columnar basalt lattice (two offset rectangular grids)\ns = vec2(1.0, 1.7320508);\nh = s * 0.5;\na = pw - s * floor(pw / s) - h;\nb = (pw - h) - s * floor((pw - h) / s) - h;\nda = dot(a, a);\ndb = dot(b, b);\ngv = if(da < db, a, b);\nid = pw - gv;\n\n# Exact distance to hexagonal column boundary\npx = abs(gv.x);\npy = abs(gv.y);\nhexDist = max(dot(vec2(px, py), normalize(s)), px);\nedgeDist = 0.5 - hexDist;\n\nseam = 1.0 - smoothstep(0.0, seamWidth, edgeDist);\nnrm = normalize(gv + vec2(0.001, 0.001));\nstoneShade = clamp(dot(nrm, normalize(vec2(0.65, 0.75))) * 0.5 + 0.5, 0.0, 1.0);\ncellTone = 0.5 + 0.5 * sin(id.x * 12.9898 + id.y * 78.233);\n\ncDark = vec3(0.110, 0.118, 0.133);\ncMid = vec3(0.245, 0.258, 0.282);\ncLight = vec3(0.470, 0.488, 0.515);\ncEmber = vec3(1.000, 0.420, 0.208);\n\nrock = mix(cDark, mix(cMid, cLight, stoneShade * bevel), 0.28 + 0.72 * cellTone);\nrock = rock * smoothstep(0.0, seamWidth * 1.6, edgeDist);\ncol = rock + cEmber * seam * emberGlow * (0.65 + 0.35 * sin(t * 1.2 + cellTone * 6.28));\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "scale": 5.5,
+      "seamWidth": 0.055,
+      "emberGlow": 0.78,
+      "drift": 0.15,
+      "bevel": 0.68
+    }
+  }
+}

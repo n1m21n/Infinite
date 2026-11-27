@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Quadrature Allpass Phaser FX",
+    "author": "Infinite",
+    "description": "Six-stage staggered allpass phaser-chorus driven by quadrature LFOs with resonant feedback and soft compander saturation.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float rateHz = 0.65 [0.08, 4.5];\nparam float depth = 0.32 [0.05, 0.55];\nparam float center = 0.52 [0.15, 0.85];\nparam float feedback = 0.52 [0.0, 0.82];\nparam float mix = 0.72 [0.0, 1.0];\nstate float lfo = 0; state float fb = 0;\nstate float a1 = 0; state float a2 = 0; state float a3 = 0;\nstate float a4 = 0; state float a5 = 0; state float a6 = 0;\n\nlfo = (lfo + rateHz / sr) % 1.0;\nsL = sin(6.2831853 * lfo);\ncL = cos(6.2831853 * lfo);\nk1 = clamp(center + sL * depth, 0.06, 0.92);\nk2 = clamp(center * 0.88 + cL * depth * 0.85, 0.06, 0.92);\n\nx = in + fb * feedback;\ny1 = -k1 * x + a1; a1 = x + k1 * y1;\ny2 = -k2 * y1 + a2; a2 = y1 + k2 * y2;\ny3 = -k1 * y2 + a3; a3 = y2 + k1 * y3;\ny4 = -k2 * y3 + a4; a4 = y3 + k2 * y4;\ny5 = -k1 * y4 + a5; a5 = y4 + k1 * y5;\ny6 = -k2 * y5 + a6; a6 = y5 + k2 * y6;\n\ndrv = y6 * 1.15;\nfb = drv / (1.0 + abs(drv));\nout = (in * (1.0 - mix) + fb * mix) * 0.78;\n",
+    "params": {
+      "rateHz": 0.65,
+      "depth": 0.32,
+      "center": 0.52,
+      "feedback": 0.52,
+      "mix": 0.72
+    }
+  }
+}

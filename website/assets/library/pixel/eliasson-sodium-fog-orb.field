@@ -1,0 +1,18 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Eliasson Sodium Fog Orb",
+    "author": "Infinite",
+    "description": "Monofrequency sodium-vapor atmospheric light chamber with mirrored horizon reflection, drifting volumetric mist, and audio-reactive solar corona.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "# Eliasson Sodium Fog Orb (Field Pixel)\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nhorizonY = -0.08;\npy = abs(p.y - horizonY);\nq = vec2(p.x, py);\n\n# Sodium-vapor solar disc\ndOrb = length(q - vec2(0.0, 0.14)) - (0.26 + 0.02 * sin(t * 0.7));\ndisc = smoothstep(0.015, -0.015, dOrb);\ncorona = exp(-max(0.0, dOrb) * 4.5) * 0.85;\n\n# Volumetric turbine-hall mist & architectural wall ribs\nmist = 0.5 + 0.5 * sin(p.x * 5.0 + t * 0.35 + sin(p.y * 8.0 - t * 0.2));\nribs = 0.85 + 0.15 * cos(p.x * 26.0) * smoothstep(0.18, 0.55, abs(p.x));\n\n# Mirror floor attenuation below horizon\nmirror = mix(0.68, 1.0, step(horizonY, p.y));\nenergy = (disc * 1.15 + corona * (0.75 + 0.35 * mist)) * ribs * mirror;\n\n# Monofrequency sodium-amber palette (#120602 -> #E86A00 -> #FFCC00)\ncDeep = vec3(0.071, 0.024, 0.008);\ncAmber = vec3(0.910, 0.416, 0.0);\ncSun = vec3(1.0, 0.85, 0.12);\n\ncol = mix(cDeep, cAmber, clamp(energy * 0.9, 0.0, 1.0));\ncol = mix(col, cSun, clamp(disc * 0.95 + max(0.0, energy - 0.85), 0.0, 1.0));\n",
+    "params": {
+      "radius": 0.28,
+      "mist_density": 0.65,
+      "horizon": 0.36
+    }
+  }
+}

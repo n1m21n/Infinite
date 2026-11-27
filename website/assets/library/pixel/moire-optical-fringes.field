@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Moire Optical Fringes",
+    "author": "Infinite",
+    "description": "Concentric silver-halide optical interference fringes with dual-center curvature warp and fine emulsion grain.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float freq = 28.0 [10.0, 60.0];\nparam float offset = 0.11 [0.01, 0.30];\nparam float warp = 0.36 [0.0, 1.0];\nparam float grain = 0.14 [0.0, 0.4];\nparam float speed = 0.25 [0.0, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nca = cos(t * speed * 0.4);\nsa = sin(t * speed * 0.4);\nc1 = vec2(ca * offset, sa * offset);\nc2 = vec2(-ca * offset, -sa * offset);\n\nw1 = warp * 0.06 * sin(p.y * 9.0 + t * speed);\nw2 = warp * 0.06 * cos(p.x * 9.0 - t * speed * 0.8);\nr1 = length(p - c1 + vec2(w1, w2));\nr2 = length(p - c2 - vec2(w2, w1));\n\nf1 = 0.5 + 0.5 * cos(r1 * freq * 3.14159 - t * speed * 1.4);\nf2 = 0.5 + 0.5 * cos(r2 * freq * 3.14159 + t * speed * 1.1);\nfringe = mix(f1 * f2, abs(f1 - f2), 0.38);\n\n# Fine silver-halide emulsion grain\nn = fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453);\nlum = clamp(fringe + (n - 0.5) * grain, 0.0, 1.0);\n\ncDark = vec3(0.094, 0.102, 0.110);\ncMid = vec3(0.427, 0.443, 0.459);\ncLight = vec3(0.851, 0.863, 0.878);\ncol = mix(cDark, cMid, smoothstep(0.05, 0.52, lum));\ncol = mix(col, cLight, smoothstep(0.48, 0.92, lum));\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "freq": 28.0,
+      "offset": 0.11,
+      "warp": 0.36,
+      "grain": 0.14,
+      "speed": 0.25
+    }
+  }
+}

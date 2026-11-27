@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Clavinet D6 Pickup Synth",
+    "author": "Infinite",
+    "description": "Physical-modeled Hohner Clavinet D6 with damped string tangent strike, asymmetric dual-coil magnetic pickup comb filtering, and warm preamp grit.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float pickupPos = 0.28 [0.08, 0.48];\nparam float bite = 0.72 [0.1, 1.0];\nparam float damp = 0.9991 [0.997, 0.9997];\nparam float preamp = 0.45 [0.0, 1.0];\nparam float bodyHz = 1650.0 [600.0, 3800.0];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0;\nstate float env = 0; state float strikeEnv = 1.0;\nstate float lp1 = 0; state float bp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.28, env * damp);\nstrikeEnv = if(gate > 0.5, strikeEnv * 0.988, 1.0);\n\nf0 = clamp(freq, 45.0, 3200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 2.001) / sr) % 1.0;\np3 = (p3 + (f0 * 3.003) / sr) % 1.0;\n\nh1 = sin(6.2831853 * p1) * sin(3.14159265 * pickupPos);\nh2 = sin(6.2831853 * p2) * sin(6.2831853 * pickupPos) * (0.65 + strikeEnv * 0.45);\nh3 = sin(6.2831853 * p3) * sin(9.424778 * pickupPos) * (0.35 + bite * 0.55) * strikeEnv;\n\ndriven = (h1 + h2 + h3) * (1.2 + preamp * 2.2) * env;\nsat = driven / (1.0 + abs(driven) * 0.65);\n\ng = clamp(6.2831853 * bodyHz / sr, 0.04, 0.72);\nbp1 = bp1 + g * (sat - lp1 - 0.58 * bp1);\nlp1 = lp1 + g * bp1;\n\nout = (sat * 0.55 + bp1 * 0.48) * 0.58;\n",
+    "params": {
+      "pickupPos": 0.28,
+      "bite": 0.72,
+      "damp": 0.9991,
+      "preamp": 0.45,
+      "bodyHz": 1650.0
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

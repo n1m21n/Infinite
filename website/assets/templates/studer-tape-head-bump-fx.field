@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Studer Tape Head Bump FX",
+    "author": "Infinite",
+    "description": "Analog reel-to-reel tape path with low-frequency head-bump resonance, asymmetric hysteresis saturation, and subtle wow/flutter allpass drift.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float drive = 1.65 [0.8, 3.5];\nparam float bumpHz = 88.0 [45.0, 160.0];\nparam float bumpGain = 0.42 [0.0, 0.85];\nparam float wowHz = 0.55 [0.1, 2.5];\nparam float mix = 0.78 [0.0, 1.0];\nstate float lfo = 0; state float ap1 = 0;\nstate float bpLow = 0; state float bpBand = 0; state float hfLp = 0;\n\nlfo = (lfo + wowHz / sr) % 1.0;\nc = clamp(0.42 + sin(6.2831853 * lfo) * 0.16, 0.1, 0.82);\n\n# Subtle capstan wow/flutter dispersion\nwowed = -c * in + ap1;\nap1 = in + c * wowed;\n\n# Resonant head-bump shelf around bumpHz\nfBump = clamp(2.0 * sin(3.14159265 * bumpHz / sr), 0.002, 0.25);\nbpLow = bpLow + fBump * (wowed - bpBand - bpLow);\nbpBand = bpBand + fBump * bpLow * 1.4;\nbumped = wowed + bpBand * bumpGain;\n\n# Asymmetric tape hysteresis saturation + 7.5 ips HF roll-off\ndrv = (bumped + 0.08 * bumped * bumped) * drive;\nsat = (drv / (1.0 + abs(drv))) * 0.82;\ngHf = clamp(2.0 * sin(3.14159265 * 5400.0 / sr), 0.08, 0.88);\nhfLp = hfLp + gHf * (sat - hfLp);\n\nout = (in * (1.0 - mix) + hfLp * mix) * 0.78;\n",
+    "params": {
+      "drive": 1.65,
+      "bumpHz": 88.0,
+      "bumpGain": 0.42,
+      "wowHz": 0.55,
+      "mix": 0.78
+    }
+  }
+}

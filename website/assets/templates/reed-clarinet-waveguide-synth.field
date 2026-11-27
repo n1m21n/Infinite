@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Reed Clarinet Waveguide Synth",
+    "author": "Infinite",
+    "description": "Physical-modeled woodwind synthesizer coupling a nonlinear cubic reed pressure valve to a cylindrical bore delay resonator and breath exciter.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float breath = 0.78 [0.2, 1.2];\nparam float stiffness = 0.42 [0.1, 0.9];\nparam float boreDamp = 0.64 [0.2, 0.95];\nparam float vibratoHz = 4.8 [0.5, 8.0];\nparam float vibratoAmt = 0.012 [0.0, 0.05];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0;\nstate float vib = 0; state float env = 0;\nstate float lp1 = 0; state float bp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.0045, env * 0.9985);\nvib = (vib + vibratoHz / sr) % 1.0;\nf0 = clamp(freq * (1.0 + sin(6.2831853 * vib) * vibratoAmt), 65.0, 2400.0);\n\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 3.0) / sr) % 1.0;\np3 = (p3 + (f0 * 5.0) / sr) % 1.0;\n\n# Odd-harmonic cylindrical bore + nonlinear reed valve shaping\nbore = sin(6.2831853 * p1) + sin(6.2831853 * p2) * 0.44 + sin(6.2831853 * p3) * 0.20;\ndp = breath * env - bore * (0.45 + stiffness * 0.35);\nreed = clamp(dp - 0.35 * dp * dp * dp, -1.0, 1.0);\n\ng = clamp(2.0 * sin(3.14159265 * (900.0 + boreDamp * 2600.0) / sr), 0.05, 0.85);\nlp1 = lp1 + g * (reed * env - lp1);\nbp1 = bp1 + 0.14 * (lp1 - bp1);\n\nout = (lp1 * 0.72 + bp1 * 0.28) * 0.68;\n",
+    "params": {
+      "breath": 0.78,
+      "stiffness": 0.42,
+      "boreDamp": 0.64,
+      "vibratoHz": 4.8,
+      "vibratoAmt": 0.012
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

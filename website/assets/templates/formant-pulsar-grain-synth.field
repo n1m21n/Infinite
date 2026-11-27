@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Formant Pulsar Grain Synth",
+    "author": "Infinite",
+    "description": "Curtis Roads-inspired pulsar synthesis with raised-cosine Hann windowing, dual vocal formant carriers, and warm soft-clipped resonance.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float formant1 = 4.2 [1.2, 12.0];\nparam float formant2 = 7.6 [2.0, 18.0];\nparam float duty = 0.42 [0.12, 0.95];\nparam float tilt = 0.55 [0.0, 1.0];\nparam float decay = 0.9992 [0.996, 0.9997];\nstate float p0 = 0; state float vib = 0;\nstate float env = 0; state float lp1 = 0; state float lp2 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.18, env * decay);\nvib = (vib + 4.8 / sr) % 1.0;\n\nf0 = clamp(freq * (1.0 + 0.004 * sin(6.2831853 * vib)), 45.0, 2400.0);\np0 = (p0 + f0 / sr) % 1.0;\n\n# Raised-cosine pulsar window inside fundamental period\ndPhase = min(1.0, p0 / max(0.08, duty));\nwin = 0.5 - 0.5 * cos(6.2831853 * dPhase);\n\nc1 = sin(6.2831853 * p0 * formant1);\nc2 = sin(6.2831853 * p0 * formant2 + 0.7);\npulsar = win * (c1 * (1.0 - tilt * 0.45) + c2 * tilt * 0.65);\n\n# Fundamental sub-anchor + body filter\nraw = pulsar * 0.78 + sin(6.2831853 * p0) * 0.34;\ng = clamp(2.0 * sin(3.14159265 * (650.0 + env * 2800.0) / sr), 0.05, 0.85);\nlp1 = lp1 + g * (raw - lp1);\nlp2 = lp2 + g * (lp1 - lp2);\n\ndrv = lp2 * 1.45;\nsat = drv / (1.0 + abs(drv));\nout = sat * env * 0.78;\n",
+    "params": {
+      "formant1": 4.2,
+      "formant2": 7.6,
+      "duty": 0.42,
+      "tilt": 0.55,
+      "decay": 0.9992
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}
