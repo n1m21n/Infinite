@@ -169,6 +169,14 @@ namespace Ml
                "f12c6018da46d00571e80f25bb837ab118dcee7d57247af5fa36754e5915ef96", 6432884, "Apache-2.0",
                "Clean-room Auto-Colorize (Apache-2.0 MobileNetV4-Small), self-supervised BT.601 YCbCr on PD12M CC0.",
                { 1, 1, 256, 256 }, EpPref::CpuOnly, "colorize" });
+         add({ "migan_clean_512", "Clean Inpaint 512", "1.0.0", "inpaint-clean", "models/migan_clean_512.onnx",
+               "35c4ce8c1aa050a6cbff2ef3c059db1b784b7cf649e386b8768a54b4c15ae09d", 4073067, "MIT",
+               "Clean-room 512x512 Inpainting (MIT), trained on PD12M CC0 + Infinite renders + LPIPS (BSD-2). Zero Places2.",
+               { 1, 3, 512, 512 }, EpPref::CpuOnly, "inpaint-clean" });
+         add({ "rtmpose_s_coco_clean", "Pure-COCO Pose", "1.0.0", "pose", "models/rtmpose_s_coco_clean.onnx",
+               "ba375a7041624b9a74774fe10135e22b2a5b0f074471f0f65a4ee414ec05218d", 9457390, "Apache-2.0",
+               "Clean-room 17-keypoint Pose (Apache-2.0 MobileNetV4-Small), trained strictly on MS COCO val2017. Zero AIC/MPII.",
+               { 1, 3, 256, 192 }, EpPref::CpuOnly, "pose" });
       }
 
       void CloseAllSessionsLocked(RegistryState& s)

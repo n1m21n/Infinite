@@ -745,6 +745,8 @@ set(COMMON_SOURCES
     src/core/ml/Upscale.cpp
     src/core/ml/LineArt.cpp
     src/core/ml/Colorize.cpp
+    src/core/ml/CleanInpaint.cpp
+    src/core/ml/PoseDetect.cpp
     src/core/SelectMaths.cpp
     src/core/tracking/HandTracker.cpp
     src/core/tracking/FaceTracker.cpp

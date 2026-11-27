@@ -17,6 +17,8 @@
 #include "core/ml/Upscale.h"
 #include "core/ml/LineArt.h"
 #include "core/ml/Colorize.h"
+#include "core/ml/CleanInpaint.h"
+#include "core/ml/PoseDetect.h"
 #include "stb_image.h"
 #include "gl3.h"
 #include "stb_image_write.h"
@@ -3935,6 +3937,37 @@ void RunView2DTest()
                   const float cfrac = col.empty() ? 0.0f : (float)chroma / (float)(col.size() / 4);
                   printf("  ML-COLORIZE: ok=%d chroma=%.3f active=%s err=%s\n", okC, cfrac, Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
                   Check("ML-COLORIZE: produces colour channels on photo", okC && cfrac > 0.05f);
+               }
+               // 3f. Clean-room MI-GAN 512 Inpaint (zero Places2)
+               if (!Ml::CleanInpaint::Available())
+                  printf("  [skip] ML-INPAINT-CLEAN: %s\n", Ml::CleanInpaint::Missing().c_str());
+               else
+               {
+                  std::vector<uint8_t> mask((size_t)iw * ih, 0);
+                  for (int y = ih / 3; y < ih * 2 / 3; y++)
+                     for (int x = iw / 3; x < iw * 2 / 3; x++)
+                        mask[(size_t)y * iw + x] = 255;
+                  std::vector<uint8_t> filled; std::string err;
+                  const bool okI = Ml::CleanInpaint::RunNow(rgba, mask, iw, ih, filled, err);
+                  printf("  ML-INPAINT-CLEAN: ok=%d active=%s err=%s\n", okI, Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
+                  Check("ML-INPAINT-CLEAN: fills masked hole cleanly", okI && filled.size() == rgba.size());
+               }
+            }
+            // 3g. Pure-COCO 17-Keypoint Pose
+            if (!Ml::PoseDetect::Available())
+               printf("  [skip] ML-POSE: %s\n", Ml::PoseDetect::Missing().c_str());
+            else
+            {
+               int pw = 0, ph = 0; std::vector<uint8_t> prgba;
+               std::error_code ec;
+               for (const auto& de : std::filesystem::directory_iterator(evalRoot + "/S2", ec))
+                  if (de.path().extension() == ".jpg" && loadRgbaFile(de.path().string(), prgba, pw, ph)) break;
+               if (!prgba.empty())
+               {
+                  std::vector<Ml::PoseDetect::Keypoint> kpts; std::string err;
+                  const bool okP = Ml::PoseDetect::DetectNow(prgba, pw, ph, 0, 0, pw, ph, kpts, err);
+                  printf("  ML-POSE: ok=%d kpts=%zu active=%s err=%s\n", okP, kpts.size(), Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
+                  Check("ML-POSE: returns 17 COCO keypoints cleanly", okP && kpts.size() == 17 && Ml::ModelRegistry::ActiveFamily() == "pose");
                }
             }
          }
