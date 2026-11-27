@@ -4264,6 +4264,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "buchla-wavefolder-complex-synth",
+      "name": "Buchla Wavefolder Complex Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "West-coast complex oscillator pairing linear FM modulation with a multi-stage trigonometric wavefolder and vactrol-style lowpass gate.",
+      "price": 0,
+      "preview": "assets/templates/buchla-wavefolder-complex-synth.webp",
+      "file": "assets/templates/buchla-wavefolder-complex-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "metallic-gong-inharmonic-synth",
+      "name": "Metallic Gong Inharmonic Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Four-partial inharmonic bronze gong and metallophone synthesizer with mallet strike transient, shimmer beating, and warm nonlinear saturation.",
+      "price": 0,
+      "preview": "assets/templates/metallic-gong-inharmonic-synth.webp",
+      "file": "assets/templates/metallic-gong-inharmonic-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "quadrature-allpass-phaser-fx",
+      "name": "Quadrature Allpass Phaser FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Six-stage staggered allpass phaser-chorus driven by quadrature LFOs with resonant feedback and soft compander saturation.",
+      "price": 0,
+      "preview": "assets/templates/quadrature-allpass-phaser-fx.webp",
+      "file": "assets/templates/quadrature-allpass-phaser-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "twin-peak-formant-filter-fx",
+      "name": "Twin Peak Formant Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Parallel dual-SVF vowel formant resonator swept by an envelope follower and slow LFO morphing with warm nonlinear drive.",
+      "price": 0,
+      "preview": "assets/templates/twin-peak-formant-filter-fx.webp",
+      "file": "assets/templates/twin-peak-formant-filter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
   "count": 260

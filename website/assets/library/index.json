@@ -14271,6 +14271,218 @@
       "file": "assets/library/pixel/soto-kinetic-penetrable-moire.field",
       "preview": "assets/library/previews/soto-kinetic-penetrable-moire.jpg",
       "bytes": 1302
+    },
+    {
+      "id": "mondrian-neoplastic-grid",
+      "name": "Mondrian Neoplastic Grid",
+      "kind": "Generator",
+      "tags": [
+        "de-stijl",
+        "neoplasticism",
+        "mondrian",
+        "grid",
+        "geometric",
+        "sketch"
+      ],
+      "description": "Asymmetric neoplastic grid of primary vermilion, cobalt, and cadmium planes divided by charcoal bars over gessoed linen.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/mondrian-neoplastic-grid.js",
+      "preview": "assets/library/previews/mondrian-neoplastic-grid.jpg",
+      "bytes": 2427
+    },
+    {
+      "id": "urushi-katawaguruma-wheels",
+      "name": "Urushi Katawaguruma Wheels",
+      "kind": "Generator",
+      "tags": [
+        "urushi",
+        "raden",
+        "lacquerware",
+        "japanese",
+        "gold",
+        "sketch"
+      ],
+      "description": "Obsidian urushi lacquerware with flowing gold maki-e stream contours and half-submerged raden mother-of-pearl cartwheels.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/urushi-katawaguruma-wheels.js",
+      "preview": "assets/library/previews/urushi-katawaguruma-wheels.jpg",
+      "bytes": 3185
+    },
+    {
+      "id": "chrysler-sunburst-crown-3d",
+      "name": "Chrysler Sunburst Crown 3D",
+      "kind": "Generator",
+      "tags": [
+        "art-deco",
+        "streamline",
+        "architecture",
+        "brass",
+        "3d",
+        "sketch-3d"
+      ],
+      "description": "Terraced Art Deco stainless-steel and brass sunburst spire with radiating lancet fins above a stepped setback podium.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 3,
+      "file": "assets/library/sketch/chrysler-sunburst-crown-3d.js",
+      "preview": "assets/library/previews/chrysler-sunburst-crown-3d.jpg",
+      "bytes": 1654
+    },
+    {
+      "id": "doesburg-counter-prism-3d",
+      "name": "Doesburg Counter Prism 3D",
+      "kind": "Generator",
+      "tags": [
+        "de-stijl",
+        "doesburg",
+        "architectural",
+        "3d",
+        "geometric",
+        "sketch-3d"
+      ],
+      "description": "Tilted 45-degree counter-composition of cantilevered primary planes and charcoal structural beams in asymmetrical tension.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 3,
+      "file": "assets/library/sketch/doesburg-counter-prism-3d.js",
+      "preview": "assets/library/previews/doesburg-counter-prism-3d.jpg",
+      "bytes": 1617
+    },
+    {
+      "id": "buchla-wavefolder-complex-synth",
+      "name": "Buchla Wavefolder Complex Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "wavefolder",
+        "west-coast",
+        "fm",
+        "audio",
+        "dsp"
+      ],
+      "description": "West-coast complex oscillator pairing linear FM modulation with a multi-stage trigonometric wavefolder and vactrol-style lowpass gate.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/buchla-wavefolder-complex-synth.inf",
+      "preview": "assets/library/previews/buchla-wavefolder-complex-synth.jpg",
+      "bytes": 2005
+    },
+    {
+      "id": "metallic-gong-inharmonic-synth",
+      "name": "Metallic Gong Inharmonic Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "gong",
+        "inharmonic",
+        "metallophone",
+        "audio",
+        "dsp"
+      ],
+      "description": "Four-partial inharmonic bronze gong and metallophone synthesizer with mallet strike transient, shimmer beating, and warm nonlinear saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/metallic-gong-inharmonic-synth.inf",
+      "preview": "assets/library/previews/metallic-gong-inharmonic-synth.jpg",
+      "bytes": 2186
+    },
+    {
+      "id": "quadrature-allpass-phaser-fx",
+      "name": "Quadrature Allpass Phaser FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "phaser",
+        "allpass",
+        "quadrature",
+        "audio",
+        "dsp"
+      ],
+      "description": "Six-stage staggered allpass phaser-chorus driven by quadrature LFOs with resonant feedback and soft compander saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/quadrature-allpass-phaser-fx.inf",
+      "preview": "assets/library/previews/quadrature-allpass-phaser-fx.jpg",
+      "bytes": 2046
+    },
+    {
+      "id": "twin-peak-formant-filter-fx",
+      "name": "Twin Peak Formant Filter FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "formant",
+        "filter",
+        "svf",
+        "vowel",
+        "audio",
+        "dsp"
+      ],
+      "description": "Parallel dual-SVF vowel formant resonator swept by an envelope follower and slow LFO morphing with warm nonlinear drive.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/twin-peak-formant-filter-fx.inf",
+      "preview": "assets/library/previews/twin-peak-formant-filter-fx.jpg",
+      "bytes": 2046
+    },
+    {
+      "id": "art-deco-sunburst-relief",
+      "name": "Art Deco Sunburst Relief",
+      "kind": "Generator",
+      "tags": [
+        "art-deco",
+        "brass",
+        "sunburst",
+        "shader",
+        "pixel",
+        "audioreactive"
+      ],
+      "description": "Stepped Streamline Moderne brass and stainless-steel sunburst arches with fluted radial louvers and anisotropic metallic rim light.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 3,
+      "file": "assets/library/pixel/art-deco-sunburst-relief.field",
+      "preview": "assets/library/previews/art-deco-sunburst-relief.jpg",
+      "bytes": 1558
+    },
+    {
+      "id": "urushi-raden-iridescence",
+      "name": "Urushi Raden Iridescence",
+      "kind": "Generator",
+      "tags": [
+        "urushi",
+        "raden",
+        "lacquer",
+        "iridescence",
+        "shader",
+        "pixel",
+        "audioreactive"
+      ],
+      "description": "Deep obsidian urushi lacquer with domain-warped gold maki-e stream contours and thin-film iridescent raden mother-of-pearl inlay.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 3,
+      "file": "assets/library/pixel/urushi-raden-iridescence.field",
+      "preview": "assets/library/previews/urushi-raden-iridescence.jpg",
+      "bytes": 1473
     }
   ],
   "count": 689

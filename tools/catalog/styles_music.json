@@ -5882,6 +5882,208 @@
         "gain": -10.0
       },
       "groove": 0.25
+    },
+    {
+      "id": "buchla_wavefolder_complex",
+      "family": "experimental",
+      "bpm": [
+        98,
+        124
+      ],
+      "swing": 0.08,
+      "scale": [
+        3,
+        6
+      ],
+      "drums": {},
+      "bass": "0..3..5.0..7..a.",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.45,
+      "refs": [
+        "Buchla 259 complex oscillator linear FM & multi-stage trigonometric wavefolder"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "steps": 4,
+        "strum": 10.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.4,
+        "octave": 3,
+        "gate": 60,
+        "gain": -8.0
+      },
+      "groove": 0.35
+    },
+    {
+      "id": "metallic_gong_inharmonic",
+      "family": "ambient",
+      "bpm": [
+        68,
+        92
+      ],
+      "swing": 0.0,
+      "scale": [
+        9,
+        10
+      ],
+      "drums": {},
+      "bass": "0.......4.......",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.25,
+      "refs": [
+        "Inharmonic bronze gong & gamelan metallophone partial ratios (1, 2.756, 5.404, 8.93)"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 24.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.25,
+        "octave": 3,
+        "gate": 80,
+        "gain": -10.0
+      },
+      "groove": 0.2
+    },
+    {
+      "id": "quadrature_allpass_phaser",
+      "family": "downtempo",
+      "bpm": [
+        88,
+        112
+      ],
+      "swing": 0.06,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {},
+      "bass": "0.0.3.5.0.0.7.5.",
+      "fx": [
+        "Field Effect"
+      ],
+      "synth": [
+        "Analog",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.4,
+      "refs": [
+        "6-stage quadrature-LFO allpass phaser-chorus with compander warmth"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 2.0,
+        "steps": 4,
+        "strum": 12.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.35,
+        "octave": 3,
+        "gate": 65,
+        "gain": -8.0
+      },
+      "groove": 0.3
+    },
+    {
+      "id": "twin_peak_formant_filter",
+      "family": "house",
+      "bpm": [
+        114,
+        126
+      ],
+      "swing": 0.05,
+      "scale": [
+        1,
+        10
+      ],
+      "drums": {},
+      "bass": "0..0.3.50..7.5.3",
+      "fx": [
+        "Field Effect"
+      ],
+      "synth": [
+        "Analog"
+      ],
+      "ban": [
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.5,
+      "refs": [
+        "Parallel dual-SVF vowel formant resonator with envelope & LFO morphing"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "steps": 4,
+        "strum": 8.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.4,
+        "octave": 3,
+        "gate": 55,
+        "gain": -8.0
+      },
+      "groove": 0.4
     }
   ]
 }

@@ -795,6 +795,16 @@
       "slug": "soto-kinetic-penetrable-moire",
       "title": "Soto Kinetic Penetrable Moire",
       "description": "Audio-reactive kinetic rod-array moire interference inspired by Jesus Rafael Soto."
+    },
+    {
+      "slug": "art-deco-sunburst-relief",
+      "title": "Art Deco Sunburst Relief",
+      "description": "Stepped Streamline Moderne brass and stainless-steel sunburst arches with audio-reactive radial louvers and specular rim sheen."
+    },
+    {
+      "slug": "urushi-raden-iridescence",
+      "title": "Urushi Raden Iridescence",
+      "description": "Obsidian urushi lacquer with domain-warped gold maki-e stream contours and audio-reactive iridescent raden mother-of-pearl arcs."
     }
   ]
 }

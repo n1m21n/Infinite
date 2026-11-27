@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Buchla Wavefolder Complex Synth",
+    "author": "Infinite",
+    "description": "West-coast complex oscillator pairing linear FM modulation with a multi-stage trigonometric wavefolder and vactrol-style lowpass gate.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float ratio = 1.5 [0.5, 4.0];\nparam float fmIndex = 1.35 [0.0, 4.0];\nparam float fold = 2.6 [1.0, 5.5];\nparam float timbreEnv = 0.65 [0.0, 1.0];\nparam float decay = 0.9992 [0.996, 0.9997];\nstate float pc = 0; state float pm = 0; state float env = 0; state float lp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.08, env * decay);\nfc = clamp(freq, 40.0, 3200.0);\nfm = clamp(fc * ratio, 40.0, 8000.0);\npc = (pc + fc / sr) % 1.0;\npm = (pm + fm / sr) % 1.0;\n\nmodSig = sin(6.2831853 * pm) * fmIndex * (0.35 + 0.65 * env);\ncar = sin(6.2831853 * pc + modSig);\n\ndrive = fold * (0.45 + timbreEnv * env * 0.85);\nw1 = sin(car * drive + 0.45 * sin(car * drive * 2.0));\nw2 = sin(w1 * 1.85 + 0.3 * sin(w1 * 3.0));\n\ncutHz = 320.0 + 5200.0 * env * env;\ng = clamp(2.0 * sin(3.14159265 * cutHz / sr), 0.04, 0.85);\nlp1 = lp1 + g * (w2 * env - lp1);\n\ndrv = lp1 * 1.25;\nout = (drv / (1.0 + abs(drv))) * 0.65;\n",
+    "params": {
+      "ratio": 1.5,
+      "fmIndex": 1.35,
+      "fold": 2.6,
+      "timbreEnv": 0.65,
+      "decay": 0.9992
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

@@ -3323,6 +3323,101 @@
         "Jesus Rafael Soto suspended vertical rod array optical parallax and kinetic moire interference",
         "Steps Mono (Velvetyne) & Azeret Mono (Fontshare) kinetic exhibition typography"
       ]
+    },
+    {
+      "id": "art_deco_moderne",
+      "taxonomy": "new",
+      "name": "Art Deco Streamline Brass & Sunburst",
+      "palette": [
+        "#0D1528",
+        "#C8CED6",
+        "#D4A84F",
+        "#4A5A70"
+      ],
+      "sources": [
+        "Sketch 3D",
+        "Field Pixel"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "buchla_wavefolder_complex"
+      ],
+      "refs": [
+        "Chrysler Building stainless-steel sunburst crown & stepped Art Deco fenestration",
+        "Bifur, Broadway, Grotesk (Velvetyne) & Geom (Uncut) display typography"
+      ]
+    },
+    {
+      "id": "de_stijl_neoplasticism",
+      "taxonomy": "new",
+      "name": "De Stijl Neoplastic Grid & Counter-Composition",
+      "palette": [
+        "#F3EFE6",
+        "#141414",
+        "#D92B20",
+        "#124E9B",
+        "#EBC328"
+      ],
+      "sources": [
+        "Sketch",
+        "Sketch 3D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "blur"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "quadrature_allpass_phaser"
+      ],
+      "refs": [
+        "Piet Mondrian Composition II & Theo van Doesburg Counter-Composition V",
+        "Architype Van Doesburg, Architype Aubette & Poca geometric typography"
+      ]
+    },
+    {
+      "id": "urushi_raden_lacquer",
+      "taxonomy": "new",
+      "name": "Japanese Urushi Lacquer & Raden Mother-of-Pearl",
+      "palette": [
+        "#120F0D",
+        "#C9A24D",
+        "#EAE6DF",
+        "#9BD4C9"
+      ],
+      "sources": [
+        "Sketch",
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.22,
+      "pairs": [
+        "metallic_gong_inharmonic"
+      ],
+      "refs": [
+        "Ogata Korin Yatsuhashi & Heian Katawaguruma urushi maki-e & raden inlay",
+        "Format 1452, Sporting Grotesque & Getai Grotesk Display"
+      ]
     }
   ]
 }

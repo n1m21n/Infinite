@@ -1,0 +1,73 @@
+infinite-patch 1
+# Quadrature Allpass Phaser FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 45
+  i note1 48
+  i note2 52
+  i note3 55
+  i note4 57
+  i note5 55
+  i note6 52
+  i note7 48
+  i note8 45
+  i note9 52
+  i note10 57
+  i note11 60
+  i note12 55
+  i note13 52
+  i note14 48
+  i note15 45
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id src
+  pos 340 1024
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 680 1024
+  s code param float rateHz = 0.65 [0.08, 4.5];\nparam float depth = 0.32 [0.05, 0.55];\nparam float center = 0.52 [0.15, 0.85];\nparam float feedback = 0.52 [0.0, 0.82];\nparam float mix = 0.72 [0.0, 1.0];\nstate float lfo = 0; state float fb = 0;\nstate float a1 = 0; state float a2 = 0; state float a3 = 0;\nstate float a4 = 0; state float a5 = 0; state float a6 = 0;\n\nlfo = (lfo + rateHz / sr) % 1.0;\nsL = sin(6.2831853 * lfo);\ncL = cos(6.2831853 * lfo);\nk1 = clamp(center + sL * depth, 0.06, 0.92);\nk2 = clamp(center * 0.88 + cL * depth * 0.85, 0.06, 0.92);\n\nx = in + fb * feedback;\ny1 = -k1 * x + a1; a1 = x + k1 * y1;\ny2 = -k2 * y1 + a2; a2 = y1 + k2 * y2;\ny3 = -k1 * y2 + a3; a3 = y2 + k1 * y3;\ny4 = -k2 * y3 + a4; a4 = y3 + k2 * y4;\ny5 = -k1 * y4 + a5; a5 = y4 + k1 * y5;\ny6 = -k2 * y5 + a6; a6 = y5 + k2 * y6;\n\ndrv = y6 * 1.15;\nfb = drv / (1.0 + abs(drv));\nout = (in * (1.0 - mix) + fb * mix) * 0.78;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.30 0.36
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Quadrature Allpass Phaser FX. Six-stage staggered allpass phaser-chorus driven by quadrature LFOs with resonant feedback and soft compander saturation.
+  f width 340
+  f height 120
+end
+note src 0 notes
+aud fx 0 src
+aud speakers 0 fx
+cable out 0 pic

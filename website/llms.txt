@@ -417,6 +417,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Sho Mouth Organ Cluster Synth](https://infinitedevices.org/library/sho-mouth-organ-cluster-synth.html): Gagaku free-reed harmonic cluster synthesizer with beating detuned fifths, slow breath-swell envelope, and warm reed-pipe formant filtering. (file: https://infinitedevices.org/assets/templates/sho-mouth-organ-cluster-synth.inf)
 - [Solenoid Spring Resonator FX](https://infinitedevices.org/library/solenoid-spring-resonator-fx.html): Electro-mechanical spring-coil dispersion effect with staggered allpass tanks, resonant metallic chime feedback, and gentle saturation. (file: https://infinitedevices.org/assets/templates/solenoid-spring-resonator-fx.inf)
 - [Binaural Haas Room Slit FX](https://infinitedevices.org/library/binaural-haas-room-slit-fx.html): Architectural concrete slit-aperture spatializer using micro-delayed allpass early reflections, air-absorption damping, and warm saturation. (file: https://infinitedevices.org/assets/templates/binaural-haas-room-slit-fx.inf)
+- [Buchla Wavefolder Complex Synth](https://infinitedevices.org/library/buchla-wavefolder-complex-synth.html): West-coast complex oscillator pairing linear FM modulation with a multi-stage trigonometric wavefolder and vactrol-style lowpass gate. (file: https://infinitedevices.org/assets/templates/buchla-wavefolder-complex-synth.inf)
+- [Metallic Gong Inharmonic Synth](https://infinitedevices.org/library/metallic-gong-inharmonic-synth.html): Four-partial inharmonic bronze gong and metallophone synthesizer with mallet strike transient, shimmer beating, and warm nonlinear saturation. (file: https://infinitedevices.org/assets/templates/metallic-gong-inharmonic-synth.inf)
+- [Quadrature Allpass Phaser FX](https://infinitedevices.org/library/quadrature-allpass-phaser-fx.html): Six-stage staggered allpass phaser-chorus driven by quadrature LFOs with resonant feedback and soft compander saturation. (file: https://infinitedevices.org/assets/templates/quadrature-allpass-phaser-fx.inf)
+- [Twin Peak Formant Filter FX](https://infinitedevices.org/library/twin-peak-formant-filter-fx.html): Parallel dual-SVF vowel formant resonator swept by an envelope follower and slow LFO morphing with warm nonlinear drive. (file: https://infinitedevices.org/assets/templates/twin-peak-formant-filter-fx.inf)
 
 ## Library: Community
 
@@ -840,7 +844,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 159 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 161 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -857,4 +861,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 144 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 146 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
