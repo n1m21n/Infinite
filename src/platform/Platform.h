@@ -295,6 +295,9 @@ namespace Platform
    const std::vector<std::string>& AvailableFontFamilies();
    // The font file an installed family resolves to ("" when unknown).
    std::string FontFileForFamily(const std::string& family);
+   // True when an installed face carries exactly this PostScript name ("Helvetica-Bold", "BMDoHyeon", "Daum_SemiBold"),
+   // whatever its family is called: a run that names a face is not missing just because the name is not a family.
+   bool FontFaceInstalled(const std::string& postscriptName);
    // A font file (.ttf/.otf/.ttc) for this run only, not installed system-wide: joins AvailableFontFamilies and every
    // text render by its family name, which comes back in `family`. False when the file is not a font.
    bool AddFontFile(const std::string& path, std::string& family);
@@ -319,6 +322,9 @@ namespace Platform
       float wrapWidth = 0.9f;  // fraction of canvas width
       float wrapHeight = 0.9f; // fraction of canvas height
       float lineSpacing = 1.0f;
+      // Leading as a pitch: lines exactly fontSize * lineSpacing px apart (Photoshop's leading). Windows and Linux
+      // always space lines that way; macOS otherwise scales the font's own line height.
+      bool exactLeading = false;
       float outlineWidth = 0.0f;
       float outlineColor[3] = { 0, 0, 0 };
       bool outlineOnly = false;
@@ -348,12 +354,25 @@ namespace Platform
          float size = 24.0f, tracking = 0.0f;
          float color[4] = { 1, 1, 1, 1 };
          bool bold = false, italic = false, underline = false;
+         // OpenType features: space-separated tags turned on ("tnum ss01"); "-liga" turns standard ligatures off.
+         std::string features;
+         // Kerning: 0 the font's pairs, 1 optical (drawn as the font's pairs), 2 off with a fixed kern (1/1000 em).
+         int kernMode = 0;
+         float kern = 0.0f;
       };
       std::vector<Span> spans;
    };
 
    void RasterizeText(const TextRasterRequest& req, int width, int height,
                       unsigned char* outPixelsRGBA, float& outFittedSize);
+
+   // The font's own pair kerning between two characters (UTF-8), px at `size` (negative pulls them together).
+   // 0 where the OS gives no measure.
+   float PairKerning(const std::string& font, float size, const std::string& a, const std::string& b);
+   // Spelling (macOS: the system checker; elsewhere every word passes and there are no suggestions).
+   // language "" = the user's. CheckWord: true = spelled right.
+   bool CheckWord(const std::string& word, const std::string& language = "");
+   std::vector<std::string> SpellSuggestions(const std::string& word, int max, const std::string& language = "");
 
    bool LoadModel(const std::string& path, std::vector<ModelVertex>& outVertices,
                   std::vector<unsigned int>& outIndices, std::string& outError);

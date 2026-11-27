@@ -1437,6 +1437,147 @@ void RunView2DTest()
       glBindTexture(GL_TEXTURE_2D, 0);
       Check("Phase5: tiltSize widens a tilted dab beyond flat radius", Lit(tiltPx, 159, 100));
 
+      // ---- Pen pose (PhotoCraft's pose suite): fixed pen values stand in for the pen's, axis by axis ----
+      {
+         bool only = true;
+         for (int enabled = 0; enabled < 2; enabled++)
+            for (int mask = 0; mask < 4; mask++)
+            {
+               BrushEngine::Brush pb;
+               pb.pose = enabled != 0;
+               pb.poseTiltXOn = (mask & 1) != 0;
+               pb.poseTiltYOn = (mask & 2) != 0;
+               pb.poseTiltX = 0.5f;
+               pb.poseTiltY = -0.2f;
+               pb.posePressure = 0.4f;
+               pb.poseRot = 120.0f;
+               float pr = 0.71f, tx = 0.13f, ty = -0.27f, rot = 67.0f;
+               BrushEngine::Stroke::ApplyPose(pb, pr, tx, ty, rot);
+               const float ex = enabled && (mask & 1) ? 0.5f : 0.13f, ey = enabled && (mask & 2) ? -0.2f : -0.27f;
+               only = only && pr == 0.71f && rot == 67.0f && tx == ex && ty == ey;
+            }
+         Check("parity: pose axes override only the selected stylus components", only);
+         auto shot = [&](const BrushEngine::Brush& b, float tx, float ty, float pressure, float at = 150.0f) {
+            while (!pic.Layers().empty())
+               pic.Layers().pop_back();
+            pic.Commit();
+            const int pl = pic.AddPaintLayer();
+            pic.SetPaintMeta(tx, ty, 0.0f, 1.0);
+            pic.BeginPaint(pl, 0, b, at, 100.0f, pressure);
+            pic.EndPaint();
+            Cook(&pic);
+            std::vector<float> out((size_t)pic.GetOutputWidth() * pic.GetOutputHeight() * 4);
+            glBindTexture(GL_TEXTURE_2D, pic.GetOutputTexture());
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, out.data());
+            glBindTexture(GL_TEXTURE_2D, 0);
+            pic.SetPaintMeta(0.0f, 0.0f, 0.0f, 1.0);
+            return out;
+         };
+         auto same = [](const std::vector<float>& a, const std::vector<float>& b) {
+            if (a.size() != b.size())
+               return false;
+            float d = 0.0f;
+            for (size_t i = 0; i < a.size(); i++)
+               d = std::max(d, std::fabs(a[i] - b[i]));
+            if (d >= 0.01f)
+               fprintf(stderr, "PROBE pose shots differ by %.3f\n", d);
+            return d < 0.01f;
+         };
+         BrushEngine::Brush pb = BrushEngine::Presets()[5].brush;
+         pb.size = 40.0f;
+         pb.pressureSize = true;
+         pb.seed = 7u;   // one grain for every shot: fresh strokes draw a fresh seed
+         pb.color[0] = pb.color[1] = pb.color[2] = 1.0f;
+         const std::vector<float> half = shot(pb, 0.0f, 0.0f, 0.5f), full = shot(pb, 0.0f, 0.0f, 1.0f);
+         BrushEngine::Brush posed = pb;
+         posed.pose = true;
+         posed.posePressureOn = true;
+         posed.posePressure = 0.5f;
+         const std::vector<float> fixedP = shot(posed, 0.0f, 0.0f, 1.0f);
+         fprintf(stderr, "PROBE pose pressure: half==fixed %d full!=fixed %d\n", (int)same(half, fixedP), (int)!same(full, fixedP));
+         Check("parity: pose overrides stylus values", same(half, fixedP) && !same(full, fixedP));
+         // A posed tilt reaches the dabs and the pixels exactly as the same tilt from the pen would.
+         BrushEngine::Brush tb = BrushEngine::Presets()[5].brush;
+         tb.size = 16.0f;
+         tb.tiltRound = true;
+         tb.seed = 7u;
+         tb.tiltSize = true;
+         tb.color[0] = tb.color[1] = tb.color[2] = 1.0f;
+         bool reach = true;
+         for (int mask = 1; mask < 4; mask++)
+         {
+            BrushEngine::Brush tp = tb;
+            tp.pose = true;
+            tp.poseTiltXOn = (mask & 1) != 0;
+            tp.poseTiltYOn = (mask & 2) != 0;
+            tp.poseTiltX = 0.8f;
+            tp.poseTiltY = -0.3f;
+            const std::vector<float> a = shot(tp, 0.1f, 0.4f, 1.0f);
+            const std::vector<float> e = shot(tb, (mask & 1) ? 0.8f : 0.1f, (mask & 2) ? -0.3f : 0.4f, 1.0f);
+            const bool lit = Lit(a, 150, 100), eq = same(a, e);
+            if (!lit || !eq)
+               fprintf(stderr, "PROBE pose tilt mask %d: same %d lit %d\n", mask, (int)eq, (int)lit);
+            reach = reach && eq && lit;
+         }
+         Check("parity: pose axes reach dabs and pixels at all rgba depths", reach);
+         // Brush projection: a tip leaning 60 degrees along x shows half its width along x and all its height.
+         BrushEngine::Brush jb = BrushEngine::Presets()[5].brush;
+         jb.size = 40.0f;
+         jb.hardness = 1.0f;
+         jb.projection = true;
+         jb.color[0] = jb.color[1] = jb.color[2] = 1.0f;
+         auto extent = [&](const std::vector<float>& px, bool alongX) {
+            int n = 0;
+            for (int k = -30; k <= 30; k++)
+               n += alongX ? (int)Lit(px, 150 + k, 100) : (int)Lit(px, 150, 100 + k);
+            return n;
+         };
+         const std::vector<float> lx = shot(jb, 2.0f / 3.0f, 0.0f, 1.0f), ly = shot(jb, 0.0f, 2.0f / 3.0f, 1.0f);
+         jb.projection = false;
+         const std::vector<float> off = shot(jb, 2.0f / 3.0f, 0.0f, 1.0f);
+         const int xw = extent(lx, true), xh = extent(lx, false), yw = extent(ly, true), yh = extent(ly, false), ow = extent(off, true), oh = extent(off, false);
+         fprintf(stderr, "PROBE projection: x lean %dx%d y lean %dx%d off %dx%d\n", xw, xh, yw, yh, ow, oh);
+         // Symmetry reflects about the canvas centre; the copies take the pen's pressure and tilt as they are.
+         {
+            auto near = [](const std::pair<float, float>& p, float x, float y) { return std::fabs(p.first - x) < 1e-3f && std::fabs(p.second - y) < 1e-3f; };
+            const int sym0 = pic.Doc().symmetry;
+            pic.Doc().symmetry = 1;
+            const auto v = pic.SymmetryPoints(120.0f, 75.0f);
+            pic.Doc().symmetry = 2;
+            const auto hz = pic.SymmetryPoints(120.0f, 75.0f);
+            pic.Doc().symmetry = 3;
+            const auto both = pic.SymmetryPoints(120.0f, 75.0f);
+            bool where = v.size() == 2 && near(v[1], 180.0f, 75.0f) && hz.size() == 2 && near(hz[1], 120.0f, 125.0f) && both.size() == 4;
+            if (where)
+            {
+               int hit = 0;
+               for (size_t i = 1; i < both.size(); i++)
+                  hit += near(both[i], 180.0f, 75.0f) + near(both[i], 120.0f, 125.0f) + near(both[i], 180.0f, 125.0f);
+               where = hit == 3;
+            }
+            BrushEngine::Brush sb = tb;
+            sb.pressureSize = true;
+            pic.Doc().symmetry = 1;
+            const std::vector<float> mir = shot(sb, 0.7f, 0.0f, 0.6f, 120.0f);
+            pic.Doc().symmetry = sym0;
+            // The tilted, light-pressure dab at x 120 and its copy at x 180 are the same dab, mirrored.
+            // Pixel 120 + k's mirror about x 150 is pixel 179 - k (pixel centres sit half a pixel right of their index).
+            int nl = 0, nr = 0;
+            for (int k = -25; k <= 25; k++)
+            {
+               nl += (int)Lit(mir, 120 + k, 100);
+               nr += (int)Lit(mir, 179 - k, 100);
+            }
+            bool keeps = Lit(mir, 120, 100) && Lit(mir, 179, 100) && nl > 0 && nl == nr;
+            if (!keeps)
+               fprintf(stderr, "PROBE symmetry row: left %d right %d\n", nl, nr);
+            fprintf(stderr, "PROBE symmetry: where %d keeps %d\n", (int)where, (int)keeps);
+            Check("parity: modes reflect about their centre and keep stylus data", where && keeps);
+         }
+         Check("parity: brush projection foreshortens along tilt and turns with rotation",
+               std::abs(xw - 20) <= 3 && xh >= 37 && yw >= 37 && std::abs(yh - 20) <= 3 && ow >= 37 && oh >= 37);
+      }
+
       BrushEngine::Brush air = BrushEngine::Presets()[4].brush;
       Check("Phase5: Soft airbrush has airbrushRate > 0", air.airbrushRate > 0.0f);
       while (!pic.Layers().empty())
@@ -3476,6 +3617,36 @@ void RunView2DTest()
             badEffect += nm;
       }
       S::sLensDepthAuto = keepLensAuto;
+      // Gradient map dither (PhotoCraft tone_tests): half a level of noise at most, and it does move some pixels.
+      {
+         Scene2DNode g0, g1;
+         auto gm = [&](Scene2DNode& pic, bool dither) {
+            Base(pic);
+            Layer& a = pic.AddLayer(Kind::Adjust, 0, pic.Layers().back().id);
+            a.adjType = S::kAdjGradientMap;
+            a.adjAmt = a.adjTo = 1.0f;
+            a.adjDither = dither;
+            pic.Commit();
+            Cook(&pic);
+            return Buf(&pic);
+         };
+         const std::vector<float> a = gm(g0, false), b = gm(g1, true);
+         float most = 0.0f;
+         bool moved = false;
+         for (size_t i = 0; i < a.size() && a.size() == b.size(); i += 4)
+            for (int c = 0; c < 3; c++)
+            {
+               most = std::max(most, std::fabs(a[i + c] - b[i + c]));
+               moved = moved || a[i + c] != b[i + c];
+            }
+         Scene2DNode back;
+         back.SetDocText(g1.DocText());
+         bool kept = false;
+         for (const Layer& l : back.Layers())
+            kept = kept || (l.kind == Kind::Adjust && l.adjDither);
+         printf("PROBE gradient map dither: max %.5f moved %d kept %d\n", most, moved, kept);
+         Check("parity: gradient map dither stays close", !a.empty() && a.size() == b.size() && most <= 0.75f / 255.0f && moved && kept);
+      }
       printf("  sweep adj: no change [%s] not neutral [%s] alpha [%s] non-finite [%s] save [%s] effect differs [%s]\n", noChange.c_str(),
              notNeutral.c_str(), badAlpha.c_str(), badFinite.c_str(), badSave.c_str(), badEffect.c_str());
       Check("Sweep: every adjustment changes the picture when set", noChange.empty());

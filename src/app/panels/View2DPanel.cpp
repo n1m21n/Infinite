@@ -60,6 +60,7 @@
 #include "nodes/VideoSourceNode.h"
 #include "audio/MediaExtensions.h"
 #include "platform/Platform.h"
+#include "stb_image.h"
 #include "stb_image_write.h"
 
 #include <algorithm>
@@ -106,6 +107,7 @@ namespace
 
    bool OpenLayeredFile(const std::string& path, ImVec2 at);   // PSD or ORA as a new document
    void ExportLayered(Scene2DNode* doc, const char* ext);
+   void ExportLayerMenu(Scene2DNode* doc, int id);
 
    constexpr float kSideW = UiDensity::kInspectorW + tok::control_h + tok::space_3;   // tab rail + one compact strip
    constexpr float kIconW = tok::control_h;   // icon chips are square, one panel chip
@@ -222,6 +224,7 @@ namespace
    int sStyleParts = Scene2DNode::kStAll;   // style picker: which parts travel
    int sGradExtend = 0;            // past the ends: 0 pad, 1 repeat, 2 reflect
    bool sGradDither = true;        // breaks up 8-bit banding
+   int sGradMethod = 0;            // 0 straight ramp, 1 Smooth (Photoshop's measured curves)
    bool sCropDarken = true, sCropReveal = true;   // crop: dim outside the box; show it at all
    bool sSelBrushSub = false;      // selection brush: takes away (Alt flips it)
    bool sSelBrushSoft = true;      // selection brush: soft edges (off: hard)
@@ -271,6 +274,7 @@ namespace
    SelectMaths::RangeParams sRange;
    bool sRangeInvert = false;
    std::vector<SelectMaths::Sample> sRangeSamples;
+   float sReplaceHue = 0.0f, sReplaceSat = 0.0f, sReplaceLight = 0.0f;   // Replace Color, off the Color Range window
    float sDepthNear = 1.0f, sDepthFar = 0.5f, sDepthSoft = 0.1f;   // Depth Select, 0 far .. 1 near
    bool sDepthInvert = false;
    float sFocusRange = 0.5f, sFocusNoise = 0.1f;   // Focus Area, 0..1
@@ -285,6 +289,10 @@ namespace
    std::vector<int> sSel;          // layer ids, in click order
    int sTab = 0;                   // 0 Layers, 1 Layer, 2 Transform, 3 Document, 4 Output
    bool sSideOpen = true;
+   // While the UI audit holds a state, moving decorations (marching ants, caret blink) read a fixed clock so the
+   // golden shots are the same every run.
+   bool sAuditFrozen = false;
+   double AnimNow() { return sAuditFrozen ? 0.0 : ImGui::GetTime(); }
    bool sAutoSelect = true;
    bool sDirty = false;            // a widget changed the model this frame
    float sZoom = 1.0f;
@@ -342,6 +350,9 @@ namespace
 
    bool sCropOn = false;
    int sImageW = 0, sImageH = 0;   // Document tab's Image size fields (namespace scope: the audit sets them)
+   float sImageDpi = 0.0f;         // its resolution field
+   bool sImagePrint = false;       // Keep print size: a new resolution resamples
+   int sImageResample = 0;         // 0 smooth, 1 nearest neighbour
    uint64_t sSizeFor = 0;           // the document and size those fields were last synced to
    int sSizeSeenW = 0, sSizeSeenH = 0;
    float sCrop[4] = { 0, 0, 0, 0 };   // x0 y0 x1 y1, document px, before the box's turn
@@ -352,6 +363,9 @@ namespace
    bool sEraseHistory = false;        // eraser: paints back to the History source instead of erasing (Photoshop)
    bool sShapeSnap = true;            // brush and eraser: hold at the end of a stroke to make it a clean shape
    float sVecFillGap = Scene2DNode::kVectorFillGap;   // vector bucket: gaps between lines up to this many px count as closed
+   float sCropTarget[3] = { 0.0f, 0.0f, 0.0f };   // Crop target W x H x resolution (0 = as cropped / keep)
+   bool sCropFill = false;           // Fill: Content-Aware rebuilds what the crop uncovers (a new layer above the active one)
+   bool sCropDelete = false;         // Delete Cropped Pixels: paint layers lose what lies outside (type and node layers stay whole)
    bool sCropPersp = false;           // Perspective Crop: four free corners, the quad becomes the document
    ImVec2 sCropQuad[4];               // TL TR BR BL, document px; with Perspective on, sOp.cropHandle 0..3 is a corner
    const float* CropQuadF() { return &sCropQuad[0].x; }
@@ -2276,6 +2290,33 @@ namespace
          return false;
       return true;
    }
+   // The colour an adjustment's eyedropper reads: the picture under that adjustment (Photoshop samples the input, so a
+   // second pick on the same spot lands on the same point), an N x N average. False off the document.
+   bool PickUnderAdj(Scene2DNode* doc, int key, float x, float y, float rgb[3], int size)
+   {
+      int id = 0, eff = -1;
+      KeySource(key, id, eff);
+      std::vector<uint8_t> px;
+      if (doc == nullptr || !doc->PictureUnder(id, eff, 0, px))
+         return false;
+      const int W = doc->Doc().w, H = doc->Doc().h, cx = (int)std::floor(x), cy = (int)std::floor(y);
+      if (px.size() != (size_t)W * H * params::view2d::rgba_bytes || cx < 0 || cy < 0 || cx >= W || cy >= H)
+         return false;
+      const int r = std::max(0, size / params::view2d::sample_half);
+      double sum[3] = { 0, 0, 0 };
+      int n = 0;
+      for (int yy = std::max(0, cy - r); yy <= std::min(H - 1, cy + r); yy++)
+         for (int xx = std::max(0, cx - r); xx <= std::min(W - 1, cx + r); xx++)
+         {
+            const uint8_t* p = &px[((size_t)yy * W + xx) * 4];
+            for (int c = 0; c < 3; c++)
+               sum[c] += p[c] / 255.0;
+            n++;
+         }
+      for (int c = 0; c < 3; c++)
+         rgb[c] = (float)(sum[c] / std::max(1, n));
+      return n > 0;
+   }
    // The y of a curve at x, and the point at x (added when none is near).
    float CurveAt(const std::vector<float>& c, float x)
    {
@@ -3373,6 +3414,15 @@ namespace
          }
       if (cmd && key(ImGuiKey_LeftBracket)) Restack(doc, shift ? 2 : 0);
       if (cmd && key(ImGuiKey_RightBracket)) Restack(doc, shift ? 3 : 1);
+      // Cmd+Shift+. / , step a type layer's size (2 px; with Alt, 10 px).
+      if (cmd && shift && (key(ImGuiKey_Period) || key(ImGuiKey_Comma)))
+         if (Layer* a = Active(doc); a != nullptr && a->kind == Kind::Text)
+         {
+            const float step = params::view2d::type_size_step * (alt ? params::view2d::type_size_more : 1.0f);
+            PushUndoCheckpoint("Type size");
+            doc->StepTypeSize(a->id, std::string::npos, std::string::npos, key(ImGuiKey_Period) ? step : -step);
+            Touch();
+         }
       if (cmd && key(ImGuiKey_A) && onCanvas && PixelTool(sTool))
       {
          SelStep("Select all");
@@ -3642,7 +3692,17 @@ namespace
 
    // ---- paint tools -------------------------------------------------------
 
+   // Pencil Auto Erase: the pixel under the stroke's start is the foreground colour, to the 8-bit level.
+   bool PencilOnForeground(const float k[3], const float fg[3])
+   {
+      for (int c = 0; c < 3; c++)
+         if (std::lround(k[c] * 255.0f) != std::lround(fg[c] * 255.0f))
+            return false;
+      return true;
+   }
+
    // The brush and eraser settings kept between runs: "<b|e> <field> <values>" lines in the app's support folder.
+   bool MixerState3(const float* a, const float* b) { return a[0] == b[0] && a[1] == b[1] && a[2] == b[2]; }
    std::string BrushFile() { return AppPaths::AppSupportDir() + "/2dview-brushes.txt"; }
    template <class F> void BrushFields(BrushEngine::Brush& b, F f)
    {
@@ -3651,7 +3711,8 @@ namespace
       i("tip", b.tip); f("size", &b.size, 1); f("hardness", &b.hardness, 1); f("opacity", &b.opacity, 1);
       f("flow", &b.flow, 1); f("spacing", &b.spacing, 1); f("jitter", &b.jitter, 1); f("angle", &b.angle, 1);
       f("roundness", &b.roundness, 1); f("smoothing", &b.smoothing, 1); i("stabiliser", b.stabiliser);
-      bo("pencil", b.pencil); bo("pressureSize", b.pressureSize); bo("pressureOpacity", b.pressureOpacity);
+      bo("pencil", b.pencil); bo("autoErase", b.autoErase); bo("pressureSize", b.pressureSize); bo("pressureOpacity", b.pressureOpacity);
+      f("sizeCurveMid", &b.sizeCurveMid, 1); f("opacityCurveMid", &b.opacityCurveMid, 1); i("fadeSize", b.fadeSize); i("fadeOpacity", b.fadeOpacity);
       i("mode", b.mode); bo("lockAlpha", b.lockAlpha); bo("follow", b.follow); f("taperIn", &b.taperIn, 1);
       f("taperOut", &b.taperOut, 1); f("sizeJitter", &b.sizeJitter, 1); f("opacityJitter", &b.opacityJitter, 1);
       f("hueJitter", &b.hueJitter, 1); f("satJitter", &b.satJitter, 1); f("valJitter", &b.valJitter, 1);
@@ -3664,13 +3725,17 @@ namespace
       // Retouch and dab settings (the wiring audit found them unsaved: a preset lost them on reload).
       f("sourceRotate", &b.sourceRotate, 1); f("sourceScale", &b.sourceScale, 1); bo("sourceFlipX", b.sourceFlipX);
       bo("sourceFlipY", b.sourceFlipY); i("sourceBlend", b.sourceBlend); bo("protectHue", b.protectHue);
-      i("sharpMode", b.sharpMode); i("spongeMode", b.spongeMode); f("keyTolerance", &b.keyTolerance, 1); bo("protectFg", b.protectFg);
-      bo("wetEdges", b.wetEdges); bo("autoClean", b.autoClean); f("accumulation", &b.accumulation, 1);
+      i("sharpMode", b.sharpMode); i("smudgeMode", b.smudgeMode); i("spongeMode", b.spongeMode); f("keyTolerance", &b.keyTolerance, 1); bo("protectFg", b.protectFg); bo("bgContiguous", b.bgContiguous);
+      bo("wetEdges", b.wetEdges); bo("autoClean", b.autoClean); bo("autoLoad", b.autoLoad); f("accumulation", &b.accumulation, 1);
       f("accumJitter", &b.accumJitter, 1); f("hardJitter", &b.hardJitter, 1); f("angleJitter", &b.angleJitter, 1);
       f("roundJitter", &b.roundJitter, 1); f("scatterY", &b.scatterY, 1);
       bo("oneEuro", b.oneEuro); bo("catchUp", b.catchUp); f("pressureCurve", &b.pressureCurve, 1);
       bo("tiltSize", b.tiltSize); bo("tiltAngle", b.tiltAngle); bo("tiltRound", b.tiltRound);
+      bo("projection", b.projection); bo("pose", b.pose); bo("posePressureOn", b.posePressureOn); bo("poseTiltXOn", b.poseTiltXOn);
+      bo("poseTiltYOn", b.poseTiltYOn); bo("poseRotOn", b.poseRotOn); f("posePressure", &b.posePressure, 1); f("poseTiltX", &b.poseTiltX, 1);
+      f("poseTiltY", &b.poseTiltY, 1); f("poseRot", &b.poseRot, 1);
       f("airbrushRate", &b.airbrushRate, 1); f("patternScale", &b.patternScale, 1); bo("patternAligned", b.patternAligned);
+      bo("impressionist", b.impressionist); bo("protectTexture", b.protectTexture);
       bo("wrap", b.wrap); f("wetJitter", &b.wetJitter, 1); f("refillJitter", &b.refillJitter, 1); bo("spacingOff", b.spacingOff);
    }
    std::string BrushText()
@@ -3736,8 +3801,11 @@ namespace
 
    // Saved brush presets (Photoshop's New Brush Preset): the user's own, kept between runs in the support folder as
    // "preset <b|e> <name>" lines, each followed by its "<field> <values>" lines (the same fields as the tool settings).
-   struct UserPreset { std::string name; BrushEngine::Brush brush; bool erase = false; };
+   // What a saved preset brings back when picked (Photoshop's New Brush Preset boxes): Capture Brush Size, Include
+   // Tool Settings (mode, opacity, flow, pressure buttons) and Include Color. Without the first two the tool keeps its own.
+   struct UserPreset { std::string name; BrushEngine::Brush brush; bool erase = false; bool capSize = true, capTool = true, capColour = false; };
    std::vector<UserPreset> sUserPresets;
+   bool sSaveCapSize = true, sSaveCapTool = true, sSaveCapColour = false;   // the boxes for the next Save
    int sUserPick = -1, sUserPickErase = -1;   // the saved preset the brush / eraser came from
    bool sUserLoaded = false;
    std::string UserPresetFile() { return AppPaths::AppSupportDir() + "/2dview-brush-presets.txt"; }
@@ -3747,6 +3815,9 @@ namespace
       for (UserPreset& u : sUserPresets)
       {
          o << "preset " << (u.erase ? 'e' : 'b') << " " << u.name << "\n";
+         o << "captures " << (int)u.capSize << " " << (int)u.capTool << " " << (int)u.capColour << "\n";
+         if (u.capColour)
+            o << "colour " << u.brush.color[0] << " " << u.brush.color[1] << " " << u.brush.color[2] << "\n";   // the captured foreground
          BrushFields(u.brush, [&](const char* n, float* v, int c)
          {
             o << n;
@@ -3788,6 +3859,19 @@ namespace
          std::vector<float> vals;
          for (float v; ls >> v;)
             vals.push_back(v);
+         if (field == "captures" && vals.size() >= (size_t)params::view2d::capture_fields)
+         {
+            UserPreset& u = sUserPresets.back();
+            u.capSize = vals[0] > tok::view2d_v_limit;
+            u.capTool = vals[1] > tok::view2d_v_limit;
+            u.capColour = vals[2] > tok::view2d_v_limit;
+            continue;
+         }
+         if (field == "colour" && vals.size() >= (size_t)params::view2d::colour_fields)
+         {
+            std::copy(vals.begin(), vals.begin() + params::view2d::colour_fields, sUserPresets.back().brush.color);
+            continue;
+         }
          BrushFields(sUserPresets.back().brush, [&](const char* n, float* v, int c)
          {
             if (field == n && (int)vals.size() >= c)
@@ -3825,9 +3909,34 @@ namespace
       int n = 1;
       for (const UserPreset& u : sUserPresets)
          n += u.erase == erase ? 1 : 0;
-      sUserPresets.push_back({ std::string(erase ? "Eraser " : "Brush ") + std::to_string(n), b, erase });
+      UserPreset u { std::string(erase ? "Eraser " : "Brush ") + std::to_string(n), b, erase };
+      u.capSize = sSaveCapSize;
+      u.capTool = sSaveCapTool;
+      u.capColour = sSaveCapColour;
+      if (u.capColour)
+         std::copy(sFg, sFg + 3, u.brush.color);
+      sUserPresets.push_back(u);
       SaveUserPresets();
       return (int)sUserPresets.size() - 1;
+   }
+   // A saved preset onto the tool: what it did not capture stays the tool's own; a captured colour becomes the foreground.
+   void PickUserPreset(int i, BrushEngine::Brush& b)
+   {
+      const UserPreset& u = sUserPresets[(size_t)i];
+      const BrushEngine::Brush was = b;
+      b = BrushEngine::WithProtectedTexture(u.brush, b);
+      if (!u.capSize)
+         b.size = was.size;
+      if (!u.capTool)
+      {
+         b.mode = was.mode;
+         b.opacity = was.opacity;
+         b.flow = was.flow;
+         b.pressureSize = was.pressureSize;
+         b.pressureOpacity = was.pressureOpacity;
+      }
+      if (u.capColour)
+         std::copy(u.brush.color, u.brush.color + 3, sFg);
    }
    // Previous / next brush (Photoshop's , and .): walks the tool's presets, built-in then saved, and wraps.
    void StepPreset(int dir)
@@ -3858,14 +3967,14 @@ namespace
       {
          preset = next;
          user = -1;
-         b = presets[(size_t)next].brush;
+         b = BrushEngine::WithProtectedTexture(presets[(size_t)next].brush, b);
          b.size = keepSize;   // Photoshop keeps the size when stepping brushes
       }
       else
       {
          user = -next - 1;
          preset = -1;
-         b = sUserPresets[(size_t)user].brush;
+         PickUserPreset(user, b);
       }
       if (erase)
          b.mode = BrushEngine::kErase;
@@ -3960,6 +4069,44 @@ namespace
    }();
    ImVec2 sCloneSrc(0, 0), sCloneOffset(0, 0), sCloneAnchor(0, 0);
    bool sHaveCloneSrc = false, sCloneOffsetSet = false;
+   // The document and layer the source was Alt-clicked on: painting in another document clones from them.
+   uint64_t sCloneDocUid = 0;
+   int sCloneLayer = 0;
+
+   const char* ShapeDrawName(int shapeKind, bool tool);   // defined with the history names below
+   // stb_image is built with STBI_NO_STDIO: read the file, then decode from memory (RGBA; free with stbi_image_free).
+   unsigned char* LoadPngFile(const std::string& path, int* w, int* h, int* c)
+   {
+      std::ifstream in(AppPaths::FsPath(path), std::ios::binary);
+      const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      return bytes.empty() ? nullptr : stbi_load_from_memory((const unsigned char*)bytes.data(), (int)bytes.size(), w, h, c, 4);
+   }
+   // Hands the paint engine the source document's pixels when the source lies in another document; false when that
+   // document or its layer is gone (the stroke is refused).
+   bool CloneExternal(Scene2DNode* doc, bool sampleAll)
+   {
+      doc->SetCloneExternal({}, 0, 0);
+      if (sCloneDocUid == 0 || sCloneDocUid == sDocUid)
+         return true;
+      GraphNode* g = FindNodeByUid(sCloneDocUid);
+      Scene2DNode* src = g != nullptr ? dynamic_cast<Scene2DNode*>(g->node.get()) : nullptr;
+      if (src == nullptr)
+         return false;
+      std::vector<int> set;
+      if (sampleAll)
+      {
+         for (const Layer& l : src->Layers())
+            if (l.parent == 0)
+               set.push_back(l.id);
+      }
+      else if (src->FindLayer(sCloneLayer) != nullptr)
+         set.push_back(sCloneLayer);
+      std::vector<uint8_t> px;
+      if (set.empty() || !src->RenderSet(set, 0, px))
+         return false;
+      doc->SetCloneExternal(px, src->Doc().w, src->Doc().h);
+      return true;
+   }
    // Paint mixer: the brush with wet paint; selection brush: paints the selection.
    BrushEngine::Brush sMixer = []()
    {
@@ -4142,6 +4289,53 @@ namespace
          under = c;
       }
       return 0;
+   }
+
+   // Apply to Layer Below (Photoshop's Image > Adjustments on pixels): the adjustment layer's settings baked into the
+   // paint layer under it, inside the selection when there is one, and the adjustment layer removed; one undo step.
+   bool ApplyAdjustmentBelow(Scene2DNode* doc, int adjId)
+   {
+      const Layer* a = doc != nullptr ? doc->FindLayer(adjId) : nullptr;
+      const int under = LayerUnder(doc, adjId);
+      const Layer* u = doc != nullptr ? doc->FindLayer(under) : nullptr;
+      if (a == nullptr || a->kind != Kind::Adjust || u == nullptr || u->kind != Kind::Paint)
+         return false;
+      const Layer settings = *a;
+      const size_t undo0 = gUndoStack.size();
+      PushUndoCheckpoint("Apply adjustment");
+      std::string err;
+      if (!doc->ApplyAdjustment(under, settings, &err))
+      {
+         RollbackUndoTo(undo0);
+         return false;
+      }
+      doc->RemoveLayer(adjId);
+      doc->Commit();
+      sSel.assign(1, under);
+      Touch();
+      return true;
+   }
+
+   // Image > Adjustments > Match Color: the paint layer's colours moved to another document's picture (null = its own
+   // statistics, which with no options is a no-op); one undo step, rolled back when the match is refused.
+   bool MatchColorFrom(Scene2DNode* doc, int layerId, Scene2DNode* src, float fade = 0.0f, bool neutralize = false)
+   {
+      if (doc == nullptr)
+         return false;
+      std::vector<uint8_t> px;
+      int w = 0, h = 0;
+      if (src != nullptr && (!src->ReadOutput(px, w, h) || px.empty()))
+         return false;
+      const size_t undo0 = gUndoStack.size();
+      PushUndoCheckpoint("Match Color");
+      std::string err;
+      if (!doc->MatchColor(layerId, src != nullptr ? px.data() : nullptr, (size_t)w * h, 100.0f, 100.0f, fade, neutralize, &err))
+      {
+         RollbackUndoTo(undo0);
+         return false;
+      }
+      Touch();
+      return true;
    }
 
    void RasterizeLayer(Scene2DNode* doc, int id)
@@ -4425,6 +4619,65 @@ namespace
    }
 
    // The New Snapshot dialog: a name, and Replace for a snapshot already of that name.
+   // Layer > New > Group from Layers: Photoshop's dialog (name, colour, mode, opacity), one step; the group starts closed.
+   bool sGroupAsk = false;
+   Scene2DNode::GroupOptions sGroupOpts;
+   // A layer style dropped on a layer row: one history step when it moves or copies, none when it is refused.
+   bool TransferFx(Scene2DNode* doc, int from, int to, int effect, bool copy)
+   {
+      if (!doc->CanTransferEffects(from, to, effect, copy))
+         return false;
+      PushUndoCheckpoint(copy ? "Copy layer style" : "Move layer style");
+      doc->TransferEffects(from, to, effect, copy);
+      Touch();
+      return true;
+   }
+   int GroupFromLayers(Scene2DNode* doc, const Scene2DNode::GroupOptions& o)
+   {
+      if (sSel.empty() || !doc->CanGroup(sSel))
+         return 0;   // past the nesting cap: refused with no history step
+      PushUndoCheckpoint("Group from Layers");
+      const int g = doc->GroupLayersWith(sSel, o);
+      if (g != 0)
+         SelectOnly(g);
+      Touch();
+      return g;
+   }
+   void GroupOptionsDialog(Scene2DNode* doc)
+   {
+      if (sGroupAsk)
+      {
+         ImGui::OpenPopup("##v2dgroupopts");
+         sGroupAsk = false;
+      }
+      if (!MenuParts::BeginPopup("##v2dgroupopts"))
+         return;
+      static char sBuf[sizeof sRenameBuf] = {};
+      if (ImGui::IsWindowAppearing())
+      {
+         std::snprintf(sBuf, sizeof sBuf, "%s", sGroupOpts.name.c_str());
+         UiInteract::FocusHere();
+      }
+      ImGui::TextUnformatted(T("Group from Layers"));
+      const bool enter = FieldWell::InputText("##v2dgroupname", sBuf, sizeof sBuf, ImGuiInputTextFlags_EnterReturnsTrue);
+      ComboRow(T("Color"), &sGroupOpts.label, { T("None"), T("Red"), T("Orange"), T("Yellow"), T("Green"), T("Blue"), T("Violet"), T("Grey") });
+      int mode = sGroupOpts.blend == Scene2DNode::kPassThrough ? 0 : 1;
+      if (ComboRow(T("Mode"), &mode, { T("Pass Through"), T("Normal") }))
+         sGroupOpts.blend = mode == 0 ? Scene2DNode::kPassThrough : 0;
+      float pct = sGroupOpts.opacity * tok::view2d_pct_ratio;
+      ImGui::SetNextItemWidth(tok::view2d_field_w);
+      if (FieldWell::Slider("##v2dgroupop", &pct, params::view2d::pct_lo, params::view2d::pct_hi, "%.0f%%"))
+         sGroupOpts.opacity = std::clamp(pct / tok::view2d_pct_ratio, 0.0f, 1.0f);
+      const bool ok = ActionButton::Draw(T("OK"), ImVec2(0.0f, 0.0f), ActionButton::Kind::Plain);
+      if ((ok || enter) && doc != nullptr)
+      {
+         sGroupOpts.name = sBuf;
+         GroupFromLayers(doc, sGroupOpts);
+         ImGui::CloseCurrentPopup();
+      }
+      MenuParts::EndPopup();
+   }
+
    void SnapshotNameDialog(Scene2DNode* doc)
    {
       if (sSnapNameOpen)
@@ -4519,6 +4772,15 @@ namespace
       {
          PushUndoCheckpoint("Make work path");
          doc->MakeWorkPathFromLayer(a->id);
+         Touch();
+      }
+      if (MenuParts::Item(T("Type in Shape"), nullptr, false, a != nullptr && a->kind == Kind::Vector))
+      {
+         PushUndoCheckpoint("Type on path");
+         int err = 0;
+         const int tid = doc->AddTypeInShape(a->id, T("Type in a shape"), a->id, &err);
+         if (tid > 0)
+            SelectOnly(tid);
          Touch();
       }
       if (MenuParts::Item(T("Work Path from Text"), nullptr, false, a != nullptr && a->kind == Kind::Text))
@@ -4918,6 +5180,8 @@ namespace
                b.sourceAnchor[0] = sCloneAnchor.x;
                b.sourceAnchor[1] = sCloneAnchor.y;
                b.sampleAll = sCloneAll;
+               if (!CloneExternal(doc, b.sampleAll))
+                  return;
             }
             const ImVec2 from = line && sHaveLast ? sLastPaint : at;
             const float pen = PenNow(doc);
@@ -5042,6 +5306,8 @@ namespace
          b.sourceAnchor[0] = sCloneAnchor.x;
          b.sourceAnchor[1] = sCloneAnchor.y;
          b.sampleAll = sCloneAll || cloneAbove;   // a new layer above has nothing of its own to clone
+         if (!CloneExternal(doc, b.sampleAll))
+            return;
       }
       // Blur, Sharpen and Smudge with All layers (Photoshop's Sample All Layers): they read the whole picture.
       if (b.mode == BrushEngine::kBlur || b.mode == BrushEngine::kSharpen || b.mode == BrushEngine::kSmudge)
@@ -5049,6 +5315,14 @@ namespace
       std::copy(sFg, sFg + 3, b.color);
       if (sTool == kBrush && sBrushHue != 0.0f)
          HueTurn(b.color, sBrushHue);
+      // Pencil Auto Erase: a stroke that starts on the foreground colour paints the background colour.
+      if (sTool == kBrush && b.pencil && b.autoErase && target == 0)
+      {
+         const ImVec2 o = line && sHaveLast ? sLastPaint : at;
+         float k[3] = { 0, 0, 0 };
+         if (doc->Pick(o.x, o.y, k, 1, id) && PencilOnForeground(k, sFg))
+            std::copy(sBg, sBg + 3, b.color);
+      }
       if (sTool == kPatternStamp)
          UsePattern(doc);
       b = EraseLocked(doc, id, target, b);
@@ -5251,7 +5525,7 @@ namespace
          Touch();
       }
       else if (id > 0 && target == 0)
-         doc->Gradient(id, a.x, a.y, b.x, b.y, ca, cb, sFillKind, sGradOpacity, sGradExtend, sGradDither);
+         doc->Gradient(id, a.x, a.y, b.x, b.y, ca, cb, sFillKind, sGradOpacity, sGradExtend, sGradDither, sGradMethod);
    }
 
    void ClosePoly(Scene2DNode* doc)
@@ -5602,7 +5876,7 @@ namespace
          return false;
       const ImU32 white = tok::U32(tok::canvas_ink), black = tok::U32(tok::canvas_shade);
       constexpr float kDash = tok::view2d_dash;
-      const float march = std::fmod((float)ImGui::GetTime() * tok::motion_rate_ants, kDash * 2.0f);  // ui-audit-ok: count (dash period: two dashes)
+      const float march = std::fmod((float)AnimNow() * tok::motion_rate_ants, kDash * 2.0f);  // ui-audit-ok: count (dash period: two dashes)
       for (const Seg& sg : segs)
       {
          const ImVec2 a = ToScreen(doc, sg.ax, sg.ay), b = ToScreen(doc, sg.bx, sg.by);
@@ -6945,10 +7219,15 @@ namespace
       }
       const float x0 = std::min(sCrop[0], sCrop[2]), x1 = std::max(sCrop[0], sCrop[2]);
       const float y0 = std::min(sCrop[1], sCrop[3]), y1 = std::max(sCrop[1], sCrop[3]);
-      if (std::fabs(sCropAngle) < 1e-3f)
-         doc->CropTo(x0, y0, x1, y1);
+      if (sCropFill && !sSel.empty())
+         doc->CropContentAware(sSel.back(), x0, y0, x1, y1, std::fabs(sCropAngle) < 1e-3f ? 0.0f : sCropAngle, sCropDelete);
+      else if (std::fabs(sCropAngle) < 1e-3f)
+         doc->CropTo(x0, y0, x1, y1, sCropDelete);
       else
-         doc->CropRotated((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, x1 - x0, y1 - y0, sCropAngle);
+         doc->CropRotated((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, x1 - x0, y1 - y0, sCropAngle, sCropDelete);
+      // The target size and resolution resample the cropped picture in the same step.
+      if (sCropTarget[0] >= 1.0f || sCropTarget[1] >= 1.0f || sCropTarget[2] >= 1.0f)
+         doc->ImageSizeDpi((int)std::lround(sCropTarget[0]), (int)std::lround(sCropTarget[1]), sCropTarget[2], false);
       sCropAngle = 0.0f;
       sCropStraighten = false;
       return true;
@@ -7172,6 +7451,7 @@ namespace
 
    using Shape = Scene2DNode::Shape;
    Shape sStyle;                   // what the next drawn item gets
+   bool sShapePathMode = false;    // Photoshop's Path tool mode: a drawn shape goes into the Work Path, no layer
    bool sLockScale = true;         // Transform tab: W and H % move together
    int sShapeKind = 0;             // 0 rectangle, 1 rounded, 2 ellipse, 3 polygon, 4 star, 5 line, 6 triangle
    const char* const kKinds[] = { "Rectangle", "Rounded", "Ellipse", "Polygon", "Star", "Line", "Triangle" };
@@ -7194,6 +7474,9 @@ namespace
    bool sTextStep = false;         // editing an existing text: the undo step waits for the first keystroke
    bool sTextNew = false;          // the text layer was made by this edit
    size_t sTextUndo0 = 0;          // the undo depth before "New text", dropped again when nothing is typed
+   bool sTypeMask = false;         // Type Mask: the typed text becomes the selection when the edit ends
+   bool sTypeVertical = false;     // Vertical Type: new type layers stack their letters in columns
+   int sTypeMaskOp = 0;            // how it combines (Scene2DNode::SelOp, from the click's modifiers)
    ImVec2 sEditMn(0, 0), sEditMx(0, 0);
 
    bool VectorTool(int t) { return t == kPen || t == kNode || t == kShape; }
@@ -7214,6 +7497,40 @@ namespace
       if (items == nullptr || a->id != sItemLayer || sItem < 0 || sItem >= (int)items->size())
          return nullptr;
       return &(*items)[sItem];
+   }
+
+   // Path mode: the item just drawn leaves its layer (and the layer, when that leaves it empty) and joins the Work
+   // Path in document px, inside the drag's one history step (named by the tool, "Triangle Tool").
+   bool ShapeItemToWorkPath(Scene2DNode* doc)
+   {
+      Layer* l = doc->FindLayer(sItemLayer);
+      std::vector<Shape>* items = Items(l);
+      if (items == nullptr || sItem < 0 || sItem >= (int)items->size())
+         return false;
+      Shape s = (*items)[(size_t)sItem];
+      items->erase(items->begin() + sItem);
+      const bool empty = items->empty() && l->kind == Kind::Vector;
+      float m[6];
+      doc->LayerMatrix(*l, m);
+      if (empty)
+      {
+         doc->RemoveLayer(l->id);
+         sSel.clear();
+      }
+      sItem = -1;
+      doc->Commit();
+      if (!Scene2DNode::ShapeToPath(s) || !Scene2DNode::TransformShape(s, m))
+         return false;
+      s.op = Shape::kAdd;
+      std::vector<Shape> subs;
+      if (const Scene2DNode::DocPath* wp = doc->FindPath(Scene2DNode::kWorkPath))
+         subs = wp->subs;
+      subs.push_back(s);
+      const bool ok = doc->SetWorkPath(std::move(subs));
+      fprintf(stderr, "PROBE shape path mode: %s, work path %zu subpaths\n", ok ? "added" : "refused",
+              doc->FindPath(Scene2DNode::kWorkPath) != nullptr ? doc->FindPath(Scene2DNode::kWorkPath)->subs.size() : (size_t)0);
+      Touch();
+      return ok;
    }
 
    // Where drawing goes: the active vector layer (or the mask being drawn), else a new vector layer over it.
@@ -7302,7 +7619,7 @@ namespace
       {
          if (std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) < tok::view2d_drag_shape_limit)
             return;
-         PushUndoCheckpoint(sShapeKind == 6 ? "Triangle Tool" : "Draw shape");
+         PushUndoCheckpoint(ShapeDrawName(sShapeKind, true));
          Layer* l = DrawTarget(doc);
          std::vector<Shape>* items = Items(l);
          if (items == nullptr)
@@ -7753,6 +8070,23 @@ namespace
    {
       Layer* l = doc->FindLayer(sTextEdit);
       sTextEdit = 0;
+      if (l != nullptr && l->kind == Kind::Text && sTextNew && sTypeMask)
+      {
+         // Type Mask: the session's text layer becomes the selection, all in its one step.
+         const int id = l->id;
+         std::string err;
+         if (doc->TypeMaskSelect(id, sTypeMaskOp, &err))
+         {
+            PruneSelection(doc);
+            // Steps the edit pushed after "Type Mask" fold into it (its snapshot is the state before the session).
+            while (gUndoStack.size() > sTextUndo0 + 1)
+               gUndoStack.pop_back();
+            if (gUndoStack.size() == sTextUndo0 + 1)
+               gUndoStack.back().label = "Type Mask";
+         }
+         sTextNew = sTextStep = false;
+         return;
+      }
       if (l != nullptr && l->kind == Kind::Text && l->text.empty())
       {
          doc->RemoveLayer(l->id);
@@ -7783,7 +8117,8 @@ namespace
    {
       if (sTextEdit != 0)
          EndTextEdit(doc);
-      Layer* hit = doc->FindLayer(HitLayer(doc, sMouseDoc));
+      // Type Mask always types new text; a click on a text layer does not edit it.
+      Layer* hit = sTypeMask ? nullptr : doc->FindLayer(HitLayer(doc, sMouseDoc));
       if (hit != nullptr && hit->kind == Kind::Text)
       {
          BeginTextEdit(doc, hit->id);
@@ -7794,13 +8129,14 @@ namespace
       sOp.kind = 15;
       sOp.start = mouse;
       sOp.docStart = sMouseDoc;
+      sTypeMaskOp = SelOpFor(ImGui::GetIO());
    }
 
    // A click places point text; a drag sets a box the text wraps in.
    void TextRelease(Scene2DNode* doc, ImVec2 mouse)
    {
       const size_t undo0 = gUndoStack.size();
-      PushUndoCheckpoint("New text");
+      PushUndoCheckpoint(Scene2DNode::NewTypeLayerName(sTypeMask, sTypeVertical));
       TakeForeground();
       const bool box = std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) > tok::view2d_box_limit;
       const float x = box ? std::min(sOp.docStart.x, sMouseDoc.x) : sOp.docStart.x;
@@ -7818,6 +8154,7 @@ namespace
          l->italic = sItalic;
          l->underline = sUnder;
          l->caps = sCaps;
+         l->vertical = sTypeVertical && !sTypeMask;
          std::copy(sTextC, sTextC + 4, l->textC);
          doc->Commit();
       }
@@ -7848,6 +8185,17 @@ namespace
       return (float)w;
    }
 
+   // History names (PhotoCraft triangle_history_names): a Triangle tool drag is "Triangle Tool"; other drags, and a
+   // triangle made without the tool, keep "Draw shape". A radius change on a live triangle is "Change Rounded Triangle";
+   // any other shape's radius edit (a three-point star, a three-sided polygon) stays the card's own "Edit Shape" step.
+   const char* ShapeDrawName(int shapeKind, bool tool)
+   {
+      return tool && shapeKind == 6 ? "Triangle Tool" : "Draw shape";
+   }
+   const char* RadiusEditName(const Shape* picked)
+   {
+      return picked != nullptr && picked->type == Shape::kTriangle ? "Change Rounded Triangle" : nullptr;
+   }
    void UpdateTextMarks(Scene2DNode* doc, const Layer& l, float bw, float bh, int cursor, int selA, int selB)
    {
       char num[160];
@@ -7992,6 +8340,237 @@ namespace
    }
 
    // Typing happens in a field under the text; the picture above updates as you type.
+   // Type menu (Photoshop's): OpenType, Numerals, Stylistic Sets, size keys, glyphs, Lorem Ipsum, fonts, spelling.
+   // The range is the editor's selection while typing, else the whole text.
+   std::set<std::string> sSpellIgnore;
+   void TypeRange(const Layer* l, size_t& a, size_t& b)
+   {
+      a = b = std::string::npos;
+      if (l != nullptr && sTextEdit == l->id && sTextSelA < sTextSelB && sTextSelB <= l->text.size())
+      {
+         a = sTextSelA;
+         b = sTextSelB;
+      }
+   }
+   // The Type menu's submenus and their parents (Photoshop Type > OpenType > Numerals / Stylistic Sets): the menu is
+   // drawn from these names, and the self-test reads the paths back.
+   const char* const kTypeSubs[][2] = { { "Type", "" }, { "OpenType", "Type" }, { "Numerals", "OpenType" }, { "Stylistic Sets", "OpenType" } };
+   std::string TypeMenuPath(const char* leaf)
+   {
+      std::string path;
+      for (int hops = 0; hops < 8 && leaf != nullptr && *leaf != 0; hops++)
+      {
+         const char* parent = nullptr;
+         for (const auto& sub : kTypeSubs)
+            if (std::strcmp(sub[0], leaf) == 0)
+               parent = sub[1];
+         if (parent == nullptr)
+            return "";
+         path = path.empty() ? std::string(leaf) : std::string(leaf) + " > " + path;
+         leaf = parent;
+      }
+      return path;
+   }
+   void TypeMenu(Scene2DNode* doc)
+   {
+      using SN = Scene2DNode;
+      const bool any = doc->HasTextLayer();
+      if (!MenuParts::SubMenu(T(kTypeSubs[0][0]), any))
+         return;
+      Layer* a = Active(doc);
+      const bool text = a != nullptr && a->kind == Kind::Text;
+      std::vector<int> ids;
+      for (int id : sSel)
+         if (const Layer* l = doc->FindLayer(id); l != nullptr && l->kind == Kind::Text)
+            ids.push_back(id);
+      if (ids.empty() && text)
+         ids.push_back(a->id);
+      size_t ra = std::string::npos, rb = std::string::npos;
+      TypeRange(a, ra, rb);
+      SN::RunStyle first;
+      if (text)
+      {
+         const std::vector<SN::TextRun> runs = SN::CharRuns(*a);
+         first = runs[SN::RunAt(runs, ra == std::string::npos ? 0 : ra)].st;
+      }
+      if (MenuParts::SubMenu(T(kTypeSubs[1][0]), !ids.empty()))
+      {
+         static const char* kTags[7][2] = { { "liga", "Standard Ligatures" }, { "dlig", "Discretionary Ligatures" },
+                                            { "frac", "Fractions" }, { "swsh", "Swash" }, { "salt", "Stylistic Alternates" },
+                                            { "ordn", "Ordinals" }, { "titl", "Titling Alternates" } };
+         for (const auto& t : kTags)
+            if (MenuParts::Item(T(t[1]), nullptr, SN::FeatureOn(first, t[0])))
+            {
+               PushUndoCheckpoint(t[1]);
+               doc->SetTypeFeature(ids, t[0], -1, ra, rb);
+               Touch();
+            }
+         if (MenuParts::SubMenu(T(kTypeSubs[2][0])))
+         {
+            for (int n = 0; n < (int)SN::Numerals::Count; n++)
+               if (MenuParts::Item(T(SN::NumeralsLabel((SN::Numerals)n)), nullptr, SN::NumeralsOf(first) == (SN::Numerals)n))
+               {
+                  PushUndoCheckpoint(SN::NumeralsLabel((SN::Numerals)n));
+                  doc->SetNumerals(ids, (SN::Numerals)n, ra, rb);
+                  Touch();
+               }
+            ImGui::EndMenu();
+         }
+         if (MenuParts::SubMenu(T(kTypeSubs[3][0])))
+         {
+            for (int n = 1; n <= 20; n++)
+            {
+               char tag[8], label[32];
+               std::snprintf(tag, sizeof tag, params::view2d::stylistic_set_tag, n);
+               std::snprintf(label, sizeof label, "%s %d", T("Set"), n);
+               if (MenuParts::Item(label, nullptr, SN::FeatureOn(first, tag)))
+               {
+                  PushUndoCheckpoint(label);
+                  doc->SetTypeFeature(ids, tag, -1, ra, rb);
+                  Touch();
+               }
+            }
+            ImGui::EndMenu();
+         }
+         ImGui::EndMenu();
+      }
+      if (MenuParts::SubMenu(T("Kerning"), text))
+      {
+         static const char* kModes[3] = { "Metrics", "Optical", "Off" };
+         for (int m = 0; m < 3; m++)
+            if (MenuParts::Item(T(kModes[m]), nullptr, first.kernMode == m))
+            {
+               PushUndoCheckpoint("Kerning");
+               doc->SetRangeKerning(a->id, ra, rb, m, 0.0f);
+               Touch();
+            }
+         ImGui::EndMenu();
+      }
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Increase Size"), Sc("Shift+Ctrl+."), false, text))
+      {
+         PushUndoCheckpoint("Increase size");
+         doc->StepTypeSize(a->id, ra, rb, params::view2d::type_size_step);
+         Touch();
+      }
+      if (MenuParts::Item(T("Decrease Size"), Sc("Shift+Ctrl+,"), false, text))
+      {
+         PushUndoCheckpoint("Decrease size");
+         doc->StepTypeSize(a->id, ra, rb, -params::view2d::type_size_step);
+         Touch();
+      }
+      if (MenuParts::SubMenu(T("Insert Glyph"), text))
+      {
+         static const char* kGlyphs[] = { "\xE2\x86\x92", "\xE2\x82\xAC", "\xC2\xA9", "\xC2\xAE", "\xE2\x84\xA2", "\xE2\x80\xA2",
+                                          "\xE2\x80\x94", "\xE2\x80\x93", "\xE2\x80\xA6", "\xC2\xB0", "\xC2\xB1", "\xC3\x97" };
+         for (const char* g : kGlyphs)
+            if (MenuParts::Item(g))
+            {
+               size_t at = sTextEdit == a->id ? sTextSelLo : std::string::npos, to = at;
+               if (sTextEdit == a->id && sTextSelA < sTextSelB)
+                  at = sTextSelA, to = sTextSelB;
+               if (sTextEdit != 0)
+                  EndTextEdit(doc);
+               PushUndoCheckpoint("Insert glyph");
+               doc->InsertTypeText(a->id, at, to, g);
+               Touch();
+            }
+         ImGui::EndMenu();
+      }
+      if (MenuParts::Item(T("Paste Lorem Ipsum")))
+      {
+         const int into = text ? a->id : 0;
+         const size_t at = text && sTextEdit == a->id ? sTextSelLo : std::string::npos;
+         if (sTextEdit != 0)
+            EndTextEdit(doc);
+         PushUndoCheckpoint("Paste Lorem Ipsum");
+         const int id = doc->PasteLoremIpsum(into, at);
+         if (id > 0 && into == 0)
+            SelectOnly(id);
+         Touch();
+      }
+      // Point <-> paragraph text, the ink kept in place (Photoshop Type > Convert to Paragraph / Point Text).
+      const bool plain = text && a->typeMode == 0;
+      if (MenuParts::Item(T("Convert to Paragraph Text"), nullptr, false, plain && a->boxW <= 0.0f))
+      {
+         if (sTextEdit != 0)
+            EndTextEdit(doc);
+         PushUndoCheckpoint("Convert to Paragraph Text");
+         doc->ConvertTextKind(a->id, true);
+         Touch();
+      }
+      if (MenuParts::Item(T("Convert to Point Text"), nullptr, false, plain && a->boxW > 0.0f))
+      {
+         if (sTextEdit != 0)
+            EndTextEdit(doc);
+         PushUndoCheckpoint("Convert to Point Text");
+         doc->ConvertTextKind(a->id, false);
+         Touch();
+      }
+      MenuParts::Separator();
+      const std::vector<std::string> missing = doc->MissingFonts();
+      // The active type layer's font warnings, shown as disabled lines above the fix.
+      if (text)
+         for (const std::string& w : doc->TypeWarnings(a->id))
+            MenuParts::Item(w.c_str(), nullptr, false, false);
+      if (MenuParts::Item(T("Replace All Missing Fonts"), nullptr, false, !missing.empty()))
+      {
+         PushUndoCheckpoint("Replace missing fonts");
+         doc->ReplaceMissingFonts({}, params::view2d::fallback_font);
+         Touch();
+      }
+      if (MenuParts::Item(T("Update All Text Layers")))
+      {
+         PushUndoCheckpoint("Update text layers");
+         doc->UpdateAllTextLayers();
+         Touch();
+      }
+      if (MenuParts::Item(T("Save Default Type Styles"), nullptr, false, text))
+         doc->SaveDefaultTypeStyle(a->id);
+      if (MenuParts::Item(T("Load Default Type Styles"), nullptr, false, text && doc->HasDefaultTypeStyle()))
+      {
+         PushUndoCheckpoint("Load default type styles");
+         doc->LoadDefaultTypeStyle(a->id);
+         Touch();
+      }
+      MenuParts::Separator();
+      if (MenuParts::SubMenu(T("Check Spelling"), any))
+      {
+         const std::vector<SN::Misspelling> bad = doc->CheckSpelling(ids, sSpellIgnore);
+         if (bad.empty())
+            MenuParts::Item(T("No misspelled words"), nullptr, false, false);
+         for (size_t i = 0; i < bad.size() && i < params::view2d::spell_menu_max; i++)
+         {
+            const SN::Misspelling& m = bad[i];
+            if (!MenuParts::SubMenu((m.word + "##v2dsp" + std::to_string(i)).c_str()))
+               continue;
+            for (const std::string& sg : m.suggestions)
+            {
+               if (MenuParts::Item((std::string(T("Change to")) + " " + sg).c_str()))
+               {
+                  PushUndoCheckpoint("Change spelling");
+                  doc->SpellChange(m.layer, m.start, m.end, m.word, sg);
+                  Touch();
+               }
+               if (MenuParts::Item((std::string(T("Change All to")) + " " + sg).c_str()))
+               {
+                  PushUndoCheckpoint("Change all spelling");
+                  doc->SpellChangeAll(ids, m.word, sg);
+                  Touch();
+               }
+            }
+            MenuParts::Separator();
+            if (MenuParts::Item(T("Ignore All")))
+               sSpellIgnore.insert(m.word);
+            if (MenuParts::Item(T("Add to Dictionary")))
+               SN::AddToDictionary(m.word);
+            ImGui::EndMenu();
+         }
+         ImGui::EndMenu();
+      }
+      ImGui::EndMenu();
+   }
+
    void DrawTextEditor(Scene2DNode* doc)
    {
       Layer* l = doc->FindLayer(sTextEdit);
@@ -8053,7 +8632,7 @@ namespace
          for (const std::array<float, 4>& r : sTextMarks.sel)
             dl->AddQuadFilled(BoxScreen(doc, *l, r[0], r[1]), BoxScreen(doc, *l, r[2], r[1]), BoxScreen(doc, *l, r[2], r[3]),
                               BoxScreen(doc, *l, r[0], r[3]), Hex(kOutline, tok::view2d_fill_alpha));
-         if (std::fmod(ImGui::GetTime(), (double)tok::motion_s_blink_period) < tok::motion_s_blink_on)
+         if (std::fmod(AnimNow(), (double)tok::motion_s_blink_period) < tok::motion_s_blink_on)
             dl->AddLine(BoxScreen(doc, *l, sTextMarks.caret[0], sTextMarks.caret[1]),
                         BoxScreen(doc, *l, sTextMarks.caret[0], sTextMarks.caret[2]), Hex(kOutline), tok::stroke_caret);
       }
@@ -8158,6 +8737,7 @@ namespace
             if (any && MenuParts::Item(T("Copy Merged"), Sc("Shift+Ctrl+C"))) sPending.what = Pending::CopyMerged;
             if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"))) sPending.what = Pending::Paste;
             if (any && MenuParts::Item(T("Duplicate"), Sc("Ctrl+J"))) sPending.what = Pending::Duplicate;
+            MenuParts::Check(T("Add \"copy\" to Copies"), &Scene2DNode::sCopySuffix);
             if (SelectionActsOnPixels(doc))
                if (MenuParts::Item(T("Layer via Cut"), Sc("Shift+Ctrl+J")))
                {
@@ -8290,6 +8870,7 @@ namespace
             MenuParts::Separator();
             SelectionMenu(doc);
             PathsMenu(doc);
+            TypeMenu(doc);
             SnapshotsMenu(doc);
             if (MenuParts::Item(T("Select All Layers"), Sc("Ctrl+A")))
             {
@@ -8301,6 +8882,12 @@ namespace
             if (MenuParts::Item(T("Trim Transparent Edges"))) TrimDocument(doc);
             if (MenuParts::Item(T("Trim Top Left Colour"))) TrimByCornerColour(doc, false);
             if (MenuParts::Item(T("Trim Bottom Right Colour"))) TrimByCornerColour(doc, true);
+            if (!sSel.empty() && MenuParts::Item(T("Crop and Straighten Photos")))
+            {
+               PushUndoCheckpoint("Crop and Straighten Photos");
+               if (doc->StraightenPhotos(sSel.back()) == 0)
+                  gUndoStack.pop_back();
+            }
             if (MenuParts::Item(T("Fit on Screen"), Sc("Ctrl+0"))) FitView(doc);
             if (MenuParts::Item(T("Actual Pixels"), Sc("Ctrl+1")))
             {
@@ -8325,6 +8912,7 @@ namespace
          }
       }
       SnapshotNameDialog(doc);   // outside the menu, which has closed by the time it shows
+      GroupOptionsDialog(doc);
       const ImVec2 mp = ImGui::GetIO().MousePos;
       const bool inEditor = sTextEdit != 0 && mp.x >= sEditMn.x && mp.x <= sEditMx.x && mp.y >= sEditMn.y && mp.y <= sEditMx.y;
       const bool onAsk = sRasterAsk != 0 && mp.x >= sRasterAskMn.x && mp.x <= sRasterAskMx.x && mp.y >= sRasterAskMn.y && mp.y <= sRasterAskMx.y;
@@ -8402,7 +8990,7 @@ namespace
          if (const unsigned mv = doc->MaskViewTexture(sMaskView))
             Thumb::AddQuad(dl, (ImTextureID)(intptr_t)mv, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
       if ((doc->HasSelection() || doc->quickMask) && !(doc->HasSelection() && DrawScreenAnts(dl, doc)))
-         if (const unsigned ants = doc->SelectionOverlay((float)ImGui::GetTime(), doc->quickMask))
+         if (const unsigned ants = doc->SelectionOverlay((float)AnimNow(), doc->quickMask))
             Thumb::AddQuad(dl, (ImTextureID)(intptr_t)ants, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
       if (ViewTurned())
          dl->AddPolyline(pq, tok::view2d_line_num_points_md, tok::U32(tok::canvas_shade, tok::view2d_canvas_shade_alpha), ImDrawFlags_Closed, 1.0f);
@@ -8798,7 +9386,9 @@ namespace
       {
          // Curves / Hue from the picture: the tone (or hue) under the pointer is what the drag moves.
          float c[3] = { 0, 0, 0 };
-         doc->Pick(sMouseDoc.x, sMouseDoc.y, c, 3, 0);
+         const bool under = sAdjPick.point != 0 && PickUnderAdj(doc, sAdjPick.key, sMouseDoc.x, sMouseDoc.y, c, 3);
+         if (!under)
+            doc->Pick(sMouseDoc.x, sMouseDoc.y, c, 3, 0);
          const int key = sAdjPick.key;
          BeginOp(doc, 23, mouse, "Adjust from picture");
          if (!WithAdjKey(doc, key, [&](auto& x)
@@ -8808,7 +9398,7 @@ namespace
                // The picture's working values: Levels and Curves run on them (linear in a linear document), so
                // the point is set from the same values it will act on.
                const float disp[3] = { c[0], c[1], c[2] };
-               Scene2DNode::PointFromPick(x.adjType, x.adjAmt, x.levels, x.levelsCh, x.adjP, x.curve, x.curveCh, disp, sAdjPick.point);
+               Scene2DNode::PointFromPick(x.adjType, x.adjAmt, x.levels, x.levelsCh, x.adjP, x.curve, x.curveCh, disp, sAdjPick.point, under);
                Touch();
                sAdjPick = AdjPick();
                sOp = Op();
@@ -8885,6 +9475,8 @@ namespace
          {
             sCloneSrc = sMouseDoc;
             sHaveCloneSrc = true;
+            sCloneDocUid = sDocUid;
+            sCloneLayer = sSel.empty() ? 0 : sSel.back();
             sCloneOffsetSet = false;
             // The Sample setting stays as picked: Current layer copies that layer even where it is empty, so the
             // preview, the live stroke, the commit and undo all read the same source (Photoshop).
@@ -9379,6 +9971,8 @@ namespace
                std::copy(sOp.cropWas, sOp.cropWas + 4, sCrop);
                std::copy(std::begin(sOp.quadWas), std::end(sOp.quadWas), sCropQuad);
             }
+            else if (sOp.kind == 12 && sOp.made && sShapePathMode)
+               ShapeItemToWorkPath(doc);
             else if (sOp.kind == 13)
             {
                Layer* pl = Active(doc);
@@ -9989,6 +10583,28 @@ namespace
       if (was.range != sRange.range || was.fuzziness != sRange.fuzziness || was.localized != sRange.localized ||
           was.localRange != sRange.localRange || was.tonalFuzz != sRange.tonalFuzz || inv != sRangeInvert)
          LivePreview(doc);
+      // Replace Color: the same clicks change the paint layer's colours instead of selecting them.
+      Layer* al = Active(doc);
+      if (sRange.range == SelectMaths::Range::Sampled && !sRangeInvert && al != nullptr && al->kind == Scene2DNode::Kind::Paint)
+      {
+         MoreHeader(T("Replace"));
+         MoreSlider(T("Hue"), &sReplaceHue, params::view2d::replace_hue_lo, params::view2d::replace_hue_hi, "%.0f°");
+         MoreSlider(T("Saturation"), &sReplaceSat, params::view2d::shift_lo, params::view2d::shift_hi, "%.0f");
+         MoreSlider(T("Lightness"), &sReplaceLight, params::view2d::shift_lo, params::view2d::shift_hi, "%.0f");
+         PanelKit::GridScope::EndRow();
+         if (TextChip(L("Replace##v2dreplcol"), false, T("Replace Color: shift the sampled colours on this layer")) && !sRangeSamples.empty())
+         {
+            const std::vector<SelectMaths::Sample> samples = sRangeSamples;
+            const int id = al->id;
+            LiveClose(doc, false);
+            const size_t undo0 = gUndoStack.size();
+            PushUndoCheckpoint("Replace Color");
+            if (!doc->ReplaceColor(id, samples, sRange, sReplaceHue, sReplaceSat, sReplaceLight, nullptr, sFg))   // subtract-only: from the foreground
+               RollbackUndoTo(undo0);
+            Touch();
+            return;
+         }
+      }
       OkCancel(doc);
    }
 
@@ -10106,6 +10722,7 @@ namespace
          MorePct(T("Grain scale"), &b.grainScale, params::view2d::grain_scale_lo, params::view2d::grain_scale_hi);
          MorePct(T("Grain depth"), &b.grainDepth, params::view2d::grain_depth_lo, params::view2d::grain_depth_hi);
       }
+      MoreCheck(T("Protect Texture"), &b.protectTexture);
       MoreHeader(T("Dual tip"), false, false);
       static std::vector<const char*> tips;
       if (tips.empty())
@@ -10354,8 +10971,8 @@ namespace
          if (sTool == kSharpen)
          {
             gap();
-            static const char* kSharp[3] = { "Clarity", "Unsharp", "Harsh" };
-            BarCombo("##v2dsharpmode", &b.sharpMode, kSharp, 3, kWellL);
+            static const char* kSharp[4] = { "Clarity", "Unsharp", "Harsh", "Protect detail" };
+            BarCombo("##v2dsharpmode", &b.sharpMode, kSharp, 4, kWellL);
          }
          if (sTool == kColourReplace || sTool == kBgErase)
          {
@@ -10368,6 +10985,9 @@ namespace
                next();
                if (TextChip(L("Protect##v2dbgprot"), b.protectFg, T("Keep the foreground colour: the tolerance stops short of it")))
                   b.protectFg = !b.protectFg;
+               next();
+               if (TextChip(L("Contiguous##v2dbgcont"), b.bgContiguous, T("Erase only what joins the stroke through the sampled colour")))
+                  b.bgContiguous = !b.bgContiguous;
             }
          }
          if (sTool == kPatternStamp)
@@ -10381,12 +11001,24 @@ namespace
             float sc = b.patternScale * 100.0f;
             BarSlider("##v2dpscale", &sc, params::view2d::sc_lo, params::view2d::sc_hi, "Scale %.0f%%", kWellM);
             b.patternScale = sc / 100.0f;
+            next();
+            static const char* kPatBlend[8] = { "Normal", "Multiply", "Screen", "Overlay", "Darken", "Lighten", "Difference", "Behind" };
+            BarCombo("##v2dpblend", &b.sourceBlend, kPatBlend, 8, kWellM);
+            next();
+            if (TextChip(L("Impressionist##v2dpimp"), b.impressionist, T("Each dab takes the pattern's colour, scattered")))
+               b.impressionist = !b.impressionist;
          }
          if (sTool == kBlur || sTool == kSharpen || (sTool == kBrush && ToolBrush().mode == BrushEngine::kSmudge))
          {
             gap();
             if (TextChip(L("All layers##v2dretall"), sAllLayers, T("Sample the whole picture")))
                sAllLayers = !sAllLayers;
+            if (sTool == kBrush && ToolBrush().mode == BrushEngine::kSmudge)
+            {
+               next();
+               static const char* kSmudgeModes[7] = { "Normal", "Darken", "Lighten", "Hue", "Saturation", "Color", "Luminosity" };
+               BarCombo("##v2dsmmode", &b.smudgeMode, kSmudgeModes, 7, kWellM);
+            }
          }
          if (sTool == kClone || sTool == kHeal)
          {
@@ -10441,9 +11073,30 @@ namespace
                MoreCheck(T("Size"), &b.pressureSize);
                MoreCheck(T("Opacity"), &b.pressureOpacity);
                MoreSlider(T("Response"), &b.pressureCurve, params::view2d::pressure_curve_lo, params::view2d::pressure_curve_hi, "%.2f");
+               if (b.pressureSize)
+                  MoreSlider(T("Size curve"), &b.sizeCurveMid, params::view2d::curve_mid_lo, params::view2d::curve_mid_hi, "%.2f");
+               if (b.pressureOpacity)
+                  MoreSlider(T("Opacity curve"), &b.opacityCurveMid, params::view2d::curve_mid_lo, params::view2d::curve_mid_hi, "%.2f");
                MoreCheck(T("Tilt size"), &b.tiltSize);
                MoreCheck(T("Tilt angle"), &b.tiltAngle);
                MoreCheck(T("Tilt flatness"), &b.tiltRound);
+               MoreCheck(T("Projection"), &b.projection);
+               MoreCheck(T("Pose"), &b.pose);
+               if (b.pose)
+               {
+                  MoreCheck(T("Fix pressure"), &b.posePressureOn);
+                  if (b.posePressureOn)
+                     MoreSlider(T("Pressure"), &b.posePressure, params::view2d::pose_pressure_lo, params::view2d::pose_pressure_hi, "%.2f");
+                  MoreCheck(T("Fix tilt X"), &b.poseTiltXOn);
+                  if (b.poseTiltXOn)
+                     MoreSlider(T("Tilt X"), &b.poseTiltX, params::view2d::pose_tilt_lo, params::view2d::pose_tilt_hi, "%.2f");
+                  MoreCheck(T("Fix tilt Y"), &b.poseTiltYOn);
+                  if (b.poseTiltYOn)
+                     MoreSlider(T("Tilt Y"), &b.poseTiltY, params::view2d::pose_tilt_lo, params::view2d::pose_tilt_hi, "%.2f");
+                  MoreCheck(T("Fix rotation"), &b.poseRotOn);
+                  if (b.poseRotOn)
+                     MoreSlider(T("Rotation"), &b.poseRot, params::view2d::pose_rot_lo, params::view2d::pose_rot_hi, "%.0f");
+               }
             }
          });
       }
@@ -10486,7 +11139,7 @@ namespace
                {
                   preset = i;
                   user = -1;
-                  b = presets[i].brush;
+                  b = BrushEngine::WithProtectedTexture(presets[i].brush, b);
                   if (sTool == kEraser)
                      b.mode = BrushEngine::kErase;
                   // A material's colour is part of the look (gold, steel, denim): it becomes the foreground.
@@ -10511,11 +11164,17 @@ namespace
                {
                   user = i;
                   preset = -1;
-                  b = sUserPresets[i].brush;
+                  PickUserPreset(i, b);
                }
                ImGui::PopID();
             }
             MenuParts::Separator();
+            if (MenuParts::Item(T("Capture Size"), nullptr, sSaveCapSize))
+               sSaveCapSize = !sSaveCapSize;
+            if (MenuParts::Item(T("Include Tool Settings"), nullptr, sSaveCapTool))
+               sSaveCapTool = !sSaveCapTool;
+            if (MenuParts::Item(T("Include Colour"), nullptr, sSaveCapColour))
+               sSaveCapColour = !sSaveCapColour;
             if (MenuParts::Item(T("Save Brush Preset")))
             {
                user = SaveUserPreset(b, erasing);
@@ -10574,6 +11233,8 @@ namespace
                MorePct(T("Roundness"), &b.roundness, params::view2d::roundness_lo, params::view2d::roundness_hi);
                MoreSlider(T("Angle"), &b.angle, params::view2d::angle_lo, params::view2d::angle_hi, "%.0f°");
                MoreCheck(T("Hard edge"), &b.pencil);
+               if (b.pencil && sTool == kBrush)
+                  MoreCheck(T("Auto erase"), &b.autoErase);
                MoreCheck(T("Shape Snap"), &sShapeSnap);
                if (sTool == kEraser)
                   MoreCheck(T("Erase to History"), &sEraseHistory);
@@ -10588,6 +11249,11 @@ namespace
                   b.scatterY = scatterY;
                MoreSlider(T("Taper in"), &b.taperIn, params::view2d::taper_in_lo, params::view2d::taper_in_hi, "%.0f px");
                MoreSlider(T("Taper out"), &b.taperOut, params::view2d::taper_out_lo, params::view2d::taper_out_hi, "%.0f px");
+               float fs = (float)b.fadeSize, fo = (float)b.fadeOpacity;
+               MoreSlider(T("Fade size"), &fs, params::view2d::fade_lo, params::view2d::fade_hi, "%.0f dabs");
+               MoreSlider(T("Fade opacity"), &fo, params::view2d::fade_lo, params::view2d::fade_hi, "%.0f dabs");
+               b.fadeSize = (int)std::lround(fs);
+               b.fadeOpacity = (int)std::lround(fo);
                float stab = (float)b.stabiliser;
                MoreSlider(T("Stabiliser"), &stab, params::view2d::stab_lo, params::view2d::stab_hi, "%.0f");
                b.stabiliser = (int)std::lround(stab);
@@ -10632,9 +11298,30 @@ namespace
                MoreCheck(T("Size"), &b.pressureSize);
                MoreCheck(T("Opacity"), &b.pressureOpacity);
                MoreSlider(T("Response"), &b.pressureCurve, params::view2d::pressure_curve_lo, params::view2d::pressure_curve_hi, "%.2f");
+               if (b.pressureSize)
+                  MoreSlider(T("Size curve"), &b.sizeCurveMid, params::view2d::curve_mid_lo, params::view2d::curve_mid_hi, "%.2f");
+               if (b.pressureOpacity)
+                  MoreSlider(T("Opacity curve"), &b.opacityCurveMid, params::view2d::curve_mid_lo, params::view2d::curve_mid_hi, "%.2f");
                MoreCheck(T("Tilt size"), &b.tiltSize);
                MoreCheck(T("Tilt angle"), &b.tiltAngle);
                MoreCheck(T("Tilt flatness"), &b.tiltRound);
+               MoreCheck(T("Projection"), &b.projection);
+               MoreCheck(T("Pose"), &b.pose);
+               if (b.pose)
+               {
+                  MoreCheck(T("Fix pressure"), &b.posePressureOn);
+                  if (b.posePressureOn)
+                     MoreSlider(T("Pressure"), &b.posePressure, params::view2d::pose_pressure_lo, params::view2d::pose_pressure_hi, "%.2f");
+                  MoreCheck(T("Fix tilt X"), &b.poseTiltXOn);
+                  if (b.poseTiltXOn)
+                     MoreSlider(T("Tilt X"), &b.poseTiltX, params::view2d::pose_tilt_lo, params::view2d::pose_tilt_hi, "%.2f");
+                  MoreCheck(T("Fix tilt Y"), &b.poseTiltYOn);
+                  if (b.poseTiltYOn)
+                     MoreSlider(T("Tilt Y"), &b.poseTiltY, params::view2d::pose_tilt_lo, params::view2d::pose_tilt_hi, "%.2f");
+                  MoreCheck(T("Fix rotation"), &b.poseRotOn);
+                  if (b.poseRotOn)
+                     MoreSlider(T("Rotation"), &b.poseRot, params::view2d::pose_rot_lo, params::view2d::pose_rot_hi, "%.0f");
+               }
             }
             MoreHeader(T("Paint"));
             if (brush)
@@ -10700,8 +11387,11 @@ namespace
             b.wet = wet / 100.0f;
             b.refill = refill / 100.0f;
             next();
-            if (TextChip(L("Auto clean##v2dxclean"), b.autoClean, T("Each stroke starts with clean paint")))
+            if (TextChip(L("Auto clean##v2dxclean"), b.autoClean, T("Empty the brush after each stroke")))
                b.autoClean = !b.autoClean;
+            next();
+            if (TextChip(L("Auto load##v2dxload"), b.autoLoad, T("Fill the brush with the colour after each stroke")))
+               b.autoLoad = !b.autoLoad;
             gap();
             SymmetryChip(doc);
             FormParts::Inline(0.0f, tok::space_1);
@@ -10893,6 +11583,9 @@ namespace
          next();
          if (TextChip(L("Dither##v2dgdither"), sGradDither, T("No banding")))
             sGradDither = !sGradDither;
+         gap();
+         static const char* kMethod[2] = { "Straight", "Smooth" };
+         BarCombo("##v2dgmethod", &sGradMethod, kMethod, 2, kWellM);
       }
       else if (sTool == kMarquee || sTool == kLasso)
       {
@@ -10973,6 +11666,9 @@ namespace
                   sShapeKind = i;
             MenuParts::EndCombo();
          }
+         gap();
+         if (TextChip(L("Path##v2dshpath"), sShapePathMode, T("Draw into the Work Path instead of a layer")))
+            sShapePathMode = !sShapePathMode;
          gap();
       }
       // Fill and stroke: the chip toggles, the dot beside it picks the colour (Photopea: "Fill [ ] Stroke [ ] 1 px").
@@ -11108,6 +11804,16 @@ namespace
          pick("Cap", &t.cap, { "Butt", "Round", "Square" });
          pick("Join", &t.join, { "Miter", "Round", "Bevel" });
          pick("Align", &t.align, { "Centre", "Inside", "Outside" });
+         // Gradient strokes, as the fill's: kind, angle and stops over the item's box.
+         pick("Paint", &t.strokeType, { "Solid", "Linear", "Radial", "Reflected", "Conical" });
+         if (t.strokeType >= 1 && t.strokeType <= 4)
+         {
+            if (t.strokeType != 2)
+               changed |= SliderRow(T("Angle##v2dvsa"), &t.strokeAngle, params::view2d::fill_angle_lo, params::view2d::fill_angle_hi, "%.0f°");
+            const float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            if (GradientRows("##v2dvstrokestops", t.strokeStops, t.strokeC, white))
+               changed = true;
+         }
          ImGui::TextDisabled("%s", T("Dash"));
          ImGui::SetNextItemWidth(kWellL);
          changed |= FieldWell::Slider("##v2dvdash", &t.dash, params::view2d::dash_lo, params::view2d::dash_hi, t.dash > 0.0f ? "Dash %.0f" : "Solid");
@@ -11230,8 +11936,8 @@ namespace
          }
          if (ImGui::IsItemActivated())
          {
-            if (tri && picked != nullptr)
-               PushUndoCheckpoint("Change Rounded Triangle");   // PhotoCraft triangle_history_names
+            if (const char* rn = RadiusEditName(picked))
+               PushUndoCheckpoint(rn);
             else
                undo();
          }
@@ -11745,6 +12451,16 @@ namespace
       float* colour = l != nullptr ? l->textC : sTextC;
       bool changed = false;
       auto undo = [&]() { if (l != nullptr) PushUndoCheckpoint("Text style"); };
+      if (TextChip(L("Mask##v2dtmask"), sTypeMask, T("Type Mask: the text you type becomes a selection (Shift adds, Alt subtracts)")))
+      {
+         if (sTextEdit != 0)
+            EndTextEdit(doc);
+         sTypeMask = !sTypeMask;
+      }
+      next();
+      if (TextChip(L("Vertical##v2dtvert"), sTypeVertical, T("Vertical Type: new type stacks its letters in columns")))
+         sTypeVertical = !sTypeVertical;
+      gap();
       changed |= FontPicker("##v2dfont", font, 2.0f * kWellM, undo);
       next();
       ImGui::SetNextItemWidth(kWellM);
@@ -12668,7 +13384,23 @@ namespace
          next();
          if (TextChip(L("Reveal##v2dcrev"), sCropReveal, T("Show outside the crop")))
             sCropReveal = !sCropReveal;
+         next();
+         if (TextChip(L("Delete##v2dcdel"), sCropDelete, T("Delete Cropped Pixels: paint layers lose what lies outside; type and node layers stay whole")))
+            sCropDelete = !sCropDelete;
+         if (!sCropPersp)
+         {
+            next();
+            if (TextChip(L("Fill##v2dcfill"), sCropFill, T("Content-Aware: rebuild what the crop uncovers from the active layer")))
+               sCropFill = !sCropFill;
+         }
          gap();
+         if (!sCropPersp)
+         {
+            float* const pt[3] = { &sCropTarget[0], &sCropTarget[1], &sCropTarget[2] };
+            const char* const ft[3] = { "W %.0f", "H %.0f", "%.0f ppi" };
+            DragMulti(T("Target"), pt, ft, params::view2d::crop_target_fields, 1.0f, 0.0f, params::view2d::size_def);
+            gap();
+         }
          if (!sCropNote.empty())
          {
             ImGui::TextUnformatted(sCropNote.c_str());
@@ -13282,6 +14014,9 @@ namespace
                   Touch();
                }
             }
+            if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("V2D_FX"))
+               if (pl->DataSize == (int)(2 * sizeof(int)))
+                  TransferFx(doc, ((const int*)pl->Data)[0], id, ((const int*)pl->Data)[1], io.KeyAlt);
             ImGui::EndDragDropTarget();
          }
          // The whole row opens the menu: eye, fold arrow and thumbnail included.
@@ -13339,6 +14074,23 @@ namespace
             if (sSel.size() > 1 ? MenuParts::Item(T("Merge Layers"), Sc("Ctrl+E"))
                                 : MenuParts::Item(T("Merge Down"), Sc("Ctrl+E"), false, LayerUnder(doc, id) != 0))
                sPending.what = Pending::MergeDown;
+            if (adj && sSel.size() <= 1)
+            {
+               const Layer* under = doc->FindLayer(LayerUnder(doc, id));
+               if (MenuParts::Item(T("Apply to Layer Below"), nullptr, false, under != nullptr && under->kind == Kind::Paint))
+                  ApplyAdjustmentBelow(doc, id);
+            }
+            if (l->kind == Kind::Paint && sSel.size() <= 1 && MenuParts::SubMenu(T("Match Color")))
+            {
+               GraphNode* self = DocGraphNode();
+               for (GraphNode& gn : gNodes)
+                  if (auto* other = dynamic_cast<Scene2DNode*>(gn.node.get()); other != nullptr && &gn != self)
+                     if (MenuParts::Item((std::string("Document ") + std::to_string(gn.index)).c_str()))
+                        MatchColorFrom(doc, id, other);
+               if (MenuParts::Item(T("Neutralize")))
+                  MatchColorFrom(doc, id, nullptr, 0.0f, true);
+               ImGui::EndMenu();
+            }
             if (!adj)
             {
                if (MenuParts::Item(T("Merge Visible"), Sc("Shift+Ctrl+E"))) sPending.what = Pending::MergeVisible;
@@ -13347,8 +14099,11 @@ namespace
                if (l->kind == Kind::Group && MenuParts::Item(T("Flatten Group"), nullptr)) sPending.what = Pending::FlattenGroup;
                if (MenuParts::Item(T("Flatten Image"), nullptr)) sPending.what = Pending::Flatten;
             }
+            ExportLayerMenu(doc, l->id);
             MenuParts::Separator();
             if (MenuParts::Item(T("Group Layers"), Sc("Ctrl+G"))) sPending.what = Pending::Group;
+            if (MenuParts::Item(T("Group from Layers..."), nullptr, false, !sSel.empty()))
+               sGroupAsk = true;
             LinkItems(doc);
             if (l->kind == Kind::Group && MenuParts::Item(T("Ungroup"), Sc("Shift+Ctrl+G"))) sPending.what = Pending::Ungroup;
             if (!l->clip)
@@ -13830,6 +14585,8 @@ namespace
          }
          if (l->adjType == Scene2DNode::kAdjGradientMap || l->adjMap)
          {
+            if (l->adjType == Scene2DNode::kAdjGradientMap)
+               BoolRow(T("Dither"), &l->adjDither);
             if (GradientRows("##v2dadjgrad", l->stops, l->colorA, l->colorB))
             {
                std::copy(l->stops.front().c, l->stops.front().c + 4, l->colorA);
@@ -13961,7 +14718,8 @@ namespace
          }
          {
             std::vector<std::string> styles;
-            for (int i = 0; i < Scene2DNode::kWarpStyleCount; i++)
+            // Warp Text has no cylinder (the last style); it is a paint layer's Warp Style only.
+            for (int i = 0; i < Scene2DNode::kWarpStyleCount - 1; i++)
                styles.push_back(T(Scene2DNode::WarpStyleName(i)));
             ComboRow(T("Warp"), &l->warpStyle, styles);
             if (l->warpStyle != 0)
@@ -14244,6 +15002,12 @@ namespace
             FormParts::Inline(0.0f, tok::space_1);
             if (TextChip(L("Delete##v2dpmdel"), false, T("Delete the layer mask")))
                sPending.what = Pending::RemoveMask;
+         }
+         if (l->kind == Kind::Vector)
+         {
+            // A soft shape: the fill's own Feather and Density; strokes stay crisp (Photoshop's Properties > Masks).
+            SliderRow(T("Fill feather"), &l->shapeFeather, params::view2d::fill_pct_lo, params::view2d::vmask_feather_hi, "%.0f");
+            SliderRow(T("Fill density"), &l->shapeDensity, 0.0f, 1.0f, "%.2f");
          }
          if (l->hasVMask)
          {
@@ -15808,6 +16572,11 @@ namespace
             FormParts::Inline(0.0f, tok::space_2);
          }
          const ImVec2 np = CardTitle(base + "name", T(english), l->fx[t].on, 1, winKey, T("Click for all settings, right-click for more"));
+         // Drag the style's header onto a layer row: it moves there (Alt copies), PhotoCraft transferEffects.
+         {
+            const int pay[2] = { l->id, t };
+            ReorderDrag::Source("V2D_FX", pay, sizeof(pay), T(english));
+         }
          // Right-click on the header: the style's own menu.
          if (MenuParts::ContextClicked())
             ImGui::OpenPopup("##v2dfxmenu");
@@ -16086,6 +16855,7 @@ namespace
          sSizeFor = sDocUid;
          sSizeSeenW = sCanvasW = sImageW = d.w;
          sSizeSeenH = sCanvasH = sImageH = d.h;
+         sImageDpi = d.dpi;
       }
       SectionCard::Begin(T("Canvas size"));
       {
@@ -16143,12 +16913,23 @@ namespace
             sImageH = (int)std::lround(sImageW * (float)d.h / (float)d.w);
          if (c & 2)
             sImageW = (int)std::lround(sImageH * (float)d.w / (float)d.h);
+         float* const pd[1] = { &sImageDpi };
+         const char* const fd[1] = { "%.0f ppi" };
+         const float dpiWas = sImageDpi;
+         DragMulti(T("Resolution"), pd, fd, params::view2d::one_field, 1.0f, params::view2d::dpi_lo, params::view2d::dpi_hi);
+         if (sImageDpi != dpiWas && sImagePrint && d.dpi > 0)
+         {
+            sImageW = (int)std::lround(d.w * sImageDpi / d.dpi);
+            sImageH = (int)std::lround(d.h * sImageDpi / d.dpi);
+         }
       }
-      ImGui::BeginDisabled(sImageW == d.w && sImageH == d.h);
+      BoolRow(T("Keep print size"), &sImagePrint);
+      ComboRow(T("Resample"), &sImageResample, { T("Smooth"), T("Nearest") });
+      ImGui::BeginDisabled(sImageW == d.w && sImageH == d.h && sImageDpi == d.dpi);
       if (TextChip(L("Apply##v2dimage"), false, T("Scale the document and every layer with it")))
       {
          PushUndoCheckpoint("Image size");
-         doc->ImageSize(sImageW, sImageH);
+         doc->ImageSizeDpi(sImageW, sImageH, sImageDpi, false, sImageResample == 1);
       }
       ImGui::EndDisabled();
 
@@ -16596,7 +17377,7 @@ namespace
       case Pending::RenderImage: RenderImage(); break;
       case Pending::RenderAnim: RenderAnimation(doc); break;
       case Pending::Group:
-         if (!sSel.empty())
+         if (!sSel.empty() && doc->CanGroup(sSel))
          {
             PushUndoCheckpoint("Group layers");
             const int g = doc->GroupLayers(sSel);
@@ -17040,6 +17821,32 @@ namespace
       return MakeDoc(at.x, at.y, read.DocText()) != nullptr;
    }
 
+   // Export Layer (PhotoCraft layer.exportAs): the one layer as a PNG at a chosen size and resample method.
+   int sExportLayerMethod = 1;   // 0 nearest, 1 bilinear, 2 bicubic
+   void ExportLayerMenu(Scene2DNode* doc, int id)
+   {
+      static const char* kMethods[] = { "nearest", "bilinear", "bicubic" };
+      static const char* kMethodNames[] = { "Nearest Neighbour", "Bilinear", "Bicubic" };
+      static const int kScales[] = { 50, 100, 200, 400 };
+      if (!MenuParts::SubMenu(T("Export Layer")))
+         return;
+      for (int m = 0; m < 3; m++)
+         if (MenuParts::Item(T(kMethodNames[m]), nullptr, sExportLayerMethod == m))
+            sExportLayerMethod = m;
+      MenuParts::Separator();
+      for (int pct : kScales)
+         if (MenuParts::Item((std::to_string(pct) + "%...").c_str()) && !AuditNoDialog())
+         {
+            const std::string path = Platform::SaveLayeredDialog("layer.png", "png");
+            std::string err;
+            if (!path.empty() && !doc->ExportLayerPng(id, path, pct, kMethods[sExportLayerMethod], &err))
+               fprintf(stderr, "[2D View] could not export the layer (%s)\n", err.c_str());
+            else if (!path.empty())
+               sLastRender = path;
+         }
+      ImGui::EndMenu();
+   }
+
    void ExportLayered(Scene2DNode* doc, const char* ext)
    {
       if (doc == nullptr || AuditNoDialog())
@@ -17233,12 +18040,12 @@ namespace
          ActionButton::RowNext();
          DrawSide(doc, sideW);
       }
-      // The clone source is a point in one document: another document coming up drops it (Alt-click again there).
-      static uint64_t cloneDoc = sDocUid;
-      if (cloneDoc != sDocUid)
+      // The clone source stays on the document it was Alt-clicked in: painting in another document copies from it
+      // (Photoshop). It drops only when that document is gone.
+      if (sHaveCloneSrc && sCloneDocUid != 0 && FindNodeByUid(sCloneDocUid) == nullptr)
       {
-         cloneDoc = sDocUid;
          sHaveCloneSrc = sCloneOffsetSet = false;
+         sCloneDocUid = 0;
       }
       // A lifted selection goes back down once its drag or free transform is over.
       if (sFloat.id != 0 && sFloat.docUid != sDocUid)
@@ -17520,6 +18327,17 @@ namespace
 
    bool V2Color(const json& v, float out[4])
    {
+      // "#rrggbb" or "#rrggbbaa", as the agent docs and SVG write colours.
+      if (v.is_string())
+      {
+         const std::string h = v.get<std::string>();
+         const size_t n = h.size();
+         if ((n != 7 && n != 9) || h[0] != '#' || h.find_first_not_of("0123456789abcdefABCDEF", 1) != std::string::npos)
+            return false;
+         for (size_t i = 0; i < 4; i++)
+            out[i] = 1 + i * 2 < n ? (float)std::stoul(h.substr(1 + i * 2, 2), nullptr, 16) / 255.0f : 1.0f;
+         return true;
+      }
       if (!v.is_array() || v.size() < tok::view2d_v2_color_limit || v.size() > tok::view2d_v2_color_limit_lg)
          return false;
       for (size_t i = 0; i < v.size(); i++)
@@ -17923,6 +18741,36 @@ namespace
          }
          else
             s.strokeOn = !s.closed;   // an open path with nothing said shows as a line
+         // "strokeGradient": {"kind": "linear" | "radial" | "reflected" | "conical", "angle": degrees, "stops": [[t, colour], ...]}
+         if (c.contains("strokeGradient") && c["strokeGradient"].is_object())
+         {
+            const json& g = c["strokeGradient"];
+            static const char* kKinds[5] = { "solid", "linear", "radial", "reflected", "conical" };
+            const std::string kind = g.value("kind", std::string("linear"));
+            s.strokeType = 1;
+            for (int k = 0; k < 5; k++)
+               if (kind == kKinds[k])
+                  s.strokeType = k;
+            const float ang = g.value("angle", s.strokeAngle);
+            if (std::isfinite(ang))
+               s.strokeAngle = ang;
+            s.strokeStops.clear();
+            if (g.contains("stops") && g["stops"].is_array())
+               for (const json& st : g["stops"])
+               {
+                  Scene2DNode::GradStop gs;
+                  if (st.is_array() && st.size() == 2 && st[0].is_number() && V2Color(st[1], gs.c) &&
+                      s.strokeStops.size() < (size_t)Scene2DNode::kMaxStops)
+                  {
+                     gs.t = std::clamp(st[0].get<float>(), 0.0f, 1.0f);
+                     s.strokeStops.push_back(gs);
+                  }
+               }
+            Scene2DNode::SortStops(s.strokeStops);
+            if (s.strokeStops.size() < (size_t)params::view2d::min_stroke_stops)
+               s.strokeStops.clear();
+            s.strokeOn = s.strokeOn || s.strokeType > 0;
+         }
          if (c.contains("width"))
             s.width = std::clamp(c["width"].get<float>(), 0.0f, Scene2DNode::kAgentStrokeMax);
       }
@@ -18544,7 +19392,8 @@ namespace
          const int ext = c.contains("extend") ? V2Pick(kV2Extends, c["extend"].get<std::string>()) : 0;
          return doc->Gradient(id("layer"), c["from"][0].get<float>(), c["from"][1].get<float>(), c["to"][0].get<float>(),
                               c["to"][1].get<float>(), a, b, kind, std::clamp(c.value("opacity", 1.0f), 0.0f, 1.0f), ext,
-                              c.value("dither", true));
+                              c.value("dither", true), c.value("method", std::string()) == "smooth" ? 1 : 0,
+                              std::clamp(c.value("smoothness", 1.0f), 0.0f, 1.0f));
       }
       if (op == "path")
       {
@@ -20297,6 +21146,260 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             expectS(std::string("parity: ") + nm + " eyedropper points round-trip through the document text", trip);
          }
       }
+      // Block B: the eyedroppers' refusals and fallbacks (PhotoCraft adjust_params tests). A black / white pick past
+      // the room the curve keeps makes a plateau with every point kept; a grey pick between two tight points makes a
+      // plateau between them; bad samples and points are refused; Curves picks drive a destructive Apply; a layer pick
+      // reads the picture below the layer, so a second click keeps the curve.
+      {
+         using SN = Scene2DNode;
+         float lv[4] = { 0, 1, 0, 1 }, lvCh[3][4] = { { 0, 1, 0, 1 }, { 0, 1, 0, 1 }, { 0, 1, 0, 1 } };
+         const float k = 1.0f / 255.0f;
+         auto five = [&]() { return std::vector<float>{ 0, 0, 64 * k, 50 * k, 128 * k, 100 * k, 192 * k, 200 * k, 1, 1 }; };
+         bool endOk = true;
+         for (int pass = 0; pass < 2; pass++)
+         {
+            const bool black = pass == 0;
+            const float v = black ? 0.995f : 0.005f, smp[3] = { v, v, v };
+            std::vector<float> adjP = SN::AdjParamDefault(SN::kAdjCurves), master = five();
+            std::vector<float> ch[3] = { five(), five(), five() };
+            endOk = endOk && SN::PointFromPick(SN::kAdjCurves, 1.0f, lv, lvCh, adjP, master, ch, smp, black ? 1 : 3);
+            const std::vector<float> ref = five();
+            for (const std::vector<float>& c : ch)
+            {
+               bool kept = c.size() == ref.size();
+               for (size_t i = 0; kept && i < c.size(); i += 2)
+                  kept = std::fabs(c[i] - ref[i]) < 1e-5f;
+               const bool plateau = kept && (black ? c[7] == 0.0f && c[9] == 0.0f : c[1] == 1.0f && c[3] == 1.0f);
+               if (!plateau)
+               {
+                  fprintf(stderr, "PROBE end fallback %s:", black ? "black" : "white");
+                  for (float f : c)
+                     fprintf(stderr, " %.3f", f);
+                  fprintf(stderr, "\n");
+               }
+               endOk = endOk && plateau;
+            }
+            endOk = endOk && master == ref;
+         }
+         expect("parity: endpoint eyedroppers fall back when serialization collapses curve points", endOk);
+         {
+            const std::vector<float> tight = { 0, 0, 100 * k, 100 * k, 100.51f * k, 100 * k, 1, 1 };
+            std::vector<float> adjP = SN::AdjParamDefault(SN::kAdjCurves), master = { 0, 0, 1, 1 };
+            std::vector<float> ch[3] = { tight, tight, tight };
+            const float raw[3] = { 100.25f * k, 100.1f * k, 100.4f * k };
+            const float shown[3] = { 100 * k, 100 * k, 100 * k };   // the flat pair shows every raw sample at 100
+            const float target = 0.2126f * raw[0] + 0.7152f * raw[1] + 0.0722f * raw[2];
+            bool ok = SN::PointFromPick(SN::kAdjCurves, 1.0f, lv, lvCh, adjP, master, ch, shown, 2);
+            for (const std::vector<float>& c : ch)
+            {
+               const bool kept = c.size() == 8 && c[2] == tight[2] && c[4] == tight[4];
+               ok = ok && kept && c[3] == c[5] && std::fabs(c[3] - target) < 0.001f;
+               fprintf(stderr, "PROBE grey fallback: n %zu plateau %.5f %.5f target %.5f\n", c.size() / 2, c.size() > 5 ? c[3] : -1.0f,
+                       c.size() > 5 ? c[5] : -1.0f, target);
+            }
+            expect("parity: gray point fallback keeps tightly spaced points round trip safe", ok);
+         }
+         {
+            const float grey4[3] = { 0.4f, 0.4f, 0.4f }, nan3[3] = { std::nanf(""), 0, 0 };
+            std::vector<float> adjP = SN::AdjParamDefault(SN::kAdjCurves), master = { 0, 0, 1, 1 };
+            std::vector<float> ch[3] = { { 0, 0, 1, 1 }, { 0, 0, 1, 1 }, { 0, 0, 1, 1 } };
+            adjP[0] = 1.0f;   // luma only, Photoshop's Grayscale curve
+            const bool lumaBW = SN::PointFromPick(SN::kAdjCurves, 1.0f, lv, lvCh, adjP, master, ch, grey4, 1) &&
+                                SN::PointFromPick(SN::kAdjCurves, 1.0f, lv, lvCh, adjP, master, ch, grey4, 3);
+            const std::vector<float> before = master;
+            const bool lumaGrey = SN::PointFromPick(SN::kAdjCurves, 1.0f, lv, lvCh, adjP, master, ch, grey4, 2);
+            adjP[0] = 0.0f;
+            const bool nanPick = SN::PointFromPick(SN::kAdjCurves, 1.0f, lv, lvCh, adjP, master, ch, nan3, 1);
+            const bool badPoint = SN::PointFromPick(SN::kAdjCurves, 1.0f, lv, lvCh, adjP, master, ch, grey4, 0) ||
+                                  SN::PointFromPick(SN::kAdjCurves, 1.0f, lv, lvCh, adjP, master, ch, grey4, 4);
+            std::vector<float> hueP = SN::AdjParamDefault(SN::kAdjHue);
+            const bool hue = SN::PointFromPick(SN::kAdjHue, 1.0f, lv, lvCh, hueP, master, ch, grey4, 3);
+            expect("parity: curves eyedropper support is explicit and bad samples fail",
+                   lumaBW && !lumaGrey && master == before && !nanPick && !badPoint && !hue);
+         }
+         int ef = 1 << 23;
+         const float tan6[3] = { 0.6f, 0.5f, 0.4f };
+         auto curvesOver = [&](int& base) {
+            base = doc->AddPaintLayer();
+            doc->SelectAll();
+            doc->FillPixels(base, tan6, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+            AddAdjust(doc, SN::kAdjCurves);
+            return sSel.empty() ? 0 : sSel.back();
+         };
+         auto pickAt = [&](float x, float y, float out[3]) {
+            doc->CookIfNeeded(++ef);
+            return doc->Pick(x, y, out, 1, 0);
+         };
+         auto pointFrom = [&](int adj, const float c[3], int point, bool isInput = false) {
+            Layer* a = doc->FindLayer(adj);
+            const bool ok = a != nullptr && SN::PointFromPick(a->adjType, a->adjAmt, a->levels, a->levelsCh, a->adjP, a->curve, a->curveCh, c, point, isInput);
+            doc->Commit();
+            return ok;
+         };
+         {
+            int base = 0;
+            const int adj = curvesOver(base);
+            float c[3] = { -1, -1, -1 }, got[3] = { -1, -1, -1 };
+            const bool white = pickAt(2.5f, 2.5f, c) && pointFrom(adj, c, 3) && ApplyAdjustmentBelow(doc, adj) && pickAt(2.5f, 2.5f, got) &&
+                               got[0] > 0.99f && got[1] > 0.99f && got[2] > 0.99f;
+            const int adj2 = (AddAdjust(doc, SN::kAdjCurves), sSel.empty() ? 0 : sSel.back());
+            const float one[3] = { 1, 1, 1 };
+            const bool black = pointFrom(adj2, one, 1) && ApplyAdjustmentBelow(doc, adj2) && pickAt(2.5f, 2.5f, got) && got[0] < 0.01f &&
+                               got[1] < 0.01f && got[2] < 0.01f;
+            float o[3];
+            const bool outside = pickAt((float)W + 99, 1.5f, o) || pickAt(-1.0f, 1.5f, o);
+            const int adj3 = (AddAdjust(doc, SN::kAdjCurves), sSel.empty() ? 0 : sSel.back());
+            const float nan3[3] = { std::nanf(""), 0.5f, 0.5f }, half[3] = { 0.5f, 0.5f, 0.5f };
+            const bool refused = !pointFrom(adj3, nan3, 1) && !pointFrom(adj3, half, 7);
+            fprintf(stderr, "PROBE curves command: white %d black %d outside %d refused %d\n", (int)white, (int)black, (int)outside, (int)refused);
+            expect("parity: curves eyedropper param drives the command", white && black && !outside && refused);
+            doc->RemoveLayer(adj3);
+            doc->RemoveLayer(base);
+            doc->Commit();
+         }
+         {
+            int base = 0;
+            const int adj = curvesOver(base);
+            const size_t steps = gUndoStack.size();
+            float c[3] = { -1, -1, -1 }, got[3] = { -1, -1, -1 };
+            PushUndoCheckpoint("Adjust from picture");
+            bool ok = pickAt(2.5f, 2.5f, c) && pointFrom(adj, c, 3) && gUndoStack.size() == steps + 1 && pickAt(2.5f, 2.5f, got) &&
+                      got[0] > 0.99f && got[1] > 0.99f && got[2] > 0.99f;
+            std::vector<float> first[3];
+            if (const Layer* a = doc->FindLayer(adj))
+               for (int i = 0; i < 3; i++)
+                  first[i] = a->curveCh[i];
+            PushUndoCheckpoint("Adjust from picture");
+            doc->CookIfNeeded(++ef);
+            ok = ok && PickUnderAdj(doc, adj, 2.5f, 2.5f, c, 1) && pointFrom(adj, c, 3, true);
+            if (const Layer* a = doc->FindLayer(adj))
+               for (int i = 0; i < 3; i++)
+               {
+                  bool same = a->curveCh[i].size() == first[i].size();
+                  for (size_t j = 0; same && j < first[i].size(); j++)
+                     same = std::fabs(a->curveCh[i][j] - first[i][j]) < 2e-3f;
+                  if (!same)
+                     fprintf(stderr, "PROBE layer pick moved channel %d\n", i);
+                  ok = ok && same;
+               }
+            ok = ok && undoBack() && undoBack() && gUndoStack.size() == steps;
+            float o[3];
+            const bool outside = pickAt((float)W + 99, 1.5f, o);
+            AddAdjust(doc, SN::kAdjHue);
+            const int hueId = sSel.empty() ? 0 : sSel.back();
+            const float half[3] = { 0.5f, 0.5f, 0.5f };
+            const bool hue = pointFrom(hueId, half, 3);
+            expect("parity: layer eyedropper samples below the curves layer", ok && !outside && !hue);
+            doc->RemoveLayer(hueId);
+            doc->RemoveLayer(adj);
+            doc->RemoveLayer(base);
+            doc->Commit();
+         }
+      }
+      // Block B: the eyedropper's N by N box on real pixels (PhotoCraft sample_zoom_box_tests): black with one white
+      // pixel; at 100 % a 3 by 3 is 4 x 4 (x-1..x+2) and reads 16, a 5 by 5 is 6 x 6 (x-2..x+3) and reads 7.
+      {
+         const int cx = W / 2, cy = H / 2;
+         const float black[3] = { 0, 0, 0 }, white[3] = { 1, 1, 1 };
+         const int pl = doc->AddPaintLayer();
+         doc->SelectAll();
+         doc->FillPixels(pl, black, 1.0f);
+         doc->SelectRect((float)cx, (float)cy, (float)cx + 1, (float)cy + 1, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(pl, white, 1.0f);
+         doc->Deselect();
+         doc->Commit();
+         doc->CookIfNeeded(1 << 24);
+         bool ok = true;
+         auto read = [&](int x, int y, int size) {
+            float c[3] = { -1, -1, -1 };
+            doc->Pick(x + 0.5f, y + 0.5f, c, size, 0, 1.0f);
+            return (int)std::lround(c[0] * 255.0f);
+         };
+         for (int d = -3; d <= 2; d++)
+         {
+            const int want = d >= -2 && d <= 1 ? 16 : 0;
+            const int gx = read(cx + d, cy, 3), gy = read(cx, cy + d, 3);
+            if (gx != want || gy != want)
+               fprintf(stderr, "PROBE pick box 3: d %d got %d %d want %d\n", d, gx, gy, want);
+            ok = ok && gx == want && gy == want;
+         }
+         for (int d = -4; d <= 3; d++)
+         {
+            const int want = d >= -3 && d <= 2 ? 7 : 0;
+            const int g = read(cx + d, cy, 5);
+            if (g != want)
+               fprintf(stderr, "PROBE pick box 5: d %d got %d want %d\n", d, g, want);
+            ok = ok && g == want;
+         }
+         expect("parity: the probe at 100 percent reads 16 for 3 by 3 and 7 for 5 by 5", ok);
+         doc->RemoveLayer(pl);
+         doc->Commit();
+      }
+      // Block B: the gradient's interpolation method (PhotoCraft gradient_alpha_method_tests and
+      // paint_gradient_sample_tests): without one the ramp is straight; Smooth at 100 % follows Photoshop's measured
+      // black-to-white curve every tenth and keeps an opaque gradient opaque; the unmeasured methods and Smooth at 50 %
+      // keep the straight opacity.
+      {
+         const float x0 = std::floor(W * 0.125f), L = std::floor(W * 0.075f) * 10.0f, gy = std::floor(H * 0.5f);
+         auto draw = [&](const float* a, const float* b, int method, float smooth, std::vector<uint8_t>& px, int& pw) {
+            const int pl = doc->AddPaintLayer();
+            doc->Deselect();
+            int ph = 0;
+            bool ok = doc->Gradient(pl, x0, gy, x0 + L, gy, a, b, 1, 1.0f, 0, false, method, smooth) && doc->ReadPaint(pl, px, pw, ph) &&
+                      pw > 0 && ph > (int)gy && px.size() >= (size_t)pw * ph * 4;
+            if (ok)   // keep the middle row only (surface rows run bottom first)
+               px = std::vector<uint8_t>(px.begin() + (size_t)(ph - 1 - (int)gy) * pw * 4, px.begin() + (size_t)(ph - (int)gy) * pw * 4);
+            doc->RemoveLayer(pl);
+            doc->Commit();
+            return ok;
+         };
+         auto at = [&](const std::vector<uint8_t>& row, float x, int ch) { return (int)row[(size_t)std::floor(x) * 4 + ch]; };
+         const float fg[4] = { 0.2f, 0.3f, 0.8f, 1.0f }, clear[4] = { 0.2f, 0.3f, 0.8f, 0.0f };
+         std::vector<uint8_t> row;
+         int pw = 0;
+         bool straight = draw(fg, clear, 0, 1.0f, row, pw);
+         const int want[3] = { 191, 128, 64 };
+         for (int q = 1; q <= 3; q++)
+            straight = straight && std::abs(at(row, x0 + L * q / 4.0f, 3) - want[q - 1]) <= 2;
+         fprintf(stderr, "PROBE gradient straight: %d (alpha %d %d %d)\n", (int)straight, row.empty() ? -1 : at(row, x0 + L / 4, 3),
+                 row.empty() ? -1 : at(row, x0 + L / 2, 3), row.empty() ? -1 : at(row, x0 + L * 0.75f, 3));
+         expect("parity: without a method the ramp stays straight", straight);
+         bool kept = true;
+         const std::pair<int, float> others[] = { { 2, 1.0f }, { 3, 1.0f }, { 4, 1.0f }, { 1, 0.5f } };
+         for (const auto& m : others)
+         {
+            std::vector<uint8_t> r;
+            bool ok = draw(fg, clear, m.first, m.second, r, pw);
+            for (int q = 1; q <= 3; q++)
+               ok = ok && std::abs(at(r, x0 + L * q / 4.0f, 3) - want[q - 1]) <= 1;
+            if (!ok)
+               fprintf(stderr, "PROBE gradient method %d smooth %.1f moved the opacity\n", m.first, m.second);
+            kept = kept && ok;
+         }
+         expect("parity: unmeasured methods and smoothness keep todays ramp", kept);
+         const float k0[4] = { 0, 0, 0, 1 }, k1[4] = { 1, 1, 1, 1 };
+         std::vector<uint8_t> sm, st;
+         bool opaque = draw(k0, k1, 1, 1.0f, sm, pw) && draw(k0, k1, 0, 1.0f, st, pw);
+         bool differs = false;
+         for (int x = (int)x0; opaque && x < (int)(x0 + L); x++)
+         {
+            opaque = opaque && at(sm, (float)x, 3) == 255;
+            differs = differs || at(sm, (float)x, 0) != at(st, (float)x, 0);
+         }
+         expect("parity: opaque gradients paint the same with a method", opaque && differs);
+         const int linear[11] = { 0, 2, 17, 42, 70, 99, 129, 162, 196, 228, 255 };
+         bool tenths = !sm.empty();
+         for (int i = 0; tenths && i <= 10; i++)
+         {
+            const int got = at(sm, std::min(x0 + L * i / 10.0f, (float)pw - 1), 0);
+            if (std::abs(got - linear[i]) > 1)
+               fprintf(stderr, "PROBE smooth tenth %d: got %d want %d\n", i, got, linear[i]);
+            tenths = tenths && std::abs(got - linear[i]) <= 1;
+         }
+         expect("parity: linear values stay within one level", tenths);
+      }
       // Block B: absolute Selective Colour against Photoshop 27.11 (PhotoCraft's measured table: range, cyan, grey,
       // Photoshop's red, within 1.5 levels).
       {
@@ -20336,6 +21439,133 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             doc->Commit();
          }
          expect("parity: absolute selective colour matches Photoshop's measured table", all);
+      }
+      // Block B: Apply to Layer Below bakes an adjustment layer into the paint layer under it as one undo step; a
+      // selection limits it; selective colour gives the same picture as a layer and baked.
+      {
+         int sc = 1 << 22;
+         const float g = 0.25f, grey[3] = { g, g, g };
+         auto bakeCase = [&](int type, bool sel, const float* fill, auto setUp, float px0[3], float px1[3], float live[3], bool& oneStep,
+                             bool& gone, bool& back) {
+            const int base = doc->AddPaintLayer();
+            doc->SelectAll();
+            doc->FillPixels(base, fill, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+            AddAdjust(doc, type);
+            const int adj = sSel.empty() ? 0 : sSel.back();
+            if (Layer* a = doc->FindLayer(adj))
+               setUp(*a);
+            doc->Commit();
+            doc->CookIfNeeded(++sc);
+            doc->Pick(W * 0.25f, H * 0.5f, live, 3, 0);
+            if (sel)
+            {
+               doc->SelectRect(0, 0, W * 0.5f, (float)H, Scene2DNode::kSelNew, 0, false);
+               doc->Commit();
+            }
+            const size_t u0 = gUndoStack.size();
+            const bool ok = ApplyAdjustmentBelow(doc, adj);
+            oneStep = ok && gUndoStack.size() == u0 + 1 && gUndoStack.back().label == "Apply adjustment";
+            gone = doc->FindLayer(adj) == nullptr && doc->FindLayer(base) != nullptr;
+            doc->Deselect();
+            doc->Commit();
+            doc->CookIfNeeded(++sc);
+            doc->Pick(W * 0.25f, H * 0.5f, px0, 3, 0);
+            doc->Pick(W * 0.75f, H * 0.5f, px1, 3, 0);
+            float after[3] = { -1, -1, -1 };
+            back = undoBack() && doc->FindLayer(adj) != nullptr;
+            if (back)
+            {
+               doc->CookIfNeeded(++sc);
+               doc->Pick(W * 0.25f, H * 0.5f, after, 3, 0);
+               back = std::fabs(after[0] - live[0]) < 0.01f;
+            }
+            fprintf(stderr, "PROBE apply below type %d sel %d: ok %d step %d gone %d in %.3f out %.3f live %.3f back %d\n", type, (int)sel,
+                    (int)ok, (int)oneStep, (int)gone, px0[0], px1[0], live[0], (int)back);
+            doc->RemoveLayer(adj);
+            doc->RemoveLayer(base);
+            doc->Deselect();
+            doc->Commit();
+         };
+         auto none = [](Layer&) {};
+         float a0[3], a1[3], al[3], b0[3], b1[3], bl[3];
+         bool s1 = false, g1 = false, k1 = false, s2 = false, g2 = false, k2 = false;
+         bakeCase(Scene2DNode::kAdjInvert, false, grey, none, a0, a1, al, s1, g1, k1);
+         bakeCase(Scene2DNode::kAdjBrightness, false, grey, [](Layer& a) { a.adjAmt = a.adjTo = 1.5f; }, b0, b1, bl, s2, g2, k2);
+         const bool inv = std::fabs(a0[0] - 0.75f) < 0.02f && std::fabs(a1[0] - 0.75f) < 0.02f;
+         const bool bright = std::fabs(b0[0] - bl[0]) < 0.02f && b0[0] > g + 0.02f;
+         expect("parity: destructive adjustments all depths and modes one undo step", inv && bright && s1 && g1 && k1 && s2 && g2 && k2);
+         float c0[3], c1[3], cl[3];
+         bool s3 = false, g3 = false, k3 = false;
+         bakeCase(Scene2DNode::kAdjInvert, true, grey, none, c0, c1, cl, s3, g3, k3);
+         expect("parity: destructive adjustments respect selection",
+                s3 && g3 && k3 && std::fabs(c0[0] - 0.75f) < 0.02f && std::fabs(c1[0] - g) < 0.02f);
+         const float red[3] = { 0.9f, 0.1f, 0.1f };
+         auto reds = [](Layer& a) {
+            a.adjP = Scene2DNode::AdjParamDefault(Scene2DNode::kAdjSelective);
+            a.adjP[36] = 0.0f;
+            a.adjP[3] = 0.6f;   // reds: black +60%, absolute
+         };
+         float d0[3], d1[3], dl[3];
+         bool s4 = false, g4 = false, k4 = false;
+         bakeCase(Scene2DNode::kAdjSelective, false, red, reds, d0, d1, dl, s4, g4, k4);
+         const bool darker = dl[0] < red[0] - 0.1f && std::fabs(d0[0] - dl[0]) < 0.02f && std::fabs(d0[1] - dl[1]) < 0.02f &&
+                             std::fabs(d0[2] - dl[2]) < 0.02f;
+         expect("parity: selective color layer and destructive", s4 && g4 && k4 && darker);
+      }
+      // Block B: Match Color (PhotoCraft tone.rs match_color). A bluish two-tone layer matched to a flat #e05010 picture
+      // turns orange (red up, blue down); fade 100 changes nothing; an empty source fails; no source with no options is a
+      // no-op; the menu path is one "Match Color" undo step.
+      {
+         const int ml = doc->AddPaintLayer();
+         const float blueA[3] = { 0.2f, 0.3f, 0.8f }, blueB[3] = { 0.4f, 0.5f, 0.9f };
+         doc->SelectRect(0, 0, W * 0.5f, (float)H, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(ml, blueA, 1.0f);
+         doc->SelectRect(W * 0.5f, 0, W * 0.5f, (float)H, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(ml, blueB, 1.0f);
+         doc->Deselect();
+         doc->Commit();
+         int mc = 1 << 23;
+         auto at = [&](float fx, float out[3]) {
+            doc->CookIfNeeded(++mc);
+            doc->Pick(W * fx, H * 0.5f, out, 1, 0);
+         };
+         float before[3], same[3], after[3], self[3], neut[3];
+         at(0.25f, before);
+         std::vector<uint8_t> orange(16 * 16 * 4);
+         for (size_t i = 0; i < 16 * 16; i++)
+         {
+            orange[i * 4 + 0] = 0xe0;
+            orange[i * 4 + 1] = 0x50;
+            orange[i * 4 + 2] = 0x10;
+            orange[i * 4 + 3] = 255;
+         }
+         auto d = [](const float* a, const float* b) { return std::max({ std::fabs(a[0] - b[0]), std::fabs(a[1] - b[1]), std::fabs(a[2] - b[2]) }); };
+         const bool faded = doc->MatchColor(ml, orange.data(), 16 * 16, 100.0f, 100.0f, 100.0f, false);
+         at(0.25f, same);
+         const bool noop = doc->MatchColor(ml, nullptr, 0);
+         at(0.25f, self);
+         std::string err;
+         const bool empty = !doc->MatchColor(ml, orange.data(), 0, 100.0f, 100.0f, 0.0f, false, &err) && !err.empty();
+         std::vector<uint8_t> clear(16 * 16 * 4, 0);
+         const bool clearFails = !doc->MatchColor(ml, clear.data(), 16 * 16);
+         const bool matched = doc->MatchColor(ml, orange.data(), 16 * 16);
+         at(0.25f, after);
+         const bool warm = after[0] > before[0] + 0.3f && after[2] < before[2] - 0.3f && std::fabs(after[0] - 0xe0 / 255.0f) < 0.06f;
+         fprintf(stderr, "PROBE match color: before %.3f %.3f %.3f after %.3f %.3f %.3f fade %.4f self %.4f empty %d clear %d\n", before[0],
+                 before[1], before[2], after[0], after[1], after[2], d(same, before), d(self, before), (int)empty, (int)clearFails);
+         expect("parity: match color from another document",
+                faded && d(same, before) < 2.0f / 255.0f && noop && d(self, before) < 2.0f / 255.0f && empty && clearFails && matched && warm);
+         const size_t u0 = gUndoStack.size();
+         const bool viaMenu = MatchColorFrom(doc, ml, nullptr, 0.0f, true);
+         at(0.25f, neut);
+         const bool neutral = viaMenu && gUndoStack.size() == u0 + 1 && gUndoStack.back().label == "Match Color" &&
+                              std::fabs(neut[0] - neut[2]) < std::fabs(after[0] - after[2]);
+         fprintf(stderr, "PROBE match color neutralize: %.3f %.3f %.3f step %d\n", neut[0], neut[1], neut[2], (int)neutral);
+         expect("parity: match color neutralize is one undo step", neutral);
+         doc->RemoveLayer(ml);
+         doc->Commit();
       }
       // Block B: .3dl lookups and the folder list. A Lustre file whose Mesh line declares a 3-wide cube and 12-bit
       // output inverts (64,128,192) to Photoshop's (191,127,63); a 10-bit-shaper file with 12-bit codes reads its range
@@ -21447,6 +22677,47 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->Commit();
          sSel.clear();
       }
+      // Gradient Map dither (PhotoCraft gradient_map_dither_stays_close): on a grey ramp mapped black to white, dither moves
+      // some pixels, none by more than a level.
+      {
+         const int RW = doc->Doc().w, RH = doc->Doc().h;
+         std::vector<uint8_t> ramp((size_t)RW * RH * 4, 255);
+         for (int y = 0; y < RH; y++)
+            for (int x = 0; x < RW; x++)
+            {
+               uint8_t* q = &ramp[((size_t)y * RW + x) * 4];
+               q[0] = q[1] = q[2] = (uint8_t)(x * 255 / std::max(1, RW - 1));
+            }
+         const int rp = doc->AddFileLayer(0, "Ramp", 0, 0, RW, RH, ramp);
+         Layer& g = doc->AddLayer(Kind::Adjust, 0, rp);
+         g.adjType = Scene2DNode::kAdjGradientMap;
+         g.adjAmt = g.adjTo = Scene2DNode::AdjDefault(g.adjType);
+         const float k0[4] = { 0, 0, 0, 1 }, k1[4] = { 1, 1, 1, 1 };
+         std::copy(k0, k0 + 4, g.colorA);
+         std::copy(k1, k1 + 4, g.colorB);
+         const int gid = g.id;
+         doc->Commit();
+         static int sGmFrame = 1 << 23;
+         std::vector<uint8_t> plain, dith;
+         const bool r0 = doc->RenderSet({ rp, gid }, ++sGmFrame, plain);
+         if (Layer* gl = doc->FindLayer(gid))
+            gl->adjDither = true;
+         doc->Commit();
+         const bool r1 = doc->RenderSet({ rp, gid }, ++sGmFrame, dith);
+         int moved = 0, far = 0;
+         for (size_t i = 0; r0 && r1 && i < plain.size() && i < dith.size(); i += 4)
+         {
+            const int d = std::abs((int)plain[i] - (int)dith[i]);
+            moved += d > 0 ? 1 : 0;
+            far += d > 1 ? 1 : 0;
+         }
+         if (!r0 || !r1 || moved == 0 || far > 0)
+            fprintf(stderr, "PROBE gradient map dither: render %d %d moved %d far %d\n", (int)r0, (int)r1, moved, far);
+         expect("parity: gradient map dither stays close", r0 && r1 && plain.size() == dith.size() && moved > 0 && far == 0);
+         doc->RemoveLayer(gid);
+         doc->RemoveLayer(rp);
+         doc->Commit();
+      }
       // Bug 13: Threshold weighs 0.30/0.59/0.11 (green 0.59 sits under 0.65); Hue turns the HSL hue (red +60 = yellow).
       {
          const int p = doc->AddPaintLayer();
@@ -21505,6 +22776,42 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          const float yel[3] = { 1.0f, 1.0f, 0.0f };
          const int bwr = bwOf(red), bwy = bwOf(yel);
          expect("parity: black & white weighs red 40% and yellow 60%", std::abs(bwr - 102) <= 3 && std::abs(bwy - 153) <= 3);
+         // Black & White's tint against Photoshop 27.11 (PhotoCraft black_white_tint_matches_photoshop): tint, grey in,
+         // Photoshop's RGB out, within 2.5 levels.
+         {
+            struct T { int tint[3]; int grey; int want[3]; };
+            const T table[] = { { { 255, 0, 0 }, 24, { 81, 1, 1 } }, { { 255, 0, 0 }, 120, { 255, 64, 64 } },
+                                { { 255, 0, 0 }, 240, { 255, 235, 235 } }, { { 0xe1, 0xd3, 0xb3 }, 120, { 133, 119, 87 } },
+                                { { 0xe1, 0xd3, 0xb3 }, 24, { 33, 24, 1 } }, { { 0x40, 0x20, 0x10 }, 120, { 144, 112, 96 } } };
+            bool all = true;
+            for (const T& t : table)
+            {
+               const float gv = t.grey / 255.0f, gc[3] = { gv, gv, gv };
+               doc->FillPixels(p, gc, 1.0f);
+               Layer& a = doc->AddLayer(Kind::Adjust, 0, p);
+               a.adjType = Scene2DNode::kAdjBlackWhite;
+               a.adjAmt = a.adjTo = 1.0f;
+               a.adjP = Scene2DNode::AdjParamDefault(Scene2DNode::kAdjBlackWhite);
+               a.adjP[6] = 1.0f;
+               for (int i = 0; i < 3; i++)
+                  a.colorA[i] = t.tint[i] / 255.0f;
+               a.colorA[3] = 1.0f;
+               const int aid = a.id;
+               doc->Commit();
+               uint8_t o[4] = {};
+               const bool got = pixel({ p, aid }, 10, 10, o);
+               bool near = got;
+               for (int i = 0; i < 3; i++)
+                  near = near && std::abs((int)o[i] - t.want[i]) <= 3;
+               if (!near)
+                  fprintf(stderr, "PROBE bw tint %02x%02x%02x grey %d: got %d %d %d want %d %d %d\n", t.tint[0], t.tint[1], t.tint[2], t.grey, o[0],
+                          o[1], o[2], t.want[0], t.want[1], t.want[2]);
+               all = all && near;
+               doc->RemoveLayer(aid);
+               doc->Commit();
+            }
+            expect("parity: black white tint matches photoshop", all);
+         }
          // Colour Overlay ignores Fill but not Opacity (PhotoCraft color_overlay_ignores_fill_opacity_but_not_opacity).
          {
             doc->FillPixels(p, red, 1.0f);
@@ -21586,6 +22893,52 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->RemoveLayer(vid);
          doc->Commit();
       }
+      // Gradient strokes (PhotoCraft vector_cmds gradient_stroke_round_trips_every_gradient_field): kind, angle and
+      // stops survive save and load, paint left to right across the item's box, and the agent's strokeGradient sets them.
+      {
+         Layer& vl = doc->AddLayer(Kind::Vector, 0, 0);
+         const int vid = vl.id;
+         Scene2DNode::Shape s;
+         s.type = Scene2DNode::Shape::kRect;
+         s.x0 = s.y0 = 100;
+         s.x1 = s.y1 = 300;
+         s.fillOn = false;
+         s.strokeOn = true;
+         s.width = 20.0f;
+         s.strokeType = 1;
+         s.strokeAngle = 0.0f;
+         Scene2DNode::GradStop r, b;
+         r.c[0] = 1.0f;
+         r.c[1] = r.c[2] = 0.0f;
+         b.t = 1.0f;
+         b.c[0] = b.c[1] = 0.0f;
+         b.c[2] = 1.0f;
+         s.strokeStops = { r, b };
+         vl.shapes.push_back(s);
+         doc->Commit();
+         uint8_t left[4] = {}, right[4] = {}, inner[4] = {};
+         const bool painted = pixel({ vid }, 100, 200, left) && pixel({ vid }, 300, 200, right) && pixel({ vid }, 200, 200, inner) &&
+                              left[3] > 200 && right[3] > 200 && left[0] > left[2] + 100 && right[2] > right[0] + 100 && inner[3] < 32;
+         const std::string text = doc->DocText();
+         doc->SetDocText("");
+         doc->Layers();
+         doc->SetDocText(text);
+         doc->Layers();
+         const Layer* back = doc->FindLayer(vid);
+         const bool kept = back != nullptr && back->shapes.size() == 1 && back->shapes[0].strokeType == 1 &&
+                           back->shapes[0].strokeAngle == 0.0f && back->shapes[0].strokeStops == s.strokeStops;
+         std::vector<Scene2DNode::Shape> agent(1, s);
+         agent[0].strokeType = 0;
+         agent[0].strokeStops.clear();
+         V2PathStyle(nlohmann::json::parse(R"({"strokeGradient": {"kind": "conical", "angle": 30, "stops": [[1, "#0000ff"], [0, "#ff0000"]]}})"), agent);
+         const bool parsed = agent[0].strokeType == 4 && agent[0].strokeAngle == 30.0f && agent[0].strokeStops.size() == 2 &&
+                             agent[0].strokeStops[0].t == 0.0f && agent[0].strokeStops[0].c[0] > 0.99f && agent[0].strokeOn;
+         fprintf(stderr, "PROBE gradient stroke: left %d %d %d right %d %d %d inner a %d kept %d parsed %d\n", left[0], left[1], left[2], right[0],
+                 right[1], right[2], inner[3], (int)kept, (int)parsed);
+         expect("parity: gradient stroke round trips every gradient field", painted && kept && parsed);
+         doc->RemoveLayer(vid);
+         doc->Commit();
+      }
       // Triangle (PhotoCraft triangle_box_geometry): fills its box, apex at the top centre whichever way it was
       // dragged; a corner radius rounds each corner with arcs tangent to both sides.
       {
@@ -21629,6 +22982,76 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          expect("triangle: the base corners are filled, above the edge is empty",
                 pixel({ vid }, 298, 199, a0) && a0[3] > 200 && pixel({ vid }, 102, 199, a1) && a1[3] > 200 &&
                     pixel({ vid }, 110, 110, a2) && a2[3] < 4);
+         // PhotoCraft triangle_box_geometry / triangle_history_names: the stored shape is what the preview draws; edits of
+         // the radius or box keep the live triangle (sides and star ratio mean nothing to it); hostile radii and boxes stay
+         // finite; a three-sided polygon stays inscribed in its ellipse; undo and redo give the same outline.
+         {
+            Shape& st = doc->FindLayer(vid)->shapes[0];
+            const bool agree = anchors(st) == big && st.type == Sh::kTriangle;
+            st.radius = 20.0f;
+            st.x0 = 10, st.y0 = 10, st.x1 = 60, st.y1 = 90;
+            const std::vector<float> e0 = anchors(st);
+            st.sides = 7;
+            st.inner = 0.3f;
+            const bool keeps = st.type == Sh::kTriangle && st.radius == 20.0f && anchors(st) == e0;
+            expect("parity: the preview and the measured boxes agree", agree);
+            expect("parity: editing the radius or the box keeps the triangle", keeps);
+            bool finiteR = true;
+            for (float rr : { -5.0f, 1e30f, NAN, INFINITY })
+            {
+               Sh h = t;
+               h.radius = rr;
+               for (float v : anchors(h))
+                  finiteR = finiteR && std::isfinite(v);
+            }
+            bool finiteB = true;
+            const float boxes[][4] = { { 0, 0, 1e30f, 1e30f }, { 1e30f, 1e30f, 10, 10 }, { 5, 5, 5, 5 }, { 5, 5, 5, 55 }, { 5, 5, 55, 5 } };
+            for (const auto& bx : boxes)
+            {
+               Sh h = t;
+               h.radius = 20.0f;
+               h.x0 = bx[0], h.y0 = bx[1], h.x1 = bx[2], h.y1 = bx[3];
+               for (float v : anchors(h))
+                  finiteB = finiteB && std::isfinite(v);
+            }
+            fprintf(stderr, "PROBE triangle hostile: radii %d boxes %d agree %d keeps %d\n", (int)finiteR, (int)finiteB, (int)agree, (int)keeps);
+            expect("parity: hostile radii never panic", finiteR);
+            expect("parity: hostile boxes never panic", finiteB);
+            Sh poly = t;
+            poly.type = Sh::kPolygon;
+            poly.sides = 3;
+            poly.radius = 0.0f;
+            const std::vector<float> pa = anchors(poly);
+            fprintf(stderr, "PROBE three sided polygon: %zu anchors %.3f,%.3f %.3f,%.3f\n", pa.size() / 2, pa.size() > 1 ? pa[0] : 0.0f,
+                    pa.size() > 1 ? pa[1] : 0.0f, pa.size() > 3 ? pa[2] : 0.0f, pa.size() > 3 ? pa[3] : 0.0f);
+            doc->Commit();
+            const std::vector<float> before = anchors(doc->FindLayer(vid)->shapes[0]);
+            PushUndoCheckpoint(RadiusEditName(&doc->FindLayer(vid)->shapes[0]));
+            doc->FindLayer(vid)->shapes[0].radius = 5.0f;
+            doc->Commit();
+            const std::vector<float> after = anchors(doc->FindLayer(vid)->shapes[0]);
+            Undo();
+            doc = FindDoc();
+            const bool undone = doc->FindLayer(vid) != nullptr && anchors(doc->FindLayer(vid)->shapes[0]) == before;
+            Redo();
+            doc = FindDoc();
+            const bool redone = doc->FindLayer(vid) != nullptr && anchors(doc->FindLayer(vid)->shapes[0]) == after;
+            expect("parity: a three sided polygon and undo are unchanged",
+                   pa.size() == 6 && near(pa, 200.0f, 100.0f) && near(pa, 286.603f, 175.0f) && near(pa, 113.397f, 175.0f) && undone && redone);
+            Sh star3 = t;
+            star3.type = Sh::kStar;
+            star3.sides = 3;
+            Sh poly5 = poly;
+            poly5.sides = 5;
+            const bool names = std::string(ShapeDrawName(6, true)) == "Triangle Tool" && std::string(ShapeDrawName(6, false)) == "Draw shape" &&
+                               std::string(ShapeDrawName(3, true)) == "Draw shape" && std::string(RadiusEditName(&t)) == "Change Rounded Triangle" &&
+                               RadiusEditName(&star3) == nullptr && RadiusEditName(&poly) == nullptr && RadiusEditName(&poly5) == nullptr &&
+                               RadiusEditName(nullptr) == nullptr;
+            expect("parity: a shape mode triangle is one step named triangle tool", std::string(ShapeDrawName(6, true)) == "Triangle Tool");
+            expect("parity: rounding a live triangle is change rounded triangle", std::string(RadiusEditName(&t)) == "Change Rounded Triangle");
+            expect("parity: other edits and other shapes keep edit shape", names);
+            expect("parity: without the tool the commands keep their own names", std::string(ShapeDrawName(6, false)) == "Draw shape");
+         }
          doc->RemoveLayer(vid);
          doc->Commit();
       }
@@ -21672,6 +23095,97 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->RemoveLayer(fid);
          doc->Commit();
       }
+      // A soft shape layer (PhotoCraft soft_shape_tests on a shape layer): Density and Feather soften the fill only, the
+      // stroke stays crisp; the layer covers the soft fill; hostile values render; the frame is the hard fill's painted
+      // pixels (a subtracted margin left out), found in a bounded number of strip scans.
+      {
+         using Sh = Scene2DNode::Shape;
+         Layer& vl = doc->AddLayer(Kind::Vector, 0, 0);
+         const int vid = vl.id;
+         Sh q;
+         q.type = Sh::kRect;
+         q.x0 = q.y0 = 50;
+         q.x1 = q.y1 = 150;
+         q.fillC[0] = q.fillC[1] = q.fillC[2] = 0.0f;
+         q.strokeOn = true;
+         q.width = 4.0f;
+         q.strokeC[0] = 1.0f, q.strokeC[1] = q.strokeC[2] = 0.0f;
+         vl.shapes.push_back(q);
+         vl.shapeDensity = 0.5f;
+         vl.shapeFeather = 10.0f;
+         doc->Commit();
+         uint8_t p[4] = {};
+         bool crisp = true;
+         for (int x : { 48, 49, 50, 51 })
+            crisp = crisp && pixel({ vid }, x, 100, p) && p[0] > 250 && p[1] < 4 && p[3] > 250;
+         // 10 px out: 50 % density plus half of the feather's 16 % = about 58 % black.
+         const bool out40 = pixel({ vid }, 40, 100, p) && std::abs((int)p[3] - 148) <= 12 && p[0] < 8;
+         fprintf(stderr, "PROBE soft shape stroke: crisp %d x40 alpha %d\n", (int)crisp, (int)p[3]);
+         expect("parity: soft shape keeps its stroke crisp", crisp && out40);
+         float lo[2], hi[2];
+         uint8_t c0[4] = {}, c1[4] = {};
+         const bool cover = doc->Bounds(vid, lo, hi) && lo[0] <= 20 && hi[0] >= 180 && pixel({ vid }, 2, 2, c0) && c0[3] >= 120 &&
+                            (doc->FindLayer(vid)->shapeDensity = 1.0f, doc->Commit(), pixel({ vid }, 25, 100, c1)) && c1[3] > 0;
+         fprintf(stderr, "PROBE soft shape bounds: lo %.1f hi %.1f corner a %d x25 a %d\n", lo[0], hi[0], (int)c0[3], (int)c1[3]);
+         expect("parity: soft shape bounds cover the fill", cover);
+         bool hostile = true;
+         const float bad[4][2] = { { NAN, NAN }, { -1.0f, -5.0f }, { 7.0f, 1e9f }, { INFINITY, -INFINITY } };
+         for (const auto& b : bad)
+         {
+            Layer* hl = doc->FindLayer(vid);
+            hl->shapeDensity = b[0], hl->shapeFeather = b[1];
+            doc->Commit();
+            hostile = hostile && pixel({ vid }, 100, 100, p);
+         }
+         // Saved hostile values load clamped.
+         doc->FindLayer(vid)->shapeDensity = 0.5f, doc->FindLayer(vid)->shapeFeather = 4.0f;
+         doc->Commit();
+         std::string txt = doc->DocText();
+         const size_t at = txt.find("vsoft " + std::to_string(vid) + " ");
+         if (at != std::string::npos)
+            txt.replace(at, txt.find('\n', at) - at, "vsoft " + std::to_string(vid) + " nan 7");
+         doc->SetDocText(txt);
+         doc->Layers();
+         const Layer* ll = doc->FindLayer(vid);
+         hostile = hostile && at != std::string::npos && ll != nullptr && ll->shapeFeather == 0.0f && ll->shapeDensity == 1.0f &&
+                   pixel({ vid }, 100, 100, p);
+         expect("parity: hostile values render", hostile);
+         // The frame skips a subtracted margin: 50..150 minus 40..160 x 40..140 leaves 50..150 x 140..150.
+         Sh cut = q;
+         cut.x0 = 40, cut.y0 = 40, cut.x1 = 160, cut.y1 = 140;
+         cut.op = Sh::kSubtract;
+         cut.strokeOn = false;
+         Layer* fl = doc->FindLayer(vid);
+         fl->shapes = { q, cut };
+         fl->shapes[0].strokeOn = false;
+         fl->shapeDensity = 0.5f, fl->shapeFeather = 4.0f;
+         doc->Commit();
+         int fr[4] = {};
+         const bool frame = doc->SoftShapeFrame(vid, fr) && fr[0] == 50 && fr[1] == 140 && fr[2] == 150 && fr[3] == 150;
+         fprintf(stderr, "PROBE soft shape frame: %d %d %d %d\n", fr[0], fr[1], fr[2], fr[3]);
+         expect("parity: soft shape frame skips a subtracted margin", frame);
+         // The scan is bounded: a 2 px spot in 4000 x 3000 takes at most 4 x 14 strips; empty stops after the top edge.
+         const int big[4] = { 0, 0, 4000, 3000 }, spot[4] = { 2500, 1700, 2502, 1702 };
+         int calls = 0, got[4] = {};
+         const bool found = Scene2DNode::TrimToPainted(big, [&](const int st[4], int pp[4]) {
+            calls++;
+            pp[0] = std::max(st[0], spot[0]), pp[1] = std::max(st[1], spot[1]), pp[2] = std::min(st[2], spot[2]), pp[3] = std::min(st[3], spot[3]);
+         }, got);
+         const bool spotOk = found && got[0] == 2500 && got[1] == 1700 && got[2] == 2502 && got[3] == 1702 && calls <= 56;
+         int ecalls = 0;
+         const bool none = !Scene2DNode::TrimToPainted(big, [&](const int[4], int pp[4]) {
+            ecalls++;
+            pp[0] = pp[1] = pp[2] = pp[3] = 0;
+         }, got);
+         const int emptyR[4] = { 0, 0, 0, 0 }, small[4] = { 3, 4, 9, 7 };
+         const bool edges = !Scene2DNode::TrimToPainted(emptyR, [](const int st[4], int pp[4]) { std::copy(st, st + 4, pp); }, got) &&
+                            Scene2DNode::TrimToPainted(small, [](const int st[4], int pp[4]) { std::copy(st, st + 4, pp); }, got) && got[0] == 3 &&
+                            got[1] == 4 && got[2] == 9 && got[3] == 7;
+         fprintf(stderr, "PROBE trim to painted: spot %d calls %d empty calls %d edges %d\n", (int)spotOk, calls, ecalls, (int)edges);
+         expect("parity: soft shape frame scan is bounded", spotOk && none && ecalls <= 14 && edges);
+         doc->RemoveLayer(vid);
+         doc->Commit();
+      }
       // Arrowhead Concavity (PhotoCraft arrow_concavity_takes_minus_fifty_to_fifty): +50 pulls the triangle's back
       // halfway to its tip, leaving a notch; the tip stays; old out-of-range values load clamped.
       {
@@ -21698,6 +23212,80 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
                 flat && pixel({ vid }, 320, 200, a1) && a1[3] < 4 && pixel({ vid }, 345, 200, a2) && a2[3] > 200);
          doc->RemoveLayer(vid);
          doc->Commit();
+      }
+      // Arrows under a layer transform (PhotoCraft shape.rs arrow scale tests). Infinite never bakes a transform into
+      // the item: the line stays live (ends, width, head) and the picture is the transformed outline, so what a bake
+      // would give (the path a non-uniform diagonal scale leaves, the head length an axial or reflected scale gives)
+      // is what shows. Each case: the scaled picture sampled back through the layer matrix equals the unscaled one.
+      {
+         using Sh = Scene2DNode::Shape;
+         static int sArrowFrame = 1 << 22;
+         auto render = [&](int id, std::vector<uint8_t>& rgba) { return doc->RenderSet({ id }, ++sArrowFrame, rgba) && rgba.size() >= (size_t)W * H * 4; };
+         auto alphaAt = [&](const std::vector<uint8_t>& px, float x, float y) {
+            const int ix = (int)std::lround(x), iy = (int)std::lround(y);
+            return ix < 0 || iy < 0 || ix >= W || iy >= H ? 0 : (int)px[((size_t)iy * W + ix) * 4 + 3];
+         };
+         struct Case { const char* row; float x0, y0, x1, y1, width; int head; float sx, sy, angle; };
+         const Case cases[] = {
+            { "parity: headless arrow survives nonuniform diagonal scale", 100, 100, 200, 200, 5, 0, 2, 1, 0 },
+            { "parity: headless diagonal arrow preserves geometry after nonuniform scale", 120, 80, 220, 240, 6, 0, 1, 2.5f, 0 },
+            { "parity: zero length headless arrow survives scale", 150, 150, 150, 150, 5, 0, 2, 1, 0 },
+            { "parity: headless short arrow remains editable after scaling", 150, 150, 150.5f, 150, 0.05f, 0, 0.5f, 0.5f, 0 },
+            { "parity: scale above minimum still keeps live arrow editable", 100, 150, 200, 150, 5, 2, 0.5f, 0.5f, 0 },
+            { "parity: reflected horizontal arrow uses axial scale for head length", 100, 150, 200, 150, 5, 2, -2, 1, 0 },
+            { "parity: anisotropic diagonal arrow cannot remain parametric", 100, 100, 200, 200, 5, 2, 2, 1, 0 },
+            { "parity: uniform scale preserves diagonal arrow axes", 100, 100, 160, 160, 5, 2, 2, 2, 0 },
+            { "parity: forty five degree rotation retains live arrow and geometry", 100, 150, 220, 150, 6, 2, 1, 1, 45 },
+         };
+         for (const Case& c : cases)
+         {
+            Layer& vl = doc->AddLayer(Kind::Vector, 0, 0);
+            const int vid = vl.id;
+            Sh l;
+            l.type = Sh::kLine;
+            l.x0 = c.x0, l.y0 = c.y0, l.x1 = c.x1, l.y1 = c.y1;
+            l.fillOn = false;
+            l.strokeOn = true;
+            l.width = c.width;
+            l.arrowE = c.head;
+            l.arrowSize = 6.0f;
+            vl.shapes.push_back(l);
+            doc->Commit();
+            std::vector<uint8_t> o, s;
+            float mo[6], ms[6];
+            bool ok = render(vid, o);
+            doc->LayerMatrix(*doc->FindLayer(vid), mo);
+            Layer* sl = doc->FindLayer(vid);
+            sl->sx = c.sx, sl->sy = c.sy, sl->angle = c.angle;
+            doc->Commit();
+            ok = ok && render(vid, s);
+            doc->LayerMatrix(*doc->FindLayer(vid), ms);
+            const float det = ms[0] * ms[4] - ms[1] * ms[3];
+            int covered = 0, wrong = 0;
+            for (int y = 0; ok && y < H; y += 2)
+               for (int x = 0; x < W; x += 2)
+               {
+                  // doc point -> the layer's own px -> where the unscaled layer drew it
+                  const float dx = x - ms[2], dy = y - ms[5];
+                  const float qx = (ms[4] * dx - ms[1] * dy) / det, qy = (-ms[3] * dx + ms[0] * dy) / det;
+                  const int a = alphaAt(s, (float)x, (float)y);
+                  const int b = alphaAt(o, mo[0] * qx + mo[1] * qy + mo[2], mo[3] * qx + mo[4] * qy + mo[5]);
+                  if (a > 128 || b > 128)
+                     covered++;
+                  if ((a > 128) != (b > 128) && std::abs(a - b) > 96)
+                     wrong++;
+               }
+            const Layer* after = doc->FindLayer(vid);
+            const bool live = after != nullptr && after->shapes.size() == 1 && after->shapes[0].type == Sh::kLine &&
+                              after->shapes[0].x1 == c.x1 && after->shapes[0].width == c.width && after->shapes[0].arrowE == c.head;
+            const bool empty = c.x0 == c.x1 && c.y0 == c.y1;
+            const bool same = ok && (empty || covered == 0 || wrong * 10 <= covered);
+            fprintf(stderr, "PROBE arrow scale %.2f,%.2f rot %.0f head %d: covered %d wrong %d live %d\n", c.sx, c.sy, c.angle, c.head, covered,
+                    wrong, (int)live);
+            expect(c.row, same && live);
+            doc->RemoveLayer(vid);
+            doc->Commit();
+         }
       }
       // Combine Shapes across layers (PhotoCraft combine_shapes_*): two 40x40 rects overlapping 20x20, the lower one
       // moved by its layer transform. Each op merges into the top layer (its name, fill and selection), one undo step
@@ -21925,6 +23513,28 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          Scene2DNode::SplitWarpGrid(m, r, 5.0f / 6.0f, 0.5f, Scene2DNode::kWarpSplitV);   // the middle of the last column
          expect("a split line keeps the picture", m.Nx() == 5 && std::fabs(m.pts[3 * 2] - (tx[2] + 660.0f) * 0.5f) < 0.05f &&
                 std::fabs(r.pts[3 * 2] - (tx[2] + tx[3]) * 0.5f) < 0.05f);
+         // The whole Default grid bent before a split: removing the split gives the bent grid back as it was.
+         {
+            fresh(m, r);
+            m.pts[1 * 2 + 1] -= 40.0f;
+            m.pts[(4 + 2) * 2] += 25.0f;
+            const WG bent = m;
+            const bool did = split(m, r, 400, 320, Scene2DNode::kWarpSplitH);
+            float st[2] = { 0.5f, 0.0f };
+            for (size_t j = 0; j < m.vs.size(); j++)
+               if (std::fabs(m.vs[j] - (320.0f - 150.0f) / 300.0f) < 0.02f)
+                  st[1] = m.vs[j];
+            const bool back = did && Scene2DNode::SplitWarpGrid(m, r, st[0], st[1], Scene2DNode::kWarpSplitRemove);
+            bool same = back && m.Nx() == bent.Nx() && m.Ny() == bent.Ny() && m.pts.size() == bent.pts.size();
+            for (size_t i = 0; same && i < m.pts.size(); i++)
+            {
+               same = std::fabs(m.pts[i] - bent.pts[i]) < 0.05f;
+               if (!same)
+                  fprintf(stderr, "PROBE bent default grid: pt %zu got %.2f want %.2f\n", i, m.pts[i], bent.pts[i]);
+            }
+            fprintf(stderr, "PROBE bent default grid: split %d removed %d same %d (%dx%d)\n", (int)did, (int)back, (int)same, m.Nx(), m.Ny());
+            expect("parity: a bent default grid comes back bent", same);
+         }
          // The grid stops at kWarpLinesMax lines a side.
          fresh(m, r);
          for (int k = 1; k < 40; k++)
@@ -21968,6 +23578,60 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
                 maskAt(15, 15) > 250 && alphaAt(35, 15) > 250 && maskAt(35, 15) < 5 && maskAt(35, 65) > 250);
          doc->RemoveLayer(id);
          doc->Deselect();
+         doc->Commit();
+      }
+      // A mesh warp shrinking a 1 px checkerboard 4x reads its even grey, not aliased black and white (PhotoCraft
+      // a_shrinking_mesh_warp_is_prefiltered).
+      {
+         using WG = Scene2DNode::WarpGrid;
+         const int DW = doc->Doc().w, DH = doc->Doc().h;
+         const int id = doc->AddPaintLayer();
+         const float blk[3] = { 0.0f, 0.0f, 0.0f }, wht[3] = { 1.0f, 1.0f, 1.0f };
+         doc->SelectRect(10, 10, 170, 170, Scene2DNode::kSelNew, 0.0f, false);
+         doc->FillPixels(id, blk, 1.0f);
+         std::vector<uint8_t> region((size_t)DW * DH, 0);
+         for (int y = 10; y < 170 && y < DH; y++)
+            for (int x = 10; x < 170 && x < DW; x++)
+               region[(size_t)(DH - 1 - y) * DW + x] = (x + y) % 2 == 0 ? 255 : 0;   // selection rows are bottom first
+         doc->CombineSelection(region, Scene2DNode::kSelNew);
+         const float s60 = doc->SelectionAt(60, 60), s61 = doc->SelectionAt(61, 60);
+         const bool filled = doc->FillPixels(id, wht, 1.0f);
+         fprintf(stderr, "PROBE mesh prefilter fill: sel(60,60) %.2f sel(61,60) %.2f filled %d\n", s60, s61, (int)filled);
+         doc->Deselect();
+         doc->Commit();
+         const std::vector<std::string> from = doc->FindLayer(id)->tiles;
+         const float c[8] = { 10, 10, 170, 10, 170, 170, 10, 170 };
+         WG rest;
+         Scene2DNode::WarpGridRest(rest, c);
+         WG mv = rest;
+         for (int k = 0; k < mv.Count(); k++)
+         {
+            mv.pts[k * 2] = 10.0f + (mv.pts[k * 2] - 10.0f) * 0.25f;
+            mv.pts[k * 2 + 1] = 10.0f + (mv.pts[k * 2 + 1] - 10.0f) * 0.25f;
+         }
+         std::vector<uint8_t> px;
+         int pw = 0, ph = 0;
+         if (doc->ReadPaint(id, px, pw, ph) && pw > 100 && ph > 100)
+         {
+            const uint8_t* a = &px[((size_t)(ph - 1 - 60) * pw + 60) * 4];
+            const uint8_t* b = &px[((size_t)(ph - 1 - 60) * pw + 61) * 4];
+            fprintf(stderr, "PROBE mesh prefilter before: %dx%d (60,60) %d %d %d %d (61,60) %d %d %d %d\n", pw, ph, a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]);
+         }
+         const bool warped = doc->MeshWarp(id, from, mv, true, false, &rest);
+         doc->ReadPaint(id, px, pw, ph);
+         int lo = 255, hi = 0;
+         for (int y = 18; y < 42 && y < ph; y++)
+            for (int x = 18; x < 42 && x < pw; x++)
+            {
+               const int v = px[((size_t)(ph - 1 - y) * pw + x) * 4];
+               lo = std::min(lo, v);
+               hi = std::max(hi, v);
+            }
+         if (!warped || hi - lo >= 60 || lo < 70 || hi > 185)
+            fprintf(stderr, "PROBE mesh prefilter: warped %d lo %d hi %d alpha(30,30) %d rest %d pts %zu\n", (int)warped, lo, hi,
+                    pw > 30 && ph > 30 ? (int)px[((size_t)(ph - 1 - 30) * pw + 30) * 4 + 3] : -1, rest.Count(), rest.pts.size());
+         expect("parity: a shrinking mesh warp is prefiltered", warped && hi >= lo && hi - lo < 60 && lo >= 70 && hi <= 185);
+         doc->RemoveLayer(id);
          doc->Commit();
       }
       // Link Layers (PhotoCraft layer_multi_cmds tests): group ids, toggles, Select Linked, linked moves, duplicates.
@@ -22280,6 +23944,37 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          expect("perspective crop: width alone", Scene2DNode::PerspectiveCropSize(skew, 400, 250, 661, 0, w, h) && w == 661 && h == 375);
          expect("perspective crop: height alone", Scene2DNode::PerspectiveCropSize(skew, 400, 250, 0, 375, w, h) && w == 661 && h == 375);
          expect("perspective crop: a crossed quad is refused", !Scene2DNode::PerspectiveCropSize(cross, 400, 250, 0, 0, w, h));
+         // A click or two off a rectangle keeps it near its edges, and one pixel of click error near the parallel-sides
+         // limit cannot swing the proportions: both sides of it keep the longest edges (PhotoCraft size tests).
+         {
+            bool near = true;
+            for (float e : { 0.25f, 0.5f, 1.0f, 2.0f })
+            {
+               const float qa[8] = { 100, 50, 700 + e, 50, 700, 450 + e, 100 - e, 450 };
+               const float qb[8] = { 100, 50, 700 + e, 50 + e, 700, 450 + e, 100 - e, 450 };
+               for (const float* q : { qa, qb })
+               {
+                  const bool ok = Scene2DNode::PerspectiveCropSize(q, 400, 250, 0, 0, w, h) && std::fabs(w - 600.0f) <= 2 * e + 1 &&
+                                  std::fabs(h - 400.0f) <= 2 * e + 1;
+                  if (!ok)
+                     fprintf(stderr, "PROBE persp near: e %.2f -> %d x %d\n", e, w, h);
+                  near = near && ok;
+               }
+            }
+            expect("parity: a nearly rectangular quad stays near its edges", near);
+            bool steady = true;
+            for (float x : { 697.0f, 698.0f })
+            {
+               const float q[8] = { 100, 50, 700, 50, x, 384, 100, 450 };
+               const double lw = std::max(600.0, std::hypot(x - 100.0, 384.0 - 450.0));
+               const double lh = std::max(400.0, std::hypot(x - 700.0, 384.0 - 50.0));
+               const bool ok = Scene2DNode::PerspectiveCropSize(q, 400, 250, 0, 0, w, h) && w == (int)std::lround(lw) && h == (int)std::lround(lh);
+               if (!ok)
+                  fprintf(stderr, "PROBE persp swing: x %.0f -> %d x %d want %.1f x %.1f\n", x, w, h, lw, lh);
+               steady = steady && ok;
+            }
+            expect("parity: a pixel of click error cannot swing the proportions", steady);
+         }
          // A layer covering the document: the quad's corners land on the new document's corners.
          Layer& l = doc->AddLayer(Kind::Vector, 0, 0);
          Scene2DNode::Shape r;
@@ -22317,6 +24012,44 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          {
             doc->RemoveLayer(id);
             doc->Commit();
+         }
+         // PhotoCraft #7557: a quad low on a strongly converging picture (its horizon crosses the canvas) is cropped,
+         // the layer reaching past the horizon resampled through it, not refused.
+         {
+            std::vector<uint8_t> red((size_t)W * H * 4);
+            for (size_t i = 0; i < red.size(); i += 4)
+            {
+               red[i] = 255;
+               red[i + 1] = red[i + 2] = 0;
+               red[i + 3] = 255;
+            }
+            const int rid = doc->AddFileLayer(0, "red", 0, 0, W, H, red);
+            doc->Commit();
+            const float kx = W / 100.0f, ky = H / 100.0f;
+            const float low[8] = { 40 * kx, 70 * ky, 60 * kx, 70 * ky, 90 * kx, 95 * ky, 10 * kx, 95 * ky };
+            const size_t u0 = gUndoStack.size();
+            PushUndoCheckpoint("Crop document");
+            const bool cropped = doc->PerspectiveCrop(low, 50, 39);
+            bool kept = false;
+            if (cropped)
+               for (const Layer& t : doc->Layers())
+               {
+                  std::vector<uint8_t> px;
+                  if (t.name == "red" && t.kind == Kind::Paint && doc->RenderLayerAlone(t.id, 0, px) && px.size() == (size_t)50 * 39 * 4)
+                  {
+                     const uint8_t* c = &px[((size_t)20 * 50 + 25) * 4];
+                     kept = c[0] == 255 && c[1] == 0 && c[2] == 0 && c[3] == 255;
+                     if (!kept)
+                        fprintf(stderr, "PROBE persp horizon: (25,20) %d %d %d %d\n", c[0], c[1], c[2], c[3]);
+                  }
+               }
+            expect("parity: a quad below a horizon across the canvas keeps its content", cropped && doc->Doc().w == 50 && doc->Doc().h == 39 && kept);
+            expect("perspective crop past the horizon is one undo step", undoBack() && gUndoStack.size() == u0 && doc->Doc().w == W && doc->Doc().h == H);
+            if (doc->FindLayer(rid) != nullptr)
+            {
+               doc->RemoveLayer(rid);
+               doc->Commit();
+            }
          }
       }
       // Vector tools (ai-tools Block 2). Simplify: a circle drawn as 200 anchors keeps its outline within 1 px on
@@ -22697,8 +24430,115 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             el->typePath = { line(0, 0, 100, 0) };
             doc->Commit();
          }
+         // PhotoCraft type_extra rows: the knot cap, path placement, the end's save form, and a vector mask apart.
+         {
+            SN::Shape cap;
+            cap.type = SN::Shape::kPath;
+            for (int i = 0; i <= SN::kTypePathAnchorsMax; i++)
+               for (int k = 0; k < 3; k++)
+                  cap.pts.push_back(i * 0.001f), cap.pts.push_back(50.0f);
+            SN::Shape atCap = cap;
+            atCap.pts.resize((size_t)SN::kTypePathAnchorsMax * 6);
+            const bool capOk = doc->SetTypePath(tp, { atCap }) == SN::kTypePathOk &&
+                               doc->SetTypePath(tp, { cap }) == SN::kTypePathTooManyAnchors &&
+                               doc->FindLayer(tp)->typePath[0].pts.size() == (size_t)SN::kTypePathAnchorsMax * 6;
+            fprintf(stderr, "PROBE type path cap: %d\n", (int)capOk);
+            expect("parity: an edited type path keeps the knot cap", capOk);
+
+            // A line (0,0)-(7,7): 7 sqrt 2 rounds up as a float; that float still means the end.
+            doc->SetTypePath(tp, { line(0.0f, 0.0f, 7.0f, 7.0f) });
+            const double len = doc->TypePathLength(*doc->FindLayer(tp));
+            const float lenF = (float)len;
+            const bool up = (double)lenF > len;
+            const bool far1 = !doc->SetPathPlacement(tp, 0.0f, 9.95f, false), far2 = !doc->SetPathPlacement(tp, 0.0f, lenF + 0.1f, false);
+            const bool atEnd = doc->SetPathPlacement(tp, 0.0f, lenF, false) && doc->FindLayer(tp)->pathEnd <= 1.0f &&
+                               (double)doc->FindLayer(tp)->pathEnd * len <= len;
+            const bool zero = doc->SetPathPlacement(tp, lenF, lenF, false) &&
+                              doc->FindLayer(tp)->pathOffset == doc->FindLayer(tp)->pathEnd;
+            const bool flipped = doc->SetPathPlacement(tp, 0.0f, lenF, true) && doc->FindLayer(tp)->pathFlip &&
+                                 doc->FindLayer(tp)->pathOffset == 0.0f;
+            fprintf(stderr, "PROBE path placement: up %d far %d %d end %d zero %d flip %d\n", (int)up, (int)far1, (int)far2,
+                    (int)atEnd, (int)zero, (int)flipped);
+            expect("parity: path placement noninteger line rounding upward and zero capacity",
+                   up && far1 && far2 && atEnd && zero && flipped);
+
+            // The end is written only when set; a file without it loads as "the path's end".
+            Layer* el = doc->FindLayer(tp);
+            el->pathEnd = -1.0f;
+            el->pathFlip = false;
+            doc->Commit();
+            const std::string t0 = doc->DocText();
+            doc->SetPathPlacement(tp, 0.0f, (float)len * 0.5f, false);
+            const std::string t1 = doc->DocText();
+            doc->SetDocText(t0);
+            doc->Layers();
+            const bool old = t0.find("tpend") == std::string::npos && doc->FindLayer(tp)->pathEnd < 0.0f;
+            doc->SetDocText(t1);
+            doc->Layers();
+            const bool kept = t1.find("tpend") != std::string::npos && std::fabs(doc->FindLayer(tp)->pathEnd - 0.5f) < 1e-4f;
+            doc->FindLayer(tp)->pathEnd = -1.0f;
+            doc->Commit();
+            fprintf(stderr, "PROBE path end save: old %d kept %d\n", (int)old, (int)kept);
+            expect("parity: path end is backward compatible", old && kept);
+
+            // A vector mask on type on a path: editing the mask leaves the type path, and the other way round.
+            doc->SetTypePath(tp, { line(150.0f, 10.0f, 150.0f, 110.0f) });
+            el = doc->FindLayer(tp);
+            SN::Shape rect;
+            rect.type = SN::Shape::kPath;
+            rect.closed = true;
+            const float rp[4][2] = { { 10, 10 }, { 200, 10 }, { 200, 100 }, { 10, 100 } };
+            for (const auto& q : rp)
+               for (int k = 0; k < 3; k++)
+                  rect.pts.push_back(q[0]), rect.pts.push_back(q[1]);
+            el->vmask = { rect };
+            el->hasVMask = true;
+            doc->Commit();
+            const std::vector<float> tp0 = doc->FindLayer(tp)->typePath[0].pts;
+            const bool m1 = doc->MovePathAnchor(tp, false, 0, 0, 10.0f, 0.0f) && doc->FindLayer(tp)->vmask[0].pts[0] == 20.0f &&
+                            doc->FindLayer(tp)->typePath[0].pts == tp0;
+            const bool m2 = doc->MovePathAnchor(tp, true, 0, 1, 20.0f, 0.0f) &&
+                            about(doc->FindLayer(tp)->typePath[0].pts[6] - tp0[6], 20.0f) && doc->FindLayer(tp)->vmask[0].pts[0] == 20.0f;
+            fprintf(stderr, "PROBE vmask vs type path: mask %d type %d\n", (int)m1, (int)m2);
+            expect("parity: a vector mask on type on a path is edited not the type path", m1 && m2);
+            el = doc->FindLayer(tp);
+            el->vmask.clear();
+            el->hasVMask = false;
+            doc->SetTypePath(tp, { line(0, 0, 100, 0) });
+         }
          expect("type: release turns type on a path into point text",
                 doc->ReleaseTypePath(tp) && doc->FindLayer(tp)->typeMode == 0 && doc->FindLayer(tp)->typePath.empty());
+         {
+            // Fill Path maps the document path into the text's own space: each anchor, put back through the layer's
+            // transform (turned and scaled here), lands where the document path had it.
+            const int ft = doc->AddTextLayer("words in a box", 100.0f, 100.0f, 0.0f);
+            Layer* fl = doc->FindLayer(ft);
+            fl->angle = 30.0f;
+            fl->sx = fl->sy = 1.5f;
+            doc->Commit();
+            SN::Shape sq;
+            sq.type = SN::Shape::kPath;
+            sq.closed = true;
+            const float sp[4][2] = { { 100, 100 }, { 300, 100 }, { 300, 250 }, { 100, 250 } };
+            for (const auto& q : sp)
+               for (int k = 0; k < 3; k++)
+                  sq.pts.push_back(q[0]), sq.pts.push_back(q[1]);
+            doc->SetWorkPath({ sq });
+            const bool att = doc->AttachTextToPath(ft, SN::kWorkPath, true) == SN::kTypePathOk;
+            fl = doc->FindLayer(ft);
+            int fw = 0, fh = 0;
+            doc->TextSize(*fl, fw, fh);
+            float worst = 0.0f;
+            for (int i = 0; att && i < 4; i++)
+            {
+               float dx, dy;
+               doc->BoxToDoc(*fl, fl->typePath[0].pts[i * 6] + fw * 0.5f, fl->typePath[0].pts[i * 6 + 1] + fh * 0.5f, dx, dy);
+               worst = std::max(worst, std::hypot(dx - sp[i][0], dy - sp[i][1]));
+            }
+            fprintf(stderr, "PROBE fill path text space: attached %d worst %.4f px\n", (int)att, worst);
+            expect("parity: fill path maps the path into text space", att && fl->typeMode == 2 && worst < 0.05f);
+            doc->RemoveLayer(ft);
+         }
          // Inside a closed path (area type): every letter inside, the overflow dropped; Release gives box text the
          // path's width; an open path cannot hold type.
          {
@@ -22730,6 +24570,85 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
                    e3 == SN::kTypePathNoPath);
             doc->RemoveLayer(at);
          }
+         // Paragraph style on box text (PhotoCraft type_cmds set_style_paragraph_and_box): centred with a 20 px leading,
+         // lines 20 px apart, pixels inside the 80 px box; then to point text and a 10 px move.
+         {
+            const int bt = doc->AddTextLayer("one two three four five six seven", W * 0.5f, H * 0.5f, 80.0f);
+            SN::Layer* l = doc->FindLayer(bt);
+            bool ok = l != nullptr;
+            int w20 = 0, h20 = 0, w30 = 0, h30 = 0;
+            if (ok)
+            {
+               l->fontSize = 12.0f;
+               l->align = 1;
+               l->leading = 20.0f / 12.0f;
+               doc->Commit();
+               doc->TextSize(*doc->FindLayer(bt), w20, h20);
+               SN::Layer t = *doc->FindLayer(bt);
+               t.leading = 30.0f / 12.0f;
+               doc->TextSize(t, w30, h30);
+            }
+            const int gaps = (int)std::lround((h30 - h20) / 10.0f);
+            const bool pitch = gaps >= 2 && std::abs((h30 - h20) - gaps * 10) <= 1;
+            // Pixels stay inside the box: rasterize a copy and measure the inked columns.
+            int inkW = 0;
+            PushUndoCheckpoint("Rasterize");
+            std::vector<uint8_t> px;
+            int pw = 0, ph = 0;
+            if (ok && doc->RasterizeLayer(bt) && doc->ReadPaint(bt, px, pw, ph))
+            {
+               int x0 = pw, x1 = -1;
+               for (int y = 0; y < ph; y++)
+                  for (int x = 0; x < pw; x++)
+                     if (px[((size_t)y * pw + x) * 4 + 3] > 0)
+                     {
+                        x0 = std::min(x0, x);
+                        x1 = std::max(x1, x);
+                     }
+               inkW = x1 >= x0 ? x1 - x0 + 1 : 0;
+            }
+            ok = ok && undoBack() && doc->FindLayer(bt)->kind == SN::Kind::Text && doc->FindLayer(bt)->align == 1;
+            const bool toPoint = ok && doc->ConvertTextKind(bt, false) && doc->FindLayer(bt)->boxW == 0.0f;
+            float moved = 0.0f;
+            if (toPoint)
+            {
+               const float x0 = doc->FindLayer(bt)->x;
+               doc->FindLayer(bt)->x += 10.0f;
+               doc->Commit();
+               moved = doc->FindLayer(bt)->x - x0;
+            }
+            fprintf(stderr, "PROBE para box: h20 %d h30 %d gaps %d ink %d point %d moved %.1f\n", h20, h30, gaps, inkW, toPoint, moved);
+            expect("parity: set style paragraph and box", ok && pitch && inkW > 0 && inkW <= 82 && toPoint && moved == 10.0f);
+            doc->RemoveLayer(bt);
+         }
+         // Anti-alias and orientation (PhotoCraft type_extra_cmds tests): each is one undo step; with anti-aliasing off
+         // the glyphs are only fully covered or empty pixels.
+         {
+            const int at = doc->AddTextLayer("Aa", W * 0.5f, H * 0.5f, 0.0f);
+            const int aa0 = doc->FindLayer(at)->aaMode;
+            PushUndoCheckpoint("Anti-alias");
+            doc->FindLayer(at)->aaMode = 2;
+            doc->Commit();
+            PushUndoCheckpoint("Rasterize");
+            bool binary = doc->RasterizeLayer(at);
+            std::vector<uint8_t> px;
+            int pw = 0, ph = 0, solid = 0;
+            binary = binary && doc->ReadPaint(at, px, pw, ph) && !px.empty();
+            for (size_t i = 3; binary && i < px.size(); i += 4)
+            {
+               binary = px[i] == 0 || px[i] == 255;
+               solid += px[i] == 255 ? 1 : 0;
+            }
+            const bool back = undoBack() && doc->FindLayer(at) != nullptr && doc->FindLayer(at)->kind == SN::Kind::Text &&
+                              doc->FindLayer(at)->aaMode == 2;
+            PushUndoCheckpoint("Vertical type");
+            const bool vert = doc->SetVerticalType(at, true);
+            const bool undoV = undoBack() && !doc->FindLayer(at)->vertical;
+            const bool undoA = undoBack() && doc->FindLayer(at)->aaMode == aa0;
+            fprintf(stderr, "PROBE type aa: binary %d solid %d back %d vert %d undoV %d undoA %d\n", binary, solid, back, vert, undoV, undoA);
+            expect("parity: anti alias and orientation are one step each", binary && solid > 0 && back && vert && undoV && undoA);
+            doc->RemoveLayer(at);
+         }
          // Vertical type: two letters stack into a column taller than wide; one undo step each way.
          {
             const int vt = doc->AddTextLayer("AB", W * 0.5f, H * 0.5f, 0.0f);
@@ -22747,6 +24666,14 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             doc->TextSize(*doc->FindLayer(vt), wa, ha);
             expect("type: warp style on type is warp text", warped && ha > h0 + 2 && doc->FindLayer(vt)->warpStyle == 1);
             expect("type: a bad warp style is refused", !doc->SetWarpText(vt, SN::kWarpStyleCount, 50.0f, 0.0f, 0.0f, false));
+            {
+               // PhotoCraft: Warp Text has no cylinder; the cylinder needs its own values, so a type layer refuses it.
+               const int before = doc->FindLayer(vt)->warpStyle;
+               const bool cyl = doc->SetWarpText(vt, SN::kWarpStyleCount - 1, 50.0f, 0.0f, 0.0f, false);
+               std::fprintf(stderr, "PROBE cylinder style: refused=%d style kept=%d\n", (int)!cyl, doc->FindLayer(vt)->warpStyle);
+               expect("parity: cylinder style needs its values", !cyl && doc->FindLayer(vt)->warpStyle == before &&
+                                                                     std::string(SN::WarpStyleName(SN::kWarpStyleCount - 1)) == "Cylinder");
+            }
             expect("type: warp text undoes", undoBack() && doc->FindLayer(vt)->warpStyle == 0);
             doc->RemoveLayer(vt);
          }
@@ -22891,10 +24818,575 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             std::copy(fg0, fg0 + 3, sFg);
             br.protectFg = false;
          }
+         // Contiguous (PhotoCraft contiguous_and_protect_foreground): a blue wall shields a green island; one click with
+         // Contiguous on leaves the island, off it goes; protecting the sampled green erases nothing.
+         {
+            const float blue[3] = { 0.0f, 0.0f, 1.0f }, fg0[3] = { sFg[0], sFg[1], sFg[2] };
+            auto click = [&](bool contiguous, bool protect, uint8_t at[3]) -> bool
+            {
+               const int q = doc->AddPaintLayer();
+               doc->SelectAll();
+               doc->FillPixels(q, green, 1.0f);
+               doc->SelectRect(430.0f, 0.0f, 440.0f, (float)H, Scene2DNode::kSelNew, 0.0f, false);
+               doc->FillPixels(q, blue, 1.0f);
+               doc->Deselect();
+               doc->Commit();
+               SelectOnly(q);
+               br.size = 120.0f;
+               br.keyTolerance = 0.05f;
+               br.bgContiguous = contiguous;
+               br.protectFg = protect;
+               std::copy(green, green + 3, sFg);
+               sHaveLast = false;
+               BeginStroke(doc, ImVec2(400.0f, yy), false);
+               const bool on = doc->Painting();
+               if (on)
+                  EndStroke(doc);
+               doc->Commit();
+               uint8_t c[4] = {};
+               at[0] = on && pixel({ q }, 400, H / 2, c) ? c[3] : 255;
+               at[1] = on && pixel({ q }, 435, H / 2, c) ? c[3] : 0;
+               at[2] = on && pixel({ q }, 450, H / 2, c) ? c[3] : 0;
+               doc->RemoveLayer(q);
+               doc->Commit();
+               return on;
+            };
+            uint8_t cont[3], dis[3], prot[3];
+            const bool ok = click(true, false, cont) && click(false, false, dis) && click(true, true, prot);
+            if (!ok || cont[0] > 10 || cont[2] != 255 || dis[2] > 10 || prot[0] != 255)
+               fprintf(stderr, "PROBE bg contiguous: ok %d cont %d %d %d dis %d %d %d prot %d %d %d\n", ok, cont[0], cont[1], cont[2], dis[0],
+                       dis[1], dis[2], prot[0], prot[1], prot[2]);
+            expect("parity: contiguous and protect foreground", ok && cont[0] <= 10 && cont[1] == 255 && cont[2] == 255 && dis[0] <= 10 &&
+                                                                 dis[1] == 255 && dis[2] <= 10 && prot[0] == 255 && prot[2] == 255);
+            br.bgContiguous = br.protectFg = false;
+            std::copy(fg0, fg0 + 3, sFg);
+         }
+         // Protect Foreground narrows the tolerance to the foreground (PhotoCraft protection_narrows_...): eight blocks
+         // 20 levels apart in red; the key is block 0; one dab on each block. Protected at tolerance 0.5 with the
+         // foreground at block fg erases what an unprotected dab at tolerance = the key-to-foreground distance erases,
+         // and keeps block fg and beyond.
+         {
+            const int q = doc->AddPaintLayer();
+            auto blockCol = [](int i, float c[3]) { c[0] = (40.0f + 20.0f * i) / 255.0f; c[1] = c[2] = 0.2f; };
+            auto paintBlocks = [&]()
+            {
+               for (int i = 0; i < 8; i++)
+               {
+                  float c[3];
+                  blockCol(i, c);
+                  doc->SelectRect(100.0f * i, 0.0f, 100.0f * (i + 1), (float)H, Scene2DNode::kSelNew, 0.0f, false);
+                  doc->FillPixels(q, c, 1.0f);
+               }
+               doc->Deselect();
+               doc->Commit();
+            };
+            auto dabs = [&](int fg, bool protect, float tol, int out[8])
+            {
+               for (int i = 0; i < 8; i++)
+               {
+                  paintBlocks();
+                  BrushEngine::Brush b = br;
+                  b.mode = BrushEngine::kBgErase;
+                  b.size = 40.0f;
+                  b.hardness = 1.0f;
+                  b.keyTolerance = tol;
+                  b.protectFg = protect;
+                  b.bgContiguous = false;
+                  blockCol(0, b.key);
+                  blockCol(fg, b.color);
+                  const float x = 100.0f * i + 50.0f;
+                  out[i] = -1;
+                  if (doc->BeginPaint(q, 0, b, x, yy, 1.0f))
+                  {
+                     doc->EndPaint();
+                     doc->Commit();
+                     uint8_t c[4] = {};
+                     out[i] = pixel({ q }, (int)x, H / 2, c) ? c[3] : -1;
+                  }
+               }
+            };
+            bool same = true;
+            for (int fg : { 1, 3, 5 })
+            {
+               int pr[8], nr[8];
+               dabs(fg, true, 0.5f, pr);
+               dabs(fg, false, 20.0f * fg / 255.0f / 1.7320508f, nr);   // the shader scales the tolerance by sqrt 3
+               for (int i = 0; i < 8; i++)
+               {
+                  const bool good = i < fg ? std::abs(pr[i] - nr[i]) <= 1 && pr[i] >= 0 : pr[i] == 255;
+                  if (!good)
+                     fprintf(stderr, "PROBE bg narrow: fg %d block %d protected %d narrowed %d\n", fg, i, pr[i], nr[i]);
+                  same = same && good;
+               }
+            }
+            expect("parity: protection narrows the tolerance to the foreground in one dab", same);
+            doc->RemoveLayer(q);
+            doc->Commit();
+         }
          br = br0;
          sTool = tool0;
          doc->RemoveLayer(p);
          doc->Commit();
+         sSel.clear();
+      }
+      // Image Size with a resolution and the Crop tool's target (PhotoCraft image_cmds tests): a resolution alone keeps
+      // the pixels, Keep print size resamples, a side given wins; type keeps its pixel size so it scales with the
+      // pixels only and area type wraps where it did; a crop to W x H x resolution is one call, also after a turn.
+      {
+         const std::string keep = doc->DocText();
+         auto restore = [&]() { doc->SetDocText(keep); doc->Commit(); doc->Layers(); };
+         auto readAt = [&](const std::vector<int>& set, int x, int y, uint8_t out[4])
+         {
+            std::vector<uint8_t> v;
+            const int DW = doc->Doc().w, DH = doc->Doc().h;
+            if (x < 0 || y < 0 || x >= DW || y >= DH || !doc->RenderSet(set, ++sParFrame, v) || v.size() < (size_t)DW * DH * 4)
+               return false;
+            std::copy_n(&v[((size_t)y * DW + x) * 4], 4, out);
+            return true;
+         };
+         auto ink = [&](int id, int& iw, int& ih)
+         {
+            std::vector<uint8_t> v;
+            const int DW = doc->Doc().w, DH = doc->Doc().h;
+            if (!doc->RenderSet({ id }, ++sParFrame, v) || v.size() < (size_t)DW * DH * 4)
+               return false;
+            int x0 = DW, y0 = DH, x1 = -1, y1 = -1;
+            for (int y = 0; y < DH; y++)
+               for (int x = 0; x < DW; x++)
+                  if (v[((size_t)y * DW + x) * 4 + 3] > 0)
+                  {
+                     x0 = std::min(x0, x); x1 = std::max(x1, x);
+                     y0 = std::min(y0, y); y1 = std::max(y1, y);
+                  }
+            iw = x1 - x0 + 1;
+            ih = y1 - y0 + 1;
+            return x1 >= 0;
+         };
+         doc->ImageSizeDpi(4 * W, 0, 300.0f, false);
+         const bool sideWins = doc->Doc().w == 4 * W && doc->Doc().h == 4 * H;
+         restore();
+         doc->ImageSizeDpi(0, 0, 300.0f, false);
+         const bool resOnly = doc->Doc().w == W && doc->Doc().h == H && doc->Doc().dpi == 300.0f;
+         expect("parity: resolution only change", resOnly);
+         restore();
+         doc->ImageSizeDpi(0, 0, 144.0f, false);
+         const bool p1 = doc->Doc().w == W && doc->Doc().h == H && doc->Doc().dpi == 144.0f;
+         doc->ImageSizeDpi(0, 0, 288.0f, true);
+         const bool p2 = doc->Doc().w == 2 * W && doc->Doc().h == 2 * H && doc->Doc().dpi == 288.0f &&
+                         doc->DocText().find("\ndpi 288\n") != std::string::npos;
+         doc->ImageSizeDpi(W, 0, 72.0f, true);
+         const bool p3 = doc->Doc().w == W && doc->Doc().h == H && doc->Doc().dpi == 72.0f;
+         if (!(p1 && p2 && p3 && sideWins))
+            fprintf(stderr, "PROBE image dpi: %d %d %d side %d now %d x %d @ %.0f\n", p1, p2, p3, sideWins, doc->Doc().w, doc->Doc().h, doc->Doc().dpi);
+         expect("parity: image size keep print size resamples to the resolution", p1 && p2 && p3 && sideWins);
+         restore();
+         // Type: twice the pixels at twice the ppi is twice as tall (not 4x); with the pixels kept it stays.
+         {
+            bool typeOk = true;
+            for (int k : { 2, 1 })
+            {
+               const int t = doc->AddTextLayer("Hi", 10.0f, 50.0f, 0.0f);
+               doc->Commit();
+               int w0 = 0, h0 = 0, w1 = 0, h1 = 0;
+               const bool a = ink(t, w0, h0) && h0 > 4;
+               if (k == 2)
+                  doc->ImageSizeDpi(2 * W, 2 * H, 144.0f, false);
+               else
+                  doc->ImageSizeDpi(0, 0, 144.0f, false);
+               const bool b = a && ink(t, w1, h1) && std::abs(h1 - h0 * k) <= 2;
+               if (!b)
+                  fprintf(stderr, "PROBE type dpi: k %d h %d -> %d\n", k, h0, h1);
+               typeOk = typeOk && b;
+               restore();
+            }
+            expect("parity: image size with a new resolution scales type with the pixels only", typeOk);
+         }
+         // Area type: the same words on the same lines, so the block scales by the pixel factor alone.
+         {
+            bool areaOk = true;
+            for (int k : { 1, 2 })
+            {
+               const int t = doc->AddTextLayer("The quick brown fox jumps over the lazy dog and keeps on running far", 50.0f, 50.0f, 200.0f);
+               doc->Commit();
+               int w0 = 0, h0 = 0, w1 = 0, h1 = 0;
+               const bool a = ink(t, w0, h0) && h0 > 20;
+               if (k == 2)
+                  doc->ImageSizeDpi(2 * W, 2 * H, 144.0f, false);
+               else
+                  doc->ImageSizeDpi(0, 0, 144.0f, false);
+               const bool b = a && ink(t, w1, h1) && std::abs(w1 - w0 * k) <= 3 && std::abs(h1 - h0 * k) <= 3;
+               if (!b)
+                  fprintf(stderr, "PROBE area dpi: k %d %d x %d -> %d x %d\n", k, w0, h0, w1, h1);
+               areaOk = areaOk && b;
+               restore();
+            }
+            expect("parity: a resolution change keeps area type wrapping where it was", areaOk);
+         }
+         // A 1 px checkerboard: Nearest halving keeps only source values; a smooth 8x reduction is its even average,
+         // not aliased black and white (PhotoCraft nearest_neighbor_reduction..., large_downscale_is_prefiltered).
+         {
+            auto checker = [&]() -> int
+            {
+               const int q = doc->AddPaintLayer();
+               const float blk[3] = { 0.0f, 0.0f, 0.0f }, wht[3] = { 1.0f, 1.0f, 1.0f };
+               doc->SelectAll();
+               doc->FillPixels(q, blk, 1.0f);
+               std::vector<uint8_t> region((size_t)W * H, 0);
+               for (int y = 0; y < H; y++)
+                  for (int x = 0; x < W; x++)
+                     region[(size_t)y * W + x] = (x + y) % 2 == 0 ? 255 : 0;
+               doc->CombineSelection(region, Scene2DNode::kSelNew);
+               doc->FillPixels(q, wht, 1.0f);
+               doc->Deselect();
+               doc->Commit();
+               return q;
+            };
+            int q = checker();
+            doc->ImageSizeDpi(W / 2, H / 2, 0.0f, false, true);
+            bool pure = doc->Doc().w == W / 2;
+            {
+               std::vector<uint8_t> v;
+               const int DW = doc->Doc().w, DH = doc->Doc().h;
+               pure = pure && doc->RenderSet({ q }, ++sParFrame, v) && v.size() >= (size_t)DW * DH * 4;
+               for (int y = DH / 4; pure && y < DH * 3 / 4; y += 7)
+                  for (int x = DW / 4; x < DW * 3 / 4; x += 5)
+                  {
+                     const int c = v[((size_t)y * DW + x) * 4];
+                     pure = pure && (c <= 2 || c >= 253);
+                  }
+            }
+            expect("parity: nearest neighbor reduction keeps source values", pure);
+            restore();
+            q = checker();
+            doc->ImageSizeDpi(W / 8, H / 8, 0.0f, false, false);
+            int lo = 255, hi = 0;
+            {
+               std::vector<uint8_t> v;
+               const int DW = doc->Doc().w, DH = doc->Doc().h;
+               if (doc->RenderSet({ q }, ++sParFrame, v) && v.size() >= (size_t)DW * DH * 4)
+                  for (int y = DH / 4; y < DH * 3 / 4; y++)
+                     for (int x = DW / 4; x < DW * 3 / 4; x++)
+                     {
+                        const int c = v[((size_t)y * DW + x) * 4];
+                        lo = std::min(lo, c);
+                        hi = std::max(hi, c);
+                     }
+            }
+            if (hi - lo >= 40 || lo < 90 || hi > 210)
+               fprintf(stderr, "PROBE prefilter: lo %d hi %d\n", lo, hi);
+            expect("parity: large downscale is prefiltered", hi >= lo && hi - lo < 40 && lo >= 90 && hi <= 210);
+            restore();
+         }
+         // Crop to 1200 x 1500 at 300 ppi from a 100 x 125 frame: the red frame fills the result.
+         {
+            const int q = doc->AddPaintLayer();
+            doc->SelectRect(100.0f, 100.0f, 200.0f, 225.0f, Scene2DNode::kSelNew, 0.0f, false);
+            doc->FillPixels(q, red, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+            doc->CropToTarget(100.0f, 100.0f, 200.0f, 225.0f, 0.0f, 1200, 1500, 300.0f);
+            bool filled = doc->Doc().w == 1200 && doc->Doc().h == 1500 && doc->Doc().dpi == 300.0f;
+            const int spots[3][2] = { { 0, 0 }, { 600, 750 }, { 1199, 1499 } };
+            for (const auto& xy : spots)
+            {
+               uint8_t c[4] = {};
+               const bool got = readAt({ q }, xy[0], xy[1], c);
+               if (!got || c[0] != 255 || c[1] != 0 || c[2] != 0 || c[3] != 255)
+                  fprintf(stderr, "PROBE crop target at %d,%d: got %d %d %d %d %d\n", xy[0], xy[1], (int)got, c[0], c[1], c[2], c[3]);
+               filled = filled && got && c[0] == 255 && c[1] == 0 && c[2] == 0 && c[3] == 255;
+            }
+            if (!filled)
+               fprintf(stderr, "PROBE crop target: %d x %d @ %.0f\n", doc->Doc().w, doc->Doc().h, doc->Doc().dpi);
+            expect("parity: crop to a target size and resolution is one step", filled);
+            restore();
+            doc->CropToTarget(10.0f, 0.0f, 20.0f, 20.0f, 90.0f, 30, 60, 0.0f);
+            const bool turned = doc->Doc().w == 30 && doc->Doc().h == 60;
+            restore();
+            doc->CropToTarget(2.0f, 3.0f, 32.0f, 13.0f, 0.0f, 0, 0, 150.0f);
+            const bool resAlone = doc->Doc().w == 30 && doc->Doc().h == 10 && doc->Doc().dpi == 150.0f;
+            if (!turned || !resAlone)
+               fprintf(stderr, "PROBE crop target turned %d res %d\n", turned, resAlone);
+            expect("parity: crop target resamples after a turned crop and resolution alone keeps the pixels", turned && resAlone);
+            restore();
+         }
+         // Crop Fill: Content-Aware (PhotoCraft crop_fill): 8-connected pieces with their bounds, exact unrotated
+         // coverage, and a crop past the canvas whose added strip is rebuilt from the green beside it.
+         {
+            const uint32_t u = Scene2DNode::kUnlabelled;
+            std::vector<uint32_t> l = { u, 0, 0, 0, 0, u, 0, u, 0, 0, 0, u, 0, 0, 0, 0, 0, 0, 0, 0, 0, u, u, 0 };
+            const auto pieces = Scene2DNode::LabelComponents(l, 6, 4);
+            const bool comps = pieces.size() == 3 && pieces[0] == std::array<int, 4> { 0, 0, 2, 2 } &&
+                               pieces[1] == std::array<int, 4> { 5, 0, 6, 2 } && pieces[2] == std::array<int, 4> { 3, 3, 5, 4 } &&
+                               l[7] == 1 && l[11] == 2 && l[22] == 3;
+            if (!comps)
+               fprintf(stderr, "PROBE crop fill components: %zu pieces l7 %u l11 %u l22 %u\n", pieces.size(), l[7], l[11], l[22]);
+            expect("parity: components are 8 connected with their bounds", comps);
+            const double m[6] = { 1, 0, 0, 1, -2, 0 };
+            const double mg = Scene2DNode::CropMargin(m, false);
+            const bool cover = !Scene2DNode::CropCovered(m, 5, 4, 1, 0, mg) && Scene2DNode::CropCovered(m, 5, 4, 2, 0, mg) &&
+                               Scene2DNode::CropCovered(m, 5, 4, 6, 0, mg) && !Scene2DNode::CropCovered(m, 5, 4, 7, 0, mg);
+            expect("parity: unrotated coverage is exact", cover);
+            const float grn[3] = { 0.1f, 0.7f, 0.2f };
+            const int q = doc->AddPaintLayer();
+            doc->SelectAll();
+            doc->FillPixels(q, grn, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+            const int W0 = doc->Doc().w, H0 = doc->Doc().h;
+            const int f = doc->CropContentAware(q, 0.0f, 0.0f, (float)W0 + 40.0f, (float)H0, 0.0f);
+            int filled = 0, bad = 0;
+            {
+               std::vector<uint8_t> v;
+               const int DW = doc->Doc().w, DH = doc->Doc().h;
+               if (f > 0 && doc->RenderSet({ f }, ++sParFrame, v) && v.size() >= (size_t)DW * DH * 4)
+                  for (int y = 4; y < DH - 4; y += 9)
+                     for (int x = W0 + 2; x < DW - 2; x += 5)
+                     {
+                        const uint8_t* c = &v[((size_t)y * DW + x) * 4];
+                        filled++;
+                        if (c[3] < 250 || std::abs(c[1] - 178) > 12 || c[0] > 40)
+                           bad++;
+                     }
+            }
+            if (f <= 0 || filled == 0 || bad > 0)
+               fprintf(stderr, "PROBE crop fill: layer %d doc %dx%d sampled %d bad %d\n", f, doc->Doc().w, doc->Doc().h, filled, bad);
+            expect("crop fill rebuilds an added strip from beside it", f > 0 && doc->Doc().w == W0 + 40 && filled > 0 && bad == 0);
+            restore();
+         }
+         // Crop and Straighten Photos (PhotoCraft finds_rotated_photos_in_reading_order): three turned, textured photos on
+         // a near-white scan come back in reading order with their turn, centre and sides; a blank scan finds none.
+         {
+            struct P { double cx, cy, w, h, a; };
+            const P truth[3] = { { 150, 120, 180, 120, 7 }, { 450, 130, 160, 130, -12 }, { 300, 330, 220, 110, 3 } };
+            const int SW = 600, SH = 440;
+            auto scan = [&](bool blank) {
+               std::vector<uint8_t> v((size_t)SW * SH * 4);
+               for (int y = 0; y < SH; y++)
+                  for (int x = 0; x < SW; x++)
+                  {
+                     float c[3] = { blank ? 1.0f : 0.97f, blank ? 1.0f : 0.97f, blank ? 1.0f : 0.96f };
+                     for (int k = 0; k < 3 && !blank; k++)
+                     {
+                        const double r = truth[k].a * 3.14159265358979 / 180.0, sn = std::sin(r), cs = std::cos(r);
+                        const double dx = x + 0.5 - truth[k].cx, dy = y + 0.5 - truth[k].cy;
+                        const double u = cs * dx + sn * dy, w = -sn * dx + cs * dy;
+                        if (std::fabs(u) < truth[k].w / 2 && std::fabs(w) < truth[k].h / 2)
+                        {
+                           const float t = (float)(std::sin(u * 0.05) * std::cos(w * 0.07));
+                           c[0] = 0.3f + 0.2f * t, c[1] = 0.2f + 0.1f * k, c[2] = 0.5f - 0.2f * t;
+                        }
+                     }
+                     uint8_t* o = &v[((size_t)y * SW + x) * 4];
+                     for (int ch = 0; ch < 3; ch++)
+                        o[ch] = (uint8_t)std::lround(std::clamp(c[ch], 0.0f, 1.0f) * 255.0f);
+                     o[3] = 255;
+                  }
+               return v;
+            };
+            const std::vector<uint8_t> sv = scan(false);
+            const auto found = Scene2DNode::FindPhotos(SW, SH, sv);
+            bool ok = found.size() == 3;
+            for (size_t k = 0; ok && k < 3; k++)
+            {
+               const auto& f = found[k];
+               const P& t = truth[k];
+               if (std::fabs(f.angle - t.a) >= 1.0 || std::fabs(f.cx - t.cx) >= 3.0 || std::fabs(f.cy - t.cy) >= 3.0 ||
+                   std::fabs(f.w - t.w) >= 6.0 || std::fabs(f.h - t.h) >= 6.0)
+               {
+                  fprintf(stderr, "PROBE find photos %zu: c %.1f,%.1f size %.1f x %.1f angle %.2f\n", k, f.cx, f.cy, f.w, f.h, f.angle);
+                  ok = false;
+               }
+            }
+            const bool none = Scene2DNode::FindPhotos(SW, SH, scan(true)).empty();
+            if (!ok || !none)
+               fprintf(stderr, "PROBE find photos: found %zu blank-empty %d\n", found.size(), (int)none);
+            expect("parity: finds rotated photos in reading order", ok && none);
+            // In the document: a scan layer gives three upright photo layers.
+            if (doc->Doc().w >= SW && doc->Doc().h >= SH)
+            {
+               const int sc = doc->AddFileLayer(0, "Scan", 0, 0, SW, SH, sv);
+               doc->Commit();
+               const size_t n0 = doc->Layers().size();
+               const int made = doc->StraightenPhotos(sc);
+               const bool layers = made == 3 && doc->Layers().size() == n0 + 3;
+               if (!layers)
+                  fprintf(stderr, "PROBE straighten photos: made %d layers %zu -> %zu\n", made, n0, doc->Layers().size());
+               expect("crop and straighten photos makes one upright layer a photo", layers);
+               restore();
+            }
+         }
+      }
+      // Pencil (PhotoCraft pencil_is_aliased_and_auto_erases, live_pencil_matches_the_committed_pencil_and_auto_erases):
+      // every pixel is fully on or off; with Auto erase a stroke starting on the foreground paints the background colour,
+      // live as it will be committed, and one starting elsewhere paints the foreground.
+      {
+         const int tool0 = sTool;
+         const float fg0[3] = { sFg[0], sFg[1], sFg[2] }, bg0[3] = { sBg[0], sBg[1], sBg[2] };
+         const int q = doc->AddPaintLayer();
+         doc->Commit();
+         SelectOnly(q);
+         sTool = kBrush;
+         BrushEngine::Brush& br = ToolBrush();
+         const BrushEngine::Brush br0 = br;
+         br.size = 5.0f;
+         br.opacity = br.flow = 1.0f;
+         br.pressureSize = br.pressureOpacity = false;
+         br.pencil = true;
+         br.autoErase = false;
+         sFg[0] = sFg[1] = sFg[2] = 0.0f;
+         sBg[0] = sBg[1] = sBg[2] = 1.0f;
+         const float yy = (float)(H / 2) + 0.3f;
+         auto stroke = [&](float x0, float y0, float x1, float y1, uint8_t* live, int lx, int ly)
+         {
+            sHaveLast = false;
+            BeginStroke(doc, ImVec2(x0, y0), false);
+            const bool on = doc->Painting();
+            for (int i = 1; i <= 16 && on; i++)
+               doc->PaintTo(x0 + (x1 - x0) * i / 16.0f, y0 + (y1 - y0) * i / 16.0f, 1.0f);
+            if (live != nullptr && !(on && pixel({ q }, lx, ly, live)))
+               live[3] = 0;
+            if (on)
+               EndStroke(doc);
+            doc->Commit();
+            return on;
+         };
+         bool aliased = stroke(100.0f, yy, 300.0f, yy, nullptr, 0, 0);
+         std::vector<uint8_t> rgba;
+         int partial = 0, inked = 0;
+         if (aliased && doc->RenderSet({ q }, ++sParFrame, rgba) && rgba.size() >= (size_t)W * H * 4)
+            for (int y = H / 2 - 8; y <= H / 2 + 8; y++)
+               for (int x = 90; x <= 310; x++)
+               {
+                  const uint8_t a = rgba[((size_t)y * W + x) * 4 + 3];
+                  partial += a != 0 && a != 255;
+                  inked += a == 255;
+               }
+         br.autoErase = true;
+         uint8_t live[4] = {}, done[4] = {}, other[4] = {};
+         const bool s1 = stroke(200.0f, yy, 200.0f, yy + 60.0f, live, 200, H / 2 + 40);
+         const bool got1 = pixel({ q }, 200, H / 2 + 40, done);
+         const bool s2 = stroke(400.0f, yy + 60.0f, 400.0f, yy + 80.0f, nullptr, 0, 0);
+         const bool got2 = pixel({ q }, 400, H / 2 + 70, other);
+         const bool white = got1 && done[0] == 255 && done[1] == 255 && done[2] == 255 && done[3] == 255;
+         const bool black = got2 && other[0] == 0 && other[1] == 0 && other[2] == 0 && other[3] == 255;
+         if (partial != 0 || inked == 0 || !white || !black || std::memcmp(live, done, 4) != 0)
+            fprintf(stderr, "PROBE pencil: partial %d inked %d done %d %d %d %d live %d %d %d %d other %d %d %d %d\n", partial, inked, done[0],
+                    done[1], done[2], done[3], live[0], live[1], live[2], live[3], other[0], other[1], other[2], other[3]);
+         expect("parity: pencil is aliased and auto erases", aliased && partial == 0 && inked > 0 && s1 && s2 && white && black);
+         expect("parity: live pencil matches the committed pencil and auto erases", s1 && white && std::memcmp(live, done, 4) == 0);
+         br = br0;
+         sTool = tool0;
+         std::copy(fg0, fg0 + 3, sFg);
+         std::copy(bg0, bg0 + 3, sBg);
+         doc->RemoveLayer(q);
+         doc->Commit();
+         sSel.clear();
+      }
+      // Colour Replace with Hard edge (PhotoCraft replace_anti_alias_tests, Anti-alias off = Hard edge): red with a white
+      // gap 20..40 px below an 80 px click; the row above the gap is fully replaced and the gap stays white either way;
+      // a soft tip with Hard edge on replaces fully over the reach the soft tip has, which keeps its falloff.
+      {
+         const int tool0 = sTool;
+         const float fg0[3] = { sFg[0], sFg[1], sFg[2] };
+         const float rd[3] = { 220.0f / 255.0f, 30.0f / 255.0f, 30.0f / 255.0f }, white[3] = { 1.0f, 1.0f, 1.0f };
+         const int cx = 400, cy = H / 2;
+         sTool = kColourReplace;
+         BrushEngine::Brush& br = ToolBrush();
+         const BrushEngine::Brush br0 = br;
+         sFg[0] = sFg[1] = 0.0f;
+         sFg[2] = 1.0f;
+         auto click = [&](bool hard, float hardness, std::vector<uint8_t>& out) -> bool
+         {
+            const int q = doc->AddPaintLayer();
+            doc->SelectAll();
+            doc->FillPixels(q, rd, 1.0f);
+            doc->SelectRect(0.0f, (float)(cy + 20), (float)W, (float)(cy + 40), Scene2DNode::kSelNew, 0.0f, false);
+            doc->FillPixels(q, white, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+            SelectOnly(q);
+            br.size = 80.0f;
+            br.hardness = hardness;
+            br.spacing = 0.25f;
+            br.opacity = br.flow = 1.0f;
+            br.pressureSize = br.pressureOpacity = false;
+            br.keyTolerance = 0.3f;
+            br.pencil = hard;
+            sHaveLast = false;
+            BeginStroke(doc, ImVec2((float)cx, (float)cy), false);
+            const bool on = doc->Painting();
+            if (on)
+               EndStroke(doc);
+            doc->Commit();
+            const bool got = on && doc->RenderSet({ q }, ++sParFrame, out) && out.size() >= (size_t)W * H * 4;
+            doc->RemoveLayer(q);
+            doc->Commit();
+            return got;
+         };
+         auto at = [&](const std::vector<uint8_t>& v, int x, int y, int c) { return (int)v[((size_t)y * W + x) * 4 + c]; };
+         auto isRed = [&](const std::vector<uint8_t>& v, int x, int y)
+         {
+            return std::abs(at(v, x, y, 0) - 220) <= 1 && std::abs(at(v, x, y, 1) - 30) <= 1 && std::abs(at(v, x, y, 2) - 30) <= 1;
+         };
+         auto isWhite = [&](const std::vector<uint8_t>& v, int x, int y)
+         {
+            return at(v, x, y, 0) == 255 && at(v, x, y, 1) == 255 && at(v, x, y, 2) == 255;
+         };
+         std::vector<uint8_t> ref;
+         const bool okRef = click(true, 1.0f, ref);
+         int full[3] = { 0, 0, 0 };
+         for (int c = 0; c < 3 && okRef; c++)
+            full[c] = at(ref, cx, cy, c);
+         auto isFull = [&](const std::vector<uint8_t>& v, int x, int y)
+         {
+            return std::abs(at(v, x, y, 0) - full[0]) <= 3 && std::abs(at(v, x, y, 1) - full[1]) <= 3 && std::abs(at(v, x, y, 2) - full[2]) <= 3;
+         };
+         bool boundary = okRef && !isRed(ref, cx, cy);
+         for (bool hard : { false, true })
+         {
+            std::vector<uint8_t> v;
+            const bool ok = click(hard, 1.0f, v) && isFull(v, cx, cy + 19) && isWhite(v, cx, cy + 20);
+            if (!ok)
+               fprintf(stderr, "PROBE replace boundary: hard %d\n", hard ? 1 : 0);
+            boundary = boundary && ok;
+         }
+         expect("parity: a colour boundary stays hard either way", boundary);
+         bool soft = okRef;
+         for (float hardness : { 0.0f, 0.5f })
+         {
+            std::vector<uint8_t> on, off;
+            if (!click(false, hardness, on) || !click(true, hardness, off))
+            {
+               soft = false;
+               continue;
+            }
+            int partialOn = 0, bad = 0, reach = 0;
+            for (int y = cy - 50; y <= cy + 50; y++)
+               for (int x = cx - 50; x <= cx + 50; x++)
+               {
+                  if (y >= cy + 20 && y < cy + 40)
+                  {
+                     bad += !isWhite(on, x, y) || !isWhite(off, x, y);
+                     continue;
+                  }
+                  bad += !isRed(off, x, y) && !isFull(off, x, y);
+                  // The reach: the soft tip's outermost pixels may round to nothing (a weight under one 8-bit level in
+                  // the outer tenth of a hardness-0 tip), so there Hard edge may replace what anti alias leaves red;
+                  // past the tip, or the other way round, nothing is let off.
+                  const float r = std::sqrt((x + 0.5f - cx) * (x + 0.5f - cx) + (y + 0.5f - cy) * (y + 0.5f - cy));
+                  const bool rimRounds = isRed(on, x, y) && r > 36.0f && r < 41.5f;
+                  if (isRed(on, x, y) != isRed(off, x, y) && !rimRounds && std::fabs(r - 40.0f) > 1.5f)
+                     reach++;
+                  partialOn += !isRed(on, x, y) && !isFull(on, x, y);
+               }
+            if (bad != 0 || reach != 0 || partialOn == 0)
+               fprintf(stderr, "PROBE replace soft: hardness %.1f bad %d reach %d partial %d\n", hardness, bad, reach, partialOn);
+            soft = soft && bad == 0 && reach == 0 && partialOn > 0;
+         }
+         expect("parity: a soft tip with anti alias off replaces fully over the same reach", soft);
+         br = br0;
+         sTool = tool0;
+         std::copy(fg0, fg0 + 3, sFg);
          sSel.clear();
       }
       // Bug 15: copy names, the pixel lock, text names, Duplicate Document, Group from Layers.
@@ -22932,6 +25424,550 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             doc->RemoveLayer(gid);
          doc->Commit();
          sSel.clear();
+      }
+      {
+         // Group from Layers takes the dialog's options in one step; No Color leaves the layers' own colours; undo removes
+         // it and redo brings it back closed. Ctrl+G with a colour labels the group and every layer in it.
+         const int a = doc->AddPaintLayer(), b = doc->AddPaintLayer();
+         doc->FindLayer(a)->label = 1;
+         doc->Commit();
+         sSel = { a, b };
+         const size_t u = gUndoStack.size();
+         Scene2DNode::GroupOptions o;
+         o.name = "Pair";
+         o.label = 0;
+         o.blend = 0;
+         o.opacity = 0.5f;
+         const int g = GroupFromLayers(doc, o);
+         const Layer* gl = doc->FindLayer(g);
+         const bool opts = gl != nullptr && gl->name == "Pair" && gl->blend == 0 && gl->opacity == 0.5f && gl->label == 0 && !gl->open &&
+                           doc->FindLayer(a)->label == 1 && gUndoStack.size() == u + 1 && gUndoStack.back().label == "Group from Layers";
+         Undo();
+         doc = FindDoc();
+         doc->Layers();
+         const bool undone = doc->FindLayer(g) == nullptr;
+         Redo();
+         doc = FindDoc();
+         doc->Layers();
+         const bool redone = doc->FindLayer(g) != nullptr && !doc->FindLayer(g)->open;
+         Undo();
+         doc = FindDoc();
+         doc->Layers();
+         Scene2DNode::GroupOptions c;
+         c.label = 4;
+         c.labelLayers = true;
+         sSel = { a, b };
+         const int g2 = GroupFromLayers(doc, c);
+         const bool green = g2 != 0 && doc->FindLayer(g2)->label == 4 && doc->FindLayer(a)->label == 4 && doc->FindLayer(b)->label == 4 &&
+                            !doc->FindLayer(g2)->open;
+         fprintf(stderr, "PROBE group options: opts %d undo %d redo %d colour %d\n", (int)opts, (int)undone, (int)redone, (int)green);
+         expect("parity: group from layers is collapsed and takes the dialog options", opts && undone && redone && green);
+         for (int id : { g2, a, b })
+            if (doc->FindLayer(id) != nullptr)
+               doc->RemoveLayer(id);
+         doc->Commit();
+         sSel.clear();
+      }
+      {
+         // Group nesting cap: wrapping a layer kMaxGroupDepth times is allowed, once more is refused with no history step;
+         // inside the innermost group a plain layer still fits, but a new group, a pasted group or a moved group goes
+         // beside it (or stays put) so the document never nests deeper.
+         using N = Scene2DNode;
+         const int a = doc->AddPaintLayer();
+         int outer = a, innermost = 0;
+         for (int i = 0; i < N::kMaxGroupDepth; i++)
+         {
+            outer = doc->GroupLayers({ outer });
+            if (i == 0)
+               innermost = outer;
+         }
+         const bool full = outer != 0 && doc->MaxGroupDepth() == N::kMaxGroupDepth;
+         const bool refused = !doc->CanGroup({ outer }) && doc->GroupLayers({ outer }) == 0 && doc->MaxGroupDepth() == N::kMaxGroupDepth;
+         sSel = { outer };
+         const size_t u = gUndoStack.size();
+         sPending.what = Pending::Group;
+         RunPending(doc);
+         doc = FindDoc();
+         const bool noStep = gUndoStack.size() == u && doc->MaxGroupDepth() == N::kMaxGroupDepth;
+         fprintf(stderr, "PROBE group cap: full %d refused %d noStep %d depth %d\n", (int)full, (int)refused, (int)noStep, doc->MaxGroupDepth());
+         expect("parity: grouping is capped at the document nesting limit", full && refused && noStep);
+
+         const int fits = doc->AddLayer(N::Kind::Paint, 0, a).id;
+         const bool plainFits = doc->FindLayer(fits)->parent == innermost && doc->MaxGroupDepth() == N::kMaxGroupDepth;
+         const int ng = doc->AddLayer(N::Kind::Group, 0, a).id;
+         const bool groupBeside = doc->FindLayer(ng)->parent != innermost && doc->MaxGroupDepth() == N::kMaxGroupDepth;
+         const int p = doc->AddPaintLayer();
+         const int pg = doc->GroupLayers({ p });
+         const std::vector<int> pasted = doc->PasteLayers(doc->CopyLayers({ pg }), a, 0.0f, 0.0f);
+         const bool pasteBeside = pasted.size() == 1 && doc->FindLayer(pasted[0])->parent != innermost &&
+                                  doc->MaxGroupDepth() == N::kMaxGroupDepth;
+         doc->MoveLayer(pg, innermost, false, true);
+         const bool moveRefused = doc->FindLayer(pg)->parent == 0 && doc->MaxGroupDepth() == N::kMaxGroupDepth;
+         fprintf(stderr, "PROBE group cap nesting: plain %d group %d paste %d move %d\n", (int)plainFits, (int)groupBeside,
+                 (int)pasteBeside, (int)moveRefused);
+         expect("parity: nesting stops at the group depth limit", plainFits && groupBeside && pasteBeside && moveRefused &&
+                                                                    doc->FindLayer(a) != nullptr);
+         for (int id : { outer, pg, pasted.empty() ? 0 : pasted[0] })
+            if (id != 0 && doc->FindLayer(id) != nullptr)
+               doc->RemoveLayer(id);
+         doc->Commit();
+         sSel.clear();
+      }
+      {
+         // Stamp Visible with an open group active lands above the group, outside it; with a layer inside the group
+         // active it lands above that layer, inside the group.
+         const int a = doc->AddPaintLayer();
+         const float red[3] = { 1.0f, 0.0f, 0.0f };
+         doc->FillPixels(a, red, 1.0f);
+         const int g = doc->GroupLayers({ a });
+         const int b = doc->AddPaintLayer();
+         doc->MoveLayer(b, g, false);
+         doc->FindLayer(g)->open = true;
+         doc->FindLayer(g)->opacity = 0.5f;
+         doc->Commit();
+         auto indexOf = [&](int id) {
+            const auto& ls = doc->Layers();
+            for (int i = 0; i < (int)ls.size(); i++)
+               if (ls[i].id == id)
+                  return i;
+            return -1;
+         };
+         auto topAbove = [&](int id) {   // the next layer up in the same parent
+            const Layer* l = doc->FindLayer(id);
+            const auto& ls = doc->Layers();
+            for (int i = indexOf(id) + 1; l != nullptr && i < (int)ls.size(); i++)
+               if (ls[i].parent == l->parent)
+                  return ls[i].id;
+            return 0;
+         };
+         SelectOnly(g);
+         sPending.what = Pending::StampVisible;
+         RunPending(doc);
+         doc = FindDoc();
+         const int stamp = sSel.size() == 1 ? sSel[0] : 0;
+         const bool outside = stamp != 0 && stamp != g && doc->FindLayer(stamp)->parent == doc->FindLayer(g)->parent &&
+                              topAbove(g) == stamp && topAbove(stamp) == b && doc->ChildrenOf(g) == std::vector<int>{ a };
+         SelectOnly(a);
+         sPending.what = Pending::StampVisible;
+         RunPending(doc);
+         doc = FindDoc();
+         const int inside = sSel.size() == 1 ? sSel[0] : 0;
+         const bool within = inside != 0 && doc->FindLayer(inside)->parent == g && doc->ChildrenOf(g) == std::vector<int>{ a, inside };
+         fprintf(stderr, "PROBE stamp over open group: stamp %d outside %d inside %d within %d\n", stamp, (int)outside, inside, (int)within);
+         expect("parity: stamp visible goes above an open group", outside && within);
+         for (int id : { g, stamp, b })
+            if (id != 0 && doc->FindLayer(id) != nullptr)
+               doc->RemoveLayer(id);
+         doc->Commit();
+         sSel.clear();
+      }
+      {
+         // Transfer effects: Alt-drop of the whole style copies it, one fx dropped moves just that one, the whole style
+         // dropped moves everything; one history step per drop, undo puts it back; bad drops change nothing.
+         using N = Scene2DNode;
+         const int a = doc->AddPaintLayer(), b = doc->AddPaintLayer(), c = doc->AddPaintLayer();
+         Layer* al = doc->FindLayer(a);
+         al->fx[0] = N::FxDefault(0);
+         al->fx[0].on = true;
+         int overlay = -1;
+         for (int k = 1; k < N::kFxCount && overlay < 0; k++)
+            if (std::string(N::FxName(k)).find("Colo") != std::string::npos)
+               overlay = k;
+         if (overlay < 0)
+            overlay = N::kFxCount - 1;
+         al->fx[overlay] = N::FxDefault(overlay);
+         al->fx[overlay].on = true;
+         doc->Commit();
+         auto ons = [&](int id) {
+            std::vector<int> v;
+            if (const Layer* l = doc->FindLayer(id))
+            {
+               for (int k = 0; k < N::kFxCount; k++)
+                  if (l->fx[k].on)
+                     v.push_back(k);
+               for (const auto& m : l->fxMore)
+                  if (m.second.on)
+                     v.push_back(100 + m.first);
+            }
+            return v;
+         };
+         const std::vector<int> both = ons(a);
+         const bool copied = TransferFx(doc, a, b, -1, true) && ons(a) == both && ons(b) == both;
+         const bool oneMoved = TransferFx(doc, a, c, overlay, false) && ons(a) == std::vector<int>{ 0 } && ons(c) == std::vector<int>{ overlay };
+         const bool allMoved = TransferFx(doc, b, a, -1, false) && ons(b).empty() && ons(a) == both;
+         const size_t u = gUndoStack.size();
+         const bool step = TransferFx(doc, a, b, -1, false) && gUndoStack.size() == u + 1;
+         Undo();
+         doc = FindDoc();
+         doc->Layers();
+         const bool undone = ons(a) == both && ons(b).empty();
+         const size_t u2 = gUndoStack.size();
+         const bool bad = !TransferFx(doc, a, a, -1, false) && !TransferFx(doc, a, 999999, -1, false) &&
+                          !TransferFx(doc, a, b, 7, false) && !TransferFx(doc, a, b, -2, false) && !TransferFx(doc, b, a, -1, false) &&
+                          gUndoStack.size() == u2 && ons(a) == both && ons(b).empty();
+         fprintf(stderr, "PROBE transfer effects: copy %d one %d all %d step %d undo %d bad %d\n", (int)copied, (int)oneMoved,
+                 (int)allMoved, (int)step, (int)undone, (int)bad);
+         expect("parity: transfer effects moves or copies between layers", copied && oneMoved && allMoved && step && undone && bad);
+         for (int id : { a, b, c })
+            if (doc->FindLayer(id) != nullptr)
+               doc->RemoveLayer(id);
+         doc->Commit();
+         sSel.clear();
+      }
+      {
+         // Add "copy" to copies off: an Alt-drop copy and a Duplicate keep the name; on, the duplicate is "… copy".
+         const int a = doc->AddPaintLayer(), b = doc->AddPaintLayer();
+         doc->FindLayer(a)->name = "Test 0";
+         doc->FindLayer(b)->name = "Test 1";
+         doc->Commit();
+         const bool keep = Scene2DNode::sCopySuffix;
+         Scene2DNode::sCopySuffix = false;
+         const int d0 = doc->Duplicate(a);
+         doc->MoveLayer(d0, b, true);
+         const int d1 = doc->Duplicate(b);
+         const bool off = doc->FindLayer(d0)->name == "Test 0" && doc->FindLayer(d1)->name == "Test 1";
+         Scene2DNode::sCopySuffix = true;
+         const int d2 = doc->Duplicate(b);
+         const bool on = doc->FindLayer(d2)->name.find("copy") != std::string::npos;
+         Scene2DNode::sCopySuffix = keep;
+         fprintf(stderr, "PROBE copy suffix: off %d on %d ('%s')\n", (int)off, (int)on, doc->FindLayer(d2)->name.c_str());
+         expect("parity: preview copy and no copy suffix option match committed layers", off && on);
+         for (int id : { a, b, d0, d1, d2 })
+            if (doc->FindLayer(id) != nullptr)
+               doc->RemoveLayer(id);
+         doc->Commit();
+      }
+      {
+         // Export Layer: a one-pixel checker exported at 200% nearest is a two-pixel checker, the same in the PNG read
+         // back; a misspelt or missing method is refused naming "resample"; exporting never edits the document.
+         const int W = doc->Doc().w, H = doc->Doc().h;
+         std::vector<uint8_t> px((size_t)W * H * 4);
+         for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+            {
+               uint8_t* p = &px[((size_t)y * W + x) * 4];
+               const bool red = (x + y) % 2 == 0;
+               p[0] = red ? 255 : 0, p[1] = 0, p[2] = red ? 0 : 255, p[3] = 255;
+            }
+         const int a = doc->AddFileLayer(0, "Checker", 0, 0, W, H, px);
+         doc->Commit();
+         const std::string before = (doc->Layers(), doc->DocText());
+         const size_t u = gUndoStack.size();
+         const std::string path = (std::filesystem::temp_directory_path() / "infinite-v2d-export-layer.png").string();
+         int ow = 0, oh = 0;
+         const bool wrote = doc->ExportLayerPng(a, path, 200, "nearest", nullptr, &ow, &oh) && ow == W * 2 && oh == H * 2;
+         int rw = 0, rh = 0, rc = 0;
+         unsigned char* back = wrote ? LoadPngFile(path, &rw, &rh, &rc) : nullptr;
+         int wrong = back == nullptr ? 1 : 0;
+         for (int y = 0; back != nullptr && y < rh && wrong < 1; y++)
+            for (int x = 0; x < rw; x++)
+            {
+               const unsigned char* p = back + ((size_t)y * rw + x) * 4;
+               const bool red = (x / 2 + y / 2) % 2 == 0;
+               if (p[0] != (red ? 255 : 0) || p[1] != 0 || p[2] != (red ? 0 : 255) || p[3] != 255)
+               {
+                  wrong++;
+                  break;
+               }
+            }
+         if (back != nullptr)
+            stbi_image_free(back);
+         bool badRefused = true;
+         for (const char* bad : { "lanczos", "Nearest", "" })
+         {
+            std::string err;
+            badRefused = badRefused && !doc->ExportLayerPng(a, path, 200, bad, &err) && err == "resample";
+         }
+         const bool smooth = Scene2DNode::ResampleRgba(px, 2, 1, 4, 1, 1).size() == 16 && Scene2DNode::ResampleRgba(px, 2, 1, 4, 1, 2).size() == 16;
+         const bool untouched = doc->DocText() == before && gUndoStack.size() == u;
+         std::error_code ec;
+         std::filesystem::remove(path, ec);
+         fprintf(stderr, "PROBE export layer: wrote %d (%dx%d) wrong %d bad %d smooth %d untouched %d\n", (int)wrote, ow, oh, wrong,
+                 (int)badRefused, (int)smooth, (int)untouched);
+         expect("parity: export layer resamples with the chosen method", wrote && rw == W * 2 && rh == H * 2 && wrong == 0 && badRefused &&
+                                                                             smooth && untouched);
+         // Bicubic is Photoshop's (PhotoCraft bicubic_upscale_matches_photoshop, Photoshop 27.11 Free Transform at 200%): a
+         // 64 px image, left half grey 64, right half 192, doubled; the row across the edge within 1.5 levels.
+         {
+            std::vector<uint8_t> step((size_t)64 * 64 * 4);
+            for (int y = 0; y < 64; y++)
+               for (int x = 0; x < 64; x++)
+               {
+                  uint8_t* p = &step[((size_t)y * 64 + x) * 4];
+                  p[0] = p[1] = p[2] = x < 32 ? 64 : 192;
+                  p[3] = 255;
+               }
+            const std::vector<uint8_t> up = Scene2DNode::ResampleRgba(step, 64, 64, 128, 128, 2);
+            const int photoshop[10] = { 64, 64, 64, 60, 51, 93, 163, 206, 197, 192 };
+            bool near = up.size() == (size_t)128 * 128 * 4;
+            for (int i = 0; i < 10 && near; i++)
+            {
+               const int got = up[((size_t)82 * 128 + 58 + i) * 4];
+               near = std::abs(got - photoshop[i]) <= 1;
+               if (!near)
+                  fprintf(stderr, "PROBE bicubic photoshop: column %d got %d want %d\n", 26 + i, got, photoshop[i]);
+            }
+            expect("parity: bicubic upscale matches photoshop", near);
+         }
+         // A 10 x 6 patch exports as a 10 x 6 file (20 x 12 at 200%), its corner the patch's red.
+         {
+            std::vector<uint8_t> patch((size_t)10 * 6 * 4);
+            for (size_t k = 0; k < patch.size(); k += 4)
+               patch[k] = 255, patch[k + 1] = 0, patch[k + 2] = 0, patch[k + 3] = 255;
+            const int b = doc->AddFileLayer(0, "Patch", 40, 30, 10, 6, patch);
+            doc->Commit();
+            int tw = 0, th = 0, sw = 0, sh = 0, bw = 0, bh = 0, bc = 0;
+            const bool one = doc->ExportLayerPng(b, path, 100, "nearest", nullptr, &tw, &th);
+            unsigned char* got = one ? LoadPngFile(path, &bw, &bh, &bc) : nullptr;
+            const bool corner = got != nullptr && got[0] == 255 && got[1] == 0 && got[3] == 255;
+            if (got != nullptr)
+               stbi_image_free(got);
+            const bool two = doc->ExportLayerPng(b, path, 200, "bilinear", nullptr, &sw, &sh);
+            std::filesystem::remove(path, ec);
+            if (!(one && tw == 10 && th == 6 && bw == 10 && bh == 6 && corner && two && sw == 20 && sh == 12))
+               fprintf(stderr, "PROBE export trim: %d %dx%d file %dx%d corner %d | %d %dx%d\n", (int)one, tw, th, bw, bh, (int)corner,
+                       (int)two, sw, sh);
+            expect("parity: export layer trims to its pixels",
+                   one && tw == 10 && th == 6 && bw == 10 && bh == 6 && corner && two && sw == 20 && sh == 12);
+            doc->RemoveLayer(b);
+            doc->Commit();
+         }
+         doc->RemoveLayer(a);
+         doc->Commit();
+      }
+      {
+         // Triangle: a uniform scale keeps it a live triangle (box and corner radius scaled); a flip makes it a path.
+         using SN = Scene2DNode;
+         SN::Shape t;
+         t.type = SN::Shape::kTriangle;
+         t.x0 = 400, t.y0 = 300, t.x1 = 600, t.y1 = 400;
+         t.radius = 10.0f;
+         SN::Shape half = t;
+         const float mHalf[6] = { 0.5f, 0, 0, 0, 0.5f, 0 };
+         const bool scaled = SN::TransformShape(half, mHalf) && half.type == SN::Shape::kTriangle && about(half.x0, 200) &&
+                             about(half.y0, 150) && about(half.x1, 300) && about(half.y1, 200) && std::fabs(half.radius - 5.0f) < 1e-3f;
+         SN::Shape flip = t;
+         flip.radius = 0.0f;
+         const float mFlip[6] = { 1, 0, 0, 0, -1, 700 };
+         const bool flipped = SN::TransformShape(flip, mFlip) && flip.type == SN::Shape::kPath && flip.Anchors() == 3 &&
+                              about(flip.pts[0], 500) && about(flip.pts[1], 400) && about(flip.pts[6], 600) && about(flip.pts[7], 300) &&
+                              about(flip.pts[12], 400) && about(flip.pts[13], 300);
+         SN::Shape round = t;
+         const bool roundFlip = SN::TransformShape(round, mFlip) && round.type == SN::Shape::kPath;
+         fprintf(stderr, "PROBE triangle transform: scaled %d (r %.2f) flipped %d round %d\n", (int)scaled, half.radius, (int)flipped, (int)roundFlip);
+         expect("parity: a scale keeps the triangle live and a flip makes it a path", scaled && flipped && roundFlip);
+      }
+      {
+         // Sub-pixel: a line with an arrowhead scaled under the live minimum becomes its own path, scaled; a normal
+         // uniform scale keeps it a live line with the stroke scaled.
+         using SN = Scene2DNode;
+         SN::Shape ln;
+         ln.type = SN::Shape::kLine;
+         ln.x0 = 0, ln.y0 = 0, ln.x1 = 100, ln.y1 = 0;
+         ln.arrowE = 1;
+         ln.strokeOn = true;
+         ln.width = 4.0f;
+         SN::Shape tiny = ln, want = ln, big = ln;
+         const float mTiny[6] = { 0.01f, 0, 0, 0, 0.01f, 0 }, mBig[6] = { 2, 0, 0, 0, 2, 0 };
+         const bool made = SN::TransformShape(tiny, mTiny) && SN::ShapeToPath(want);
+         bool same = made && tiny.type == SN::Shape::kPath && tiny.pts.size() == want.pts.size() && tiny.Anchors() >= 2;
+         for (size_t i = 0; same && i < want.pts.size(); i++)
+            same = std::fabs(tiny.pts[i] - want.pts[i] * 0.01f) < 1e-4f;
+         const bool live = SN::TransformShape(big, mBig) && big.type == SN::Shape::kLine && about(big.x1, 200) && std::fabs(big.width - 8.0f) < 1e-3f;
+         fprintf(stderr, "PROBE subpixel arrow: path %d same %d live %d\n", (int)made, (int)same, (int)live);
+         expect("parity: subpixel scale keeps transformed path but drops unreproducible live parameters", made && same && live);
+      }
+      {
+         // Arrows under transforms (PhotoCraft shape.rs): the axis scales of a line, and which transforms keep it live.
+         using SN = Scene2DNode;
+         float ax = 0, ap = 0;
+         const float mSquash[6] = { 2, 0, 0, 0, 1, 0 }, mTwo[6] = { 2, 0, 0, 0, 2, 0 }, mMirror[6] = { -2, 0, 0, 0, 1, 0 };
+         const bool aniso = !SN::ArrowAxisScales(mSquash, 0, 0, 100, 100, ax, ap);
+         expect("parity: anisotropic diagonal arrow cannot remain parametric", aniso);
+         const bool uni = SN::ArrowAxisScales(mTwo, 0, 0, 100, 100, ax, ap) && std::fabs(ax - 2) < 1e-5f && std::fabs(ap - 2) < 1e-5f;
+         expect("parity: uniform scale preserves diagonal arrow axes", uni);
+         const bool mir = SN::ArrowAxisScales(mMirror, 0, 0, 100, 0, ax, ap) && std::fabs(ax - 2) < 1e-5f && std::fabs(ap - 1) < 1e-5f;
+         expect("parity: reflected horizontal arrow uses axial scale for head length", mir);
+         auto line = [](float x0, float y0, float x1, float y1, float w, bool head) {
+            Shape s;
+            s.type = Shape::kLine;
+            s.x0 = x0, s.y0 = y0, s.x1 = x1, s.y1 = y1;
+            s.width = w;
+            s.strokeOn = true;
+            s.arrowE = head ? 1 : 0;
+            return s;
+         };
+         // A 45 degree turn keeps a headed line live: same width and head size, its ends turned.
+         const float c = std::cos(kPi * 0.25f), sn = std::sin(kPi * 0.25f);
+         const float mTurn[6] = { c, -sn, 0, sn, c, 0 };
+         Shape turned = line(0, 0, 100, 0, 8, true);
+         const float size0 = turned.arrowSize;
+         const bool turnLive = SN::TransformShape(turned, mTurn) && turned.type == Shape::kLine && std::fabs(turned.width - 8) < 1e-3f &&
+                               turned.arrowSize == size0 && std::fabs(turned.x1 - 100 * c) < 1e-3f && std::fabs(turned.y1 - 100 * sn) < 1e-3f;
+         expect("parity: forty five degree rotation retains live arrow and geometry", turnLive);
+         // A headless line under a squash maps its ends (its geometry is the transformed path) and stays a line.
+         Shape diag = line(0, 0, 100, 100, 5, false);
+         const bool diagOk = SN::TransformShape(diag, mSquash) && diag.type == Shape::kLine && std::fabs(diag.x1 - 200) < 1e-3f &&
+                             std::fabs(diag.y1 - 100) < 1e-3f && diag.x0 == 0 && diag.y0 == 0;
+         expect("parity: headless arrow survives nonuniform diagonal scale", diagOk);
+         Shape diag2 = line(40, 40, 140, 140, 5, false);
+         const bool diag2Ok = SN::TransformShape(diag2, mSquash) && diag2.type == Shape::kLine && std::fabs(diag2.x0 - 80) < 1e-3f &&
+                              std::fabs(diag2.y0 - 40) < 1e-3f && std::fabs(diag2.x1 - 280) < 1e-3f && std::fabs(diag2.y1 - 140) < 1e-3f;
+         expect("parity: headless diagonal arrow preserves geometry after nonuniform scale", diag2Ok);
+         Shape zero = line(0, 0, 0, 0, 5, false);
+         const bool zeroOk = SN::TransformShape(zero, mSquash) && zero.type == Shape::kLine && zero.arrowS == 0 && zero.arrowE == 0;
+         expect("parity: zero length headless arrow survives scale", zeroOk);
+         const float mHalf[6] = { 0.5f, 0, 0, 0, 0.5f, 0 };
+         Shape shortL = line(0, 0, 0.5f, 0, 0.05f, false);
+         const bool shortOk = SN::TransformShape(shortL, mHalf) && shortL.type == Shape::kLine && std::fabs(shortL.x1 - 0.25f) < 1e-5f;
+         expect("parity: headless short arrow remains editable after scaling", shortOk);
+         // Half size, still over the live minimum: the headed line stays live, its heads (sized from width) halve.
+         Shape halfL = line(0, 0, 100, 0, 5, true);
+         const bool halfOk = SN::TransformShape(halfL, mHalf) && halfL.type == Shape::kLine && std::fabs(halfL.width - 2.5f) < 1e-4f &&
+                             halfL.arrowE == 1 && std::fabs(halfL.x1 - 50) < 1e-3f;
+         expect("parity: scale above minimum still keeps live arrow editable", halfOk);
+         fprintf(stderr, "PROBE arrow transforms: aniso %d uni %d mirror %d turn %d diag %d %d zero %d short %d half %d\n", (int)aniso, (int)uni,
+                 (int)mir, (int)turnLive, (int)diagOk, (int)diag2Ok, (int)zeroOk, (int)shortOk, (int)halfOk);
+      }
+      {
+         // Path mode: each triangle drag is one step named "Triangle Tool" and adds a subpath to the Work Path,
+         // leaving no layer behind.
+         using SN = Scene2DNode;
+         std::vector<Shape> keepWork;
+         const bool hadWork = doc->FindPath(SN::kWorkPath) != nullptr;
+         if (hadWork)
+            keepWork = doc->FindPath(SN::kWorkPath)->subs;
+         doc->DeletePath(SN::kWorkPath);
+         const int kind0 = sShapeKind;
+         const bool mode0 = sShapePathMode;
+         const std::vector<int> sel0 = sSel;
+         sShapeKind = 6;
+         sShapePathMode = true;
+         const size_t layers0 = doc->Layers().size();
+         bool steps = true;
+         size_t subs[2] = { 0, 0 };
+         for (int i = 0; i < 2; i++)
+         {
+            sSel.clear();
+            const size_t u = gUndoStack.size();
+            sOp = Op();
+            sOp.kind = 12;
+            sOp.start = ImVec2(0, 0);
+            sOp.docStart = ImVec2(100.0f + 150.0f * i, 100.0f);
+            sMouseDoc = ImVec2(200.0f + 150.0f * i, 220.0f);
+            DragShape(doc, ImVec2(400, 400));
+            const bool made = sOp.made;
+            const bool moved = made && ShapeItemToWorkPath(doc);
+            sOp = Op();
+            steps = steps && moved && gUndoStack.size() == u + 1 && gUndoStack.back().label == "Triangle Tool";
+            const SN::DocPath* wp = doc->FindPath(SN::kWorkPath);
+            subs[i] = wp != nullptr ? wp->subs.size() : 0;
+         }
+         const bool noLayer = doc->Layers().size() == layers0;
+         fprintf(stderr, "PROBE path mode triangle: steps %d subs %zu %zu layers %zu->%zu\n", (int)steps, subs[0], subs[1], layers0,
+                 doc->Layers().size());
+         expect("parity: each path mode triangle is one step named triangle tool", steps && subs[0] == 1 && subs[1] == 2 && noLayer);
+         sShapeKind = kind0;
+         sShapePathMode = mode0;
+         sSel = sel0;
+         doc->DeletePath(SN::kWorkPath);
+         if (hadWork)
+            doc->SetWorkPath(keepWork);
+         doc->Commit();
+      }
+      {
+         // An inline path (a Pen path still being drawn) makes the shape and leaves the Work Path alone, unless it
+         // was drawn into the Work Path; an empty path or a one-anchor subpath is refused.
+         using SN = Scene2DNode;
+         auto knots = [](std::initializer_list<float> xy) {
+            Shape s;
+            s.type = Shape::kPath;
+            const std::vector<float> v(xy);
+            for (size_t i = 0; i + 1 < v.size(); i += 2)
+               s.pts.insert(s.pts.end(), { v[i], v[i + 1], v[i], v[i + 1], v[i], v[i + 1] });
+            return s;
+         };
+         std::vector<Shape> keepWork;
+         const bool hadWork = doc->FindPath(SN::kWorkPath) != nullptr;
+         if (hadWork)
+            keepWork = doc->FindPath(SN::kWorkPath)->subs;
+         doc->SetWorkPath({ knots({ 12, 12, 60, 12, 60, 60 }) });
+         const std::vector<Shape> drawn = { knots({ 5, 5, 30, 5, 30, 30 }) };
+         const float col[4] = { 1, 0, 0, 1 };
+         const size_t layers0 = doc->Layers().size();
+         const int id = doc->ShapesToShapeLayer(drawn, 0, col, false);
+         const Layer* sl = doc->FindLayer(id);
+         float dx = -1, dy = -1;
+         if (sl != nullptr && !sl->shapes.empty())
+            doc->BoxToDoc(*sl, sl->shapes[0].pts[0], sl->shapes[0].pts[1], dx, dy);
+         const bool made = sl != nullptr && sl->kind == Kind::Vector && about(dx, 5) && about(dy, 5) && doc->FindPath(SN::kWorkPath) != nullptr;
+         const int id2 = doc->ShapesToShapeLayer(drawn, 0, col, true);
+         const bool consumed = id2 > 0 && doc->FindPath(SN::kWorkPath) == nullptr;
+         const size_t layers1 = doc->Layers().size();
+         const bool refused = doc->ShapesToShapeLayer({}, 0, col, false) == 0 && doc->ShapesToShapeLayer({ knots({ 5, 5 }) }, 0, col, true) == 0 &&
+                              doc->Layers().size() == layers1;
+         fprintf(stderr, "PROBE inline path to shape: made %d (%.1f,%.1f) consumed %d refused %d layers %zu->%zu\n", (int)made, dx, dy,
+                 (int)consumed, (int)refused, layers0, layers1);
+         expect("parity: path to shape takes an inline path", made && consumed && refused && layers1 == layers0 + 2);
+         for (int l : { id, id2 })
+            if (doc->FindLayer(l) != nullptr)
+               doc->RemoveLayer(l);
+         doc->DeletePath(SN::kWorkPath);
+         if (hadWork)
+            doc->SetWorkPath(keepWork);
+         doc->Commit();
+      }
+      {
+         // Stroke Path with the Blur tool: the brush is the Blur tool's, so the white/black edge it follows goes
+         // grey while the far halves stay put; one history step, undone in one.
+         using SN = Scene2DNode;
+         auto rectPath = [](float x0, float y0, float x1, float y1) {
+            Shape s;
+            s.type = Shape::kRect;
+            s.x0 = x0, s.y0 = y0, s.x1 = x1, s.y1 = y1;
+            SN::ShapeToPath(s);
+            return s;
+         };
+         std::vector<Shape> keepWork;
+         const bool hadWork = doc->FindPath(SN::kWorkPath) != nullptr;
+         if (hadWork)
+            keepWork = doc->FindPath(SN::kWorkPath)->subs;
+         const float white[3] = { 1, 1, 1 }, black[3] = { 0, 0, 0 };
+         const int bp = doc->AddPaintLayer();
+         const float cx = std::floor(W * 0.5f), cy = std::floor(H * 0.5f);
+         doc->SetWorkPath({ rectPath(0, 0, cx, (float)H) });
+         doc->FillPath(SN::kWorkPath, bp, white, 1.0f, 0.0f);
+         doc->SetWorkPath({ rectPath(cx, 0, (float)W, (float)H) });
+         doc->FillPath(SN::kWorkPath, bp, black, 1.0f, 0.0f);
+         Shape edge;
+         edge.type = Shape::kPath;
+         edge.pts = { cx, cy - 60, cx, cy - 60, cx, cy - 60, cx, cy + 60, cx, cy + 60, cx, cy + 60 };
+         doc->SetWorkPath({ edge });
+         doc->Commit();
+         uint8_t was[4] = {}, after[4] = {}, far[4] = {}, back[4] = {};
+         const bool r0 = pixel({ bp }, (int)cx - 2, (int)cy, was);
+         const int tool0 = sTool;
+         sTool = kBlur;
+         BrushEngine::Brush b = ToolBrush();
+         sTool = tool0;
+         b.size = 24.0f;
+         const size_t u = gUndoStack.size();
+         PushUndoCheckpoint("Stroke path");
+         const bool stroked = doc->StrokePath(SN::kWorkPath, bp, b, false);
+         doc->Commit();
+         const bool r1 = pixel({ bp }, (int)cx - 2, (int)cy, after) && pixel({ bp }, (int)cx - 60, (int)cy, far);
+         const bool blurred = b.mode == BrushEngine::kBlur && stroked && r0 && r1 && was[0] > 250 && after[0] < 250 && after[0] > 5 && far[0] > 250;
+         const bool one = gUndoStack.size() == u + 1 && undoBack() && gUndoStack.size() == u;
+         const bool restored = one && pixel({ doc->FindLayer(bp) != nullptr ? bp : 0 }, (int)cx - 2, (int)cy, back) && back[0] > 250;
+         fprintf(stderr, "PROBE stroke path blur: mode %d stroked %d was %d after %d far %d one %d back %d\n", (int)b.mode, (int)stroked,
+                 was[0], after[0], far[0], (int)one, back[0]);
+         expect("parity: stroke path with the blur tool is one step", blurred && one && restored);
+         if (doc->FindLayer(bp) != nullptr)
+            doc->RemoveLayer(bp);
+         doc->DeletePath(SN::kWorkPath);
+         if (hadWork)
+            doc->SetWorkPath(keepWork);
+         doc->Commit();
       }
    }
    // Pixel-accurate hit on a 3D object: the box corner misses the sphere, the centre hits it.
@@ -23820,6 +26856,48 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
                  (int)linearOff, (int)delRedo);
          expect("parity: non linear delete is enabled while the oldest state is current", enabled && linearOff && delRedo);
       }
+      // Non-linear history keeps the undone states when a new step comes; Delete takes only the one asked for.
+      {
+         fresh();
+         gHistoryOptions.nonLinear = true;
+         PushUndoCheckpoint("nl f1");
+         doc->FillPixels(hl, red, 1.0f);
+         PushUndoCheckpoint("nl f2");
+         doc->FillPixels(hl, blue, 1.0f);
+         PushUndoCheckpoint("nl f3");
+         doc->FillPixels(hl, green, 1.0f);
+         Undo();
+         Undo();
+         bool kept = reDoc() && colourIs(0);
+         PushUndoCheckpoint("nl inv");
+         doc->FillPixels(hl, blue, 1.0f);
+         kept = kept && gUndoStack.size() == 4 && gRedoStack.empty() && gUndoStack[1].label == "nl f2" && gUndoStack[2].label == "nl f3" &&
+                gUndoStack[3].label == "nl inv";
+         Undo();
+         const bool back = reDoc() && colourIs(1);   // stepping back from the new step reaches the last kept state (green)
+         Redo();
+         reDoc();
+         const bool one = DeleteHistoryState(2, 0) && gUndoStack.size() == 3 && reDoc() && colourIs(2) && gUndoStack[1].label == "nl f3";
+         fprintf(stderr, "PROBE history non-linear keeps: kept %d back %d one %d undo %zu\n", (int)kept, (int)back, (int)one, gUndoStack.size());
+         expect("parity: non linear history keeps later states and delete removes only one", kept && back && one);
+         // A later (undone) state: only it goes, and Redo reaches the one after it.
+         fresh();
+         PushUndoCheckpoint("nl f1");
+         doc->FillPixels(hl, red, 1.0f);
+         PushUndoCheckpoint("nl f2");
+         doc->FillPixels(hl, green, 1.0f);
+         PushUndoCheckpoint("nl f3");
+         doc->FillPixels(hl, blue, 1.0f);
+         Undo();
+         Undo();
+         reDoc();
+         const bool later = DeleteHistoryState(0, 1) && gRedoStack.size() == 1 && reDoc() && colourIs(0);
+         Redo();
+         const bool reach = reDoc() && colourIs(2) && gRedoStack.empty();
+         fprintf(stderr, "PROBE history non-linear later: %d reach %d\n", (int)later, (int)reach);
+         expect("parity: non linear delete removes a later state", later && reach);
+         gHistoryOptions = optWas;
+      }
       // Layer visibility left out of History: no step, kept through Undo, Redo and a refused edit; a snapshot has its own.
       {
          fresh();
@@ -23903,6 +26981,37 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             Undo();   // the new document goes
          sDocUid = docUidWas;
          reDoc();
+      }
+      // Every background of a new document gives the same first state (PhotoCraft new_document_history_name_tests):
+      // the step is "New document" and the history's start row keeps its name.
+      {
+         bool all = true;
+         gHistoryStartLabel = "New";   // a fresh file's start row (the purge check above renamed it); restored below
+         for (int bg = 0; bg < 4; bg++)
+         {
+            const std::string labelBefore = gHistoryStartLabel;
+            const size_t n0 = gUndoStack.size();
+            PushUndoCheckpoint("New document");
+            Scene2DNode* nd = MakeDoc(0.0f, 0.0f, "");
+            bool ok = nd != nullptr;
+            if (ok)
+            {
+               nd->Doc().background = bg;
+               nd->Commit();
+               // The new document is one step named "New document"; picking its background after is an edit of its own.
+               ok = gUndoStack.size() >= n0 + 1 && gUndoStack[n0].label == "New document" && gHistoryStartLabel == labelBefore &&
+                    (labelBefore == "New" || labelBefore == "Open");
+               while (gUndoStack.size() > n0)
+                  Undo();
+            }
+            fprintf(stderr, "PROBE history new background %d: %d (doc %d steps %zu -> %zu last '%s' start '%s' -> '%s')\n", bg, (int)ok,
+                    (int)(nd != nullptr), n0, gUndoStack.size(), gUndoStack.empty() ? "" : gUndoStack.back().label.c_str(), labelBefore.c_str(),
+                    gHistoryStartLabel.c_str());
+            all = all && ok;
+            sDocUid = docUidWas;
+            reDoc();
+         }
+         expect("parity: every background and mode of file new gives new", all);
       }
       // Put the patch's history and the document back as they were.
       gUndoStack = std::move(keptUndo);
@@ -24032,6 +27141,29 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       bool ok = src && eraseHistory(q) && doc->Pick(mx, my, c, 1, q) && c[0] > 0.99f && c[1] < 0.01f && c[2] < 0.01f &&
                 doc->FindLayer(q)->opacity > 0.99f;
       expect("parity: erase to history paints a new layer with the single layers own pixels not its opacity", ok);
+      // The same with the document's background transparent or white: the single layer state is the source either way.
+      {
+         const int bgWas = doc->Doc().background;
+         bool both = true;
+         for (int bg : { 3, 0 })
+         {
+            doc->Doc().background = bg;
+            doc->Commit();
+            int qb = 0, lb = 0;
+            const std::string sb = stateWith(qb, [&] {
+               lb = doc->AddPaintLayer();
+               doc->FillPixels(lb, red, 1.0f);
+            });
+            float cb[3] = { 0, 0, 0 };
+            const bool okb = doc->SetHistorySourceText(sb, 1) && eraseHistory(qb) && doc->Pick(mx, my, cb, 1, qb) && cb[0] > 0.99f && cb[1] < 0.01f;
+            fprintf(stderr, "PROBE history lack background %d: %d\n", bg, (int)okb);
+            both = both && okb;
+            doc->RemoveLayer(qb);
+         }
+         doc->Doc().background = bgWas;
+         doc->Commit();
+         expect("parity: erase to history paints a new layer from a single layer state background or not", both);
+      }
       fprintf(stderr, "PROBE history lack lone paint: src %d ok %d rgb %.2f %.2f %.2f\n", (int)src, (int)ok, c[0], c[1], c[2]);
       // One shape with a solid fill: its colour, past its path too; only under the stroke.
       auto shapeState = [&](int fillType, bool fillOn) {
@@ -24364,6 +27496,410 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
                            !doc->TypeStyles().NextCharId(n1) && !doc->TypeStyles().NextParaId(n2);
          expect("parity: exhausted style ids survive serialization", kept);
          fprintf(stderr, "PROBE exhausted: refuse %d kept %d '%s'\n", (int)refuse, (int)kept, e1.c_str());
+         // The "Last" styles go again, so the checks after this one have ids to make styles with.
+         auto& tsx = doc->Doc().textStyles;
+         tsx.character.erase(std::remove_if(tsx.character.begin(), tsx.character.end(),
+                                            [](const auto& d) { return d.id == std::numeric_limits<uint32_t>::max(); }),
+                             tsx.character.end());
+         tsx.paragraph.erase(std::remove_if(tsx.paragraph.begin(), tsx.paragraph.end(),
+                                            [](const auto& d) { return d.id == std::numeric_limits<uint32_t>::max(); }),
+                             tsx.paragraph.end());
+         doc->Commit();
+      }
+      // Type menu (PhotoCraft type_extra_cmds / type_cmds / type_spell_cmds tests): OpenType, numerals, stylistic sets,
+      // kerning, size keys, glyphs, lorem ipsum, missing fonts, default styles and spelling.
+      {
+         const size_t npos = std::string::npos;
+         const int ta = doc->AddTextLayer("Office 1111", tx, ty, 0.0f);
+         const int tb = doc->AddTextLayer("first fit", tx, ty, 0.0f);
+         bool on = false;
+         std::string oerr;
+         const bool togg = doc->SetTypeFeature({ ta }, "dlig", -1, npos, npos, &on) && on && N::FeatureOn(runAt(ta, 0), "dlig") &&
+                           doc->SetTypeFeature({ ta }, "frac", 1, npos, npos) && N::FeatureOn(runAt(ta, 0), "frac") &&
+                           doc->SetTypeFeature({ ta }, "liga", 0, npos, npos) && !N::FeatureOn(runAt(ta, 0), "liga") &&
+                           runAt(ta, 0).features.find("-liga") != std::string::npos;
+         expect("parity: opentype toggles store features", togg);
+         expect("parity: numerals are registered with their menu path", TypeMenuPath("Numerals") == "Type > OpenType > Numerals");
+         expect("parity: stylistic sets are registered with their menu path", TypeMenuPath("Stylistic Sets") == "Type > OpenType > Stylistic Sets");
+         // Numerals replace lnum/onum/pnum/tnum and keep the rest; a range edits only its characters.
+         const bool numKeep = doc->SetNumerals({ ta }, N::Numerals::TabularOldstyle, npos, npos) &&
+                              N::NumeralsOf(runAt(ta, 0)) == N::Numerals::TabularOldstyle && N::FeatureOn(runAt(ta, 0), "dlig") &&
+                              doc->SetNumerals({ ta }, N::Numerals::Lining, npos, npos) && N::NumeralsOf(runAt(ta, 0)) == N::Numerals::Lining &&
+                              !N::FeatureOn(runAt(ta, 0), "tnum") && N::FeatureOn(runAt(ta, 0), "frac");
+         expect("parity: numerals replace figure tags and keep other features", numKeep);
+         const bool numRange = doc->SetNumerals({ ta }, N::Numerals::Tabular, 7, 11) && N::NumeralsOf(runAt(ta, 8)) == N::Numerals::Tabular &&
+                               N::NumeralsOf(runAt(ta, 0)) == N::Numerals::Lining;
+         expect("parity: numerals range edits only those characters", numRange);
+         const bool numAll = doc->SetNumerals({ ta, tb }, N::Numerals::Oldstyle, npos, npos) &&
+                             N::NumeralsOf(runAt(ta, 0)) == N::Numerals::Oldstyle && N::NumeralsOf(runAt(tb, 0)) == N::Numerals::Oldstyle;
+         expect("parity: numerals apply to every listed layer", numAll);
+         doc->Commit();
+         const std::string pre = doc->DocText();
+         PushUndoCheckpoint("Numerals");
+         doc->SetNumerals({ ta, tb }, N::Numerals::ProportionalLining, npos, npos);
+         Undo();
+         doc = FindDoc();
+         doc->Layers();
+         expect("parity: numerals are one undo step each", doc->DocText() == pre);
+         doc->SetNumerals({ ta }, N::Numerals::TabularLining, npos, npos);
+         const std::vector<N::TextRun> nb = runsOf(ta);
+         reload();
+         expect("parity: numerals survive a pcraft round trip", runsOf(ta) == nb && N::NumeralsOf(runAt(ta, 0)) == N::Numerals::TabularLining);
+         // Tabular figures: every digit takes the same advance.
+         // The width is the ink's, so both strings start and end on an 8: only the inner advances can differ.
+         const int tw1 = doc->AddTextLayer("8118", tx, ty, 0.0f), tw8 = doc->AddTextLayer("8888", tx, ty, 0.0f);
+         doc->SetNumerals({ tw1, tw8 }, N::Numerals::Tabular, npos, npos);
+         int w1 = 0, h1 = 0, w8 = 0, h8 = 0;
+         doc->TextSize(*doc->FindLayer(tw1), w1, h1);
+         doc->TextSize(*doc->FindLayer(tw8), w8, h8);
+         const bool tab = w1 > 0 && std::abs(w1 - w8) <= 1;
+         doc->SetNumerals({ tw1, tw8 }, N::Numerals::Proportional, npos, npos);
+         int p1 = 0, p8 = 0;
+         doc->TextSize(*doc->FindLayer(tw1), p1, h1);
+         doc->TextSize(*doc->FindLayer(tw8), p8, h8);
+         fprintf(stderr, "PROBE numerals widths: tabular %d/%d proportional %d/%d\n", w1, w8, p1, p8);
+         expect("parity: numerals tabular changes inter digit widths", tab && (p1 != w1 || p8 != w8 || p1 != p8));
+         doc->RemoveLayer(tw1);
+         doc->RemoveLayer(tw8);
+         // Stylistic sets: independent, range direction from the range start, every listed layer, undo, round trip.
+         bool s1 = false, s2 = false;
+         const bool sets = doc->SetTypeFeature({ tb }, "ss01", -1, npos, npos, &s1) && s1 &&
+                           doc->SetTypeFeature({ tb }, "ss02", -1, npos, npos, &s2) && s2 && N::FeatureOn(runAt(tb, 0), "ss01") &&
+                           doc->SetTypeFeature({ tb }, "ss01", -1, npos, npos, &s1) && !s1 && N::FeatureOn(runAt(tb, 0), "ss02") &&
+                           !N::FeatureOn(runAt(tb, 0), "ss01");
+         expect("parity: stylistic sets toggle independently and keep other features", sets);
+         doc->SetTypeFeature({ tb }, "ss03", 1, 0, 3);
+         bool dir = true;
+         const bool rangeDir = doc->SetTypeFeature({ tb }, "ss03", -1, 0, 9, &dir) && !dir && !N::FeatureOn(runAt(tb, 5), "ss03");
+         expect("parity: stylistic set range edits only those characters and direction follows the range start", rangeDir);
+         const bool setsAll = doc->SetTypeFeature({ ta, tb }, "ss05", 1, npos, npos) && N::FeatureOn(runAt(ta, 0), "ss05") &&
+                              N::FeatureOn(runAt(tb, 0), "ss05");
+         expect("parity: stylistic sets apply to every listed layer", setsAll);
+         doc->Commit();
+         const std::string spre = doc->DocText();
+         PushUndoCheckpoint("Stylistic Set");
+         doc->SetTypeFeature({ ta, tb }, "ss07", 1, npos, npos);
+         Undo();
+         doc = FindDoc();
+         doc->Layers();
+         const std::vector<N::TextRun> sb = runsOf(tb);
+         reload();
+         expect("parity: stylistic set toggles are one undo step each", doc->DocText() == spre);
+         expect("parity: stylistic sets survive a pcraft round trip", runsOf(tb) == sb && N::FeatureOn(runAt(tb, 0), "ss05"));
+         // Sets change glyphs: the system face's alternates (ss01 opens 6 and 9, ss02 a single-storey a) differ in pixels.
+         {
+            const int tg2 = doc->AddTextLayer("a 1469 ag", tx, ty, 0.0f);
+#ifdef __APPLE__
+            // The empty font is Helvetica, which has no stylistic sets; the system face (SF) has them.
+            if (Layer* g = doc->FindLayer(tg2))
+               g->font = ".AppleSystemUIFont";
+            doc->Commit();
+#endif
+            static int sSetFrame = 1 << 23;
+            std::vector<uint8_t> p0, p1;
+            const bool r0 = doc->RenderSet({ tg2 }, ++sSetFrame, p0);
+            doc->SetTypeFeature({ tg2 }, "ss01", 1, npos, npos);
+            doc->SetTypeFeature({ tg2 }, "ss02", 1, npos, npos);
+            const bool r1 = doc->RenderSet({ tg2 }, ++sSetFrame, p1);
+            size_t diff = 0;
+            for (size_t i = 3; r0 && r1 && i < p0.size() && i < p1.size(); i += 4)
+               diff += std::abs((int)p0[i] - (int)p1[i]) > 64;
+            fprintf(stderr, "PROBE stylistic set pixels: %zu differ\n", diff);
+            expect("parity: stylistic sets change inter glyphs", r0 && r1 && diff > 20);
+            doc->RemoveLayer(tg2);
+         }
+         std::string lerr;
+         const int px = doc->AddPaintLayer();
+         const bool refused = !doc->SetTypeFeature({ px }, "ss01", 1, npos, npos, nullptr, &lerr) && !lerr.empty() &&
+                              !doc->SetTypeFeature({ ta }, "zzzz", 1, npos, npos);
+         expect("parity: type features need type layers and known tags", refused);
+         fprintf(stderr, "PROBE opentype: togg %d keep %d range %d all %d sets %d dir %d err '%s'\n", (int)togg, (int)numKeep,
+                 (int)numRange, (int)numAll, (int)sets, (int)rangeDir, lerr.c_str());
+
+         // Kerning: a range takes a mode; Alt+arrow kerns the pair from what shows now; size keys; relative steps.
+         const int tk = doc->AddTextLayer("AVATAR", tx, ty, 0.0f);
+         const bool kr = doc->SetRangeKerning(tk, 0, 3, 2, 50.0f) && runAt(tk, 1).kernMode == 2 && runAt(tk, 1).kern == 50.0f &&
+                         runAt(tk, 4).kernMode == 0 && doc->SetRangeKerning(tk, 0, 3, 1, 0.0f) && runAt(tk, 0).kernMode == 1;
+         expect("parity: edit sets kerning over a range", kr);
+         doc->SetRangeKerning(tk, npos, npos, 0, 0.0f);
+         const N::RunStyle k0 = runAt(tk, 0);
+         const float pair = std::round(Platform::PairKerning(k0.font, k0.size, "A", "V") / k0.size * 1000.0f);
+         const bool kp = doc->KernPair(tk, 1, -20.0f) && runAt(tk, 0).kernMode == 2 && runAt(tk, 0).kern == pair - 20.0f &&
+                         doc->KernPair(tk, 1, -20.0f) && runAt(tk, 0).kern == pair - 40.0f && runAt(tk, 1).kernMode == 0 &&
+                         !doc->KernPair(tk, 0, 10.0f);
+         fprintf(stderr, "PROBE kern pair: font pair %g now %g\n", pair, runAt(tk, 0).kern);
+         expect("parity: kern pair steps from the shown kerning", kp);
+         doc->StyleTextRange(tk, 0, 2, { { "size", "40" } });
+         doc->StyleTextRange(tk, 2, 6, { { "size", "20" } });
+         const bool sz = doc->StepTypeSize(tk, npos, npos, 2.0f) && runAt(tk, 0).size == 42.0f && runAt(tk, 3).size == 22.0f &&
+                         doc->StepTypeSize(tk, npos, npos, -100.0f) && runAt(tk, 0).size == 1.0f;
+         doc->StyleTextRange(tk, 0, 6, { { "size", "20" } });
+         doc->FindLayer(tk)->sx = doc->FindLayer(tk)->sy = 2.0f;
+         doc->Commit();
+         const bool szScale = doc->StepTypeSize(tk, npos, npos, 2.0f) && std::fabs(runAt(tk, 0).size - 21.0f) < 1e-3f;
+         doc->FindLayer(tk)->sx = doc->FindLayer(tk)->sy = 1.0f;
+         std::string serr;
+         const bool szNeed = !doc->StepTypeSize(px, npos, npos, 2.0f, &serr) && !serr.empty();
+         fprintf(stderr, "PROBE size keys: step %d scale %d need %d size %.2f\n", (int)sz, (int)szScale, (int)szNeed, runAt(tk, 0).size);
+         expect("parity: size keys step each run and respect layer scale", sz && szScale);
+         expect("parity: size keys need a type layer", szNeed);
+         const float lead0 = doc->FindLayer(tk)->leading, shift0 = doc->FindLayer(tk)->baseShift;
+         const bool rel = doc->StepTypeStyle(tk, 0, 2, 25.0f, 4.0f, 3.0f) && runAt(tk, 0).tracking == 25.0f && runAt(tk, 3).tracking == 0.0f &&
+                          doc->FindLayer(tk)->leading > lead0 && doc->FindLayer(tk)->baseShift == shift0 + 3.0f &&
+                          !doc->StepTypeStyle(tk, 0, 2, NAN, 0.0f, 0.0f);
+         expect("parity: relative steps move each character from its own value", rel);
+
+         // Glyphs and Lorem Ipsum.
+         const int tg = doc->AddTextLayer("ab", tx, ty, 0.0f);
+         size_t caret = 0;
+         const bool gl = doc->InsertTypeText(tg, 1, 1, "\xC2\xA9", &caret) && doc->FindLayer(tg)->text == "a\xC2\xA9" "b" && caret == 3 &&
+                         doc->InsertTypeText(tg, 0, 3, "\xE2\x80\xA2", &caret) && doc->FindLayer(tg)->text == "\xE2\x80\xA2" "b" && caret == 3;
+         expect("parity: insert glyph at caret and over range", gl);
+         const size_t tgEnd = doc->FindLayer(tg)->text.size();   // npos: at the end of the text
+         const int lt = doc->PasteLoremIpsum(tg, npos, &caret);
+         const bool lorem = lt == tg && doc->FindLayer(tg)->text.find(N::LoremIpsum()) == tgEnd && doc->FindLayer(tb)->text == "first fit" &&
+                            doc->PasteLoremIpsum(px, 0) == -1;
+         if (!lorem)
+            fprintf(stderr, "PROBE lorem: lt %d tg %d at %zu want %zu tb '%s'\n", lt, tg, doc->FindLayer(tg)->text.find(N::LoremIpsum()), tgEnd,
+                    doc->FindLayer(tb)->text.c_str());
+         const int ln = doc->PasteLoremIpsum(0, 0);
+         const bool loremNew = ln > 0 && doc->FindLayer(ln) != nullptr && doc->FindLayer(ln)->text == N::LoremIpsum();
+         expect("parity: paste lorem ipsum inserts into the layer param not the active layer", lorem);
+         expect("parity: lorem ipsum makes a box when no layer is given", loremNew);
+
+         // Missing fonts: listed, warned, replaced; a run whose font resolves keeps it.
+         const int tm = doc->AddTextLayer("gone here", tx, ty, 0.0f);
+         doc->StyleTextRange(tm, 0, 4, { { "font", "No Such Font Zq" } });
+         doc->StyleTextRange(tm, 5, 9, { { "font", "Helvetica" } });
+         const std::vector<std::string> miss = doc->MissingFonts();
+         const bool warn = !N::FontWarning("No Such Font Zq").empty() && N::FontWarning("Helvetica").empty();
+         const int rep = doc->ReplaceMissingFonts({}, "Courier");
+         const bool kept = miss.size() == 1 && miss[0] == "No Such Font Zq" && rep >= 1 && runAt(tm, 0).font == "Courier" &&
+                           runAt(tm, 6).font == "Helvetica" && doc->MissingFonts().empty();
+         fprintf(stderr, "PROBE missing fonts: %zu replaced %d warn %d kept %d\n", miss.size(), rep, (int)warn, (int)kept);
+         // PostScript faces (PhotoCraft type_extra_cmds tests): a run naming an installed face exactly is not missing and
+         // Replace All Missing Fonts leaves it, even when no family has that name; a near name still is missing.
+         {
+#ifdef __APPLE__
+            const char* face = "Helvetica-Bold";            // family "Helvetica"
+            const char* camel = "HelveticaNeue-Bold";       // family "Helvetica Neue": the name has no space to split on
+#else
+            const char* face = "DejaVuSans-Bold";
+            const char* camel = "DejaVuSansMono";
+#endif
+            const int tp = doc->AddTextLayer("face here", tx, ty, 0.0f);
+            doc->StyleTextRange(tp, 0, 4, { { "font", face } });
+            doc->StyleTextRange(tp, 5, 9, { { "font", camel } });
+            const bool exact = Platform::FontFaceInstalled(face) && Platform::FontFaceInstalled(camel) && N::FontWarning(face).empty() &&
+                               N::FontWarning(camel).empty();
+            const bool near = !Platform::FontFaceInstalled(std::string(face) + "Zq31") && !N::FontWarning(std::string(face) + "Zq31").empty();
+            const int rep2 = doc->ReplaceMissingFonts({}, "Courier");
+            const bool keptFace = doc->MissingFonts().empty() && runAt(tp, 0).font == face && runAt(tp, 6).font == camel;
+            fprintf(stderr, "PROBE postscript faces: exact %d near %d replaced %d kept %d\n", (int)exact, (int)near, rep2, (int)keptFace);
+            expect("parity: installed postscript face is not missing or replaced", exact && keptFace && rep2 == 0);
+            expect("parity: exact postscript face outside the guessed family is not missing", exact && near);
+            expect("parity: camel case and underscore postscript names resolve to their installed faces", exact);
+            doc->RemoveLayer(tp);
+         }
+         // Create, set style and edit each leave the layer's warnings.
+         const int tw = doc->AddTextLayer("warn me", tx, ty, 0.0f);
+         const bool wCreate = doc->LastTypeWarnings() == doc->TypeWarnings(tw);
+         doc->StyleTextRange(tw, 0, 4, { { "font", "No Such Font Zq" } });
+         const bool wStyle = doc->LastTypeWarnings().size() == 1 &&
+                             doc->LastTypeWarnings()[0].find("No Such Font Zq") != std::string::npos;
+         doc->InsertTypeText(tw, 7, 7, "!");
+         const bool wEdit = doc->LastTypeWarnings().size() == 1 && doc->TypeWarnings(tw).size() == 1;
+         doc->RemoveLayer(tw);
+         fprintf(stderr, "PROBE type warnings: create %d style %d edit %d\n", (int)wCreate, (int)wStyle, (int)wEdit);
+         expect("parity: missing font emits warning in create set style and edit", warn && miss.size() == 1 && wCreate && wStyle && wEdit);
+         {
+            // Style Options: a family with the style picked under it is stored as the pair and styles the run.
+            uint32_t cs = 0;
+            const N::StyleAttrs sz = { { "size", "20" } };
+            const bool made = doc->NewCharStyle(0, 0, cs, nullptr, &sz);
+            const N::StyleAttrs pick = { { "font", "Arial" }, { "font_style", "Bold Italic" } };
+            const bool set = made && doc->SetStyleAttrs(false, cs, nullptr, &pick);
+            const N::CharStyleDef* d = doc->TypeStyles().Char(cs);
+            const bool pair = d != nullptr && d->attrs.count("font_family") && d->attrs.at("font_family") == "Arial" &&
+                              d->attrs.count("font_style") && d->attrs.at("font_style") == "Bold Italic" && !d->attrs.count("font");
+            N::RunStyle rs;
+            const bool applied = N::ApplyCharAttrs(rs, pick) && rs.font == "Arial" && rs.bold && rs.italic;
+            const N::StyleAttrs bad = { { "font_style", "Wobbly" } };
+            const bool refuses = !doc->SetStyleAttrs(false, cs, nullptr, &bad);
+            fprintf(stderr, "PROBE style options: made %d set %d pair %d applied %d refuses %d\n", (int)made, (int)set, (int)pair,
+                    (int)applied, (int)refuses);
+            expect("parity: style options take a family with the style picked under it", set && pair && applied && refuses);
+            if (made)
+               doc->DeleteStyle(false, cs);
+         }
+         {
+            // Apply Box: not finite counts as 0, sizes clamp to 1 .. FLT_MAX.
+            const int bx = doc->AddTextLayer("Hello", tx, ty, 0.0f);
+            float bw = 0.0f, bh = 0.0f;
+            const double nan = std::nan(""), inf = std::numeric_limits<double>::infinity();
+            const double b1[4] = { nan, inf, nan, -inf };
+            const bool c1 = doc->ApplyTextBox(bx, b1, &bw, &bh) && bw == 1.0f && bh == 1.0f && doc->FindLayer(bx)->x == 0.0f &&
+                            doc->FindLayer(bx)->y == 0.0f;
+            const double b2[4] = { 5.0, 6.0, 1e300, std::numeric_limits<double>::max() };
+            const float fmax = std::numeric_limits<float>::max();
+            const bool c2 = doc->ApplyTextBox(bx, b2, &bw, &bh) && bw == fmax && bh == fmax && doc->FindLayer(bx)->x == 5.0f &&
+                            doc->FindLayer(bx)->y == 6.0f;
+            const double b3[4] = { 0.0, 0.0, -20.0, 0.25 };
+            const bool c3 = doc->ApplyTextBox(bx, b3, &bw, &bh) && bw == 1.0f && bh == 1.0f;
+            doc->RemoveLayer(bx);
+            fprintf(stderr, "PROBE apply box clamps: %d %d %d\n", (int)c1, (int)c2, (int)c3);
+            expect("parity: apply box clamps sizes to a finite minimum and maximum", c1 && c2 && c3);
+         }
+         {
+            // Point <-> paragraph: for each alignment the ink stays (2 px) and no new line wraps; vertical keeps columns.
+            bool horiz = true, vert = true;
+            for (int al = 0; al < 3; al++)
+               for (int v = 0; v < 2; v++)
+               {
+                  const int ct = doc->AddTextLayer("Hello world", 150.0f, 100.0f, 0.0f);
+                  Layer* cl = doc->FindLayer(ct);
+                  cl->fontSize = 30.0f;
+                  cl->align = al;
+                  doc->Commit();
+                  if (v == 1)
+                     doc->SetVerticalType(ct, true);
+                  float lo0[2], hi0[2], lo1[2], hi1[2], lo2[2], hi2[2];
+                  int w0 = 0, h0 = 0, w1 = 0, h1 = 0;
+                  doc->Bounds(ct, lo0, hi0);
+                  doc->TextSize(*doc->FindLayer(ct), w0, h0);
+                  const bool noPoint = !doc->ConvertTextKind(ct, false);
+                  const bool toBox = doc->ConvertTextKind(ct, true) && doc->FindLayer(ct)->boxW > 0.0f;
+                  doc->Bounds(ct, lo1, hi1);
+                  doc->TextSize(*doc->FindLayer(ct), w1, h1);
+                  const bool toPoint = doc->ConvertTextKind(ct, false) && doc->FindLayer(ct)->boxW == 0.0f;
+                  doc->Bounds(ct, lo2, hi2);
+                  // The box is wider than the ink by the glyphs' side bearings (it wraps at advances, not ink), so the
+                  // edge the alignment holds is what stays: left, centre or right; columns keep their left.
+                  const float bear = std::ceil(30.0f * 0.15f);   // the 30 px size set above
+                  auto heldX = [&](const float* lo, const float* hi) { return v == 1 || al == 0 ? lo[0] : al == 1 ? (lo[0] + hi[0]) * 0.5f : hi[0]; };
+                  auto near = [&](const float* la, const float* ha, const float* lb, const float* hb) {
+                     return std::fabs(heldX(la, ha) - heldX(lb, hb)) <= 2.0f && std::fabs(la[1] - lb[1]) <= 2.0f;
+                  };
+                  const bool ok = noPoint && toBox && toPoint && near(lo0, hi0, lo1, hi1) && near(lo0, hi0, lo2, hi2) && std::abs(h1 - h0) <= 1 &&
+                                  w1 >= w0 - 2 && w1 - w0 <= (int)bear + 2;
+                  fprintf(stderr, "PROBE convert align %d vertical %d: %d (%.1f,%.1f)->(%.1f,%.1f)->(%.1f,%.1f) h %d->%d w %d->%d\n", al, v,
+                          (int)ok, lo0[0], lo0[1], lo1[0], lo1[1], lo2[0], lo2[1], h0, h1, w0, w1);
+                  (v == 0 ? horiz : vert) &= ok;
+                  doc->RemoveLayer(ct);
+               }
+            expect("parity: point and paragraph conversion keep the text in place", horiz);
+            expect("parity: vertical point and paragraph conversion keep the columns in place", vert);
+         }
+         {
+            // Paragraph -> point hardens each soft wrap into a line break; the words and the line count stay.
+            const int ht = doc->AddTextLayer("one two three four five six", tx, ty, 120.0f);
+            doc->FindLayer(ht)->fontSize = 18.0f;
+            doc->Commit();
+            int w0 = 0, h0 = 0, w1 = 0, h1 = 0;
+            doc->TextSize(*doc->FindLayer(ht), w0, h0);
+            const bool conv = doc->ConvertTextKind(ht, false);
+            const Layer* hl = doc->FindLayer(ht);
+            doc->TextSize(*hl, w1, h1);
+            std::string flat = hl->text;
+            const int nl = (int)std::count(flat.begin(), flat.end(), '\n');
+            flat.erase(std::remove(flat.begin(), flat.end(), '\n'), flat.end());
+            const bool ok = conv && nl >= 1 && nl == doc->LastHardenedWraps() && flat == "one two three four five six" &&
+                            hl->boxW == 0.0f && std::abs(h1 - h0) <= 4;
+            fprintf(stderr, "PROBE harden soft wraps: %d breaks, h %d -> %d, text '%s'\n", nl, h0, h1, hl->text.c_str());
+            expect("parity: paragraph to point hardens soft wraps", ok);
+            doc->RemoveLayer(ht);
+         }
+         {
+            // Orientation: one command both ways, the same parameters (a type layer and the direction).
+            const int ot = doc->AddTextLayer("AB", tx, ty, 0.0f);
+            const int op = doc->AddPaintLayer();
+            bool (N::*cmd)(int, bool) = &N::SetVerticalType;
+            const bool same = (doc->*cmd)(ot, true) && doc->FindLayer(ot)->vertical && (doc->*cmd)(ot, false) &&
+                              !doc->FindLayer(ot)->vertical && !(doc->*cmd)(op, true) && !(doc->*cmd)(op, false);
+            doc->RemoveLayer(ot);
+            doc->RemoveLayer(op);
+            expect("parity: vertical orientation params match horizontal", same);
+         }
+         {
+            // Vertical Type: a click or a drag makes a new vertical type layer, named so in History.
+            bool named = true;
+            const bool wasV = sTypeVertical;
+            sTypeVertical = true;
+            for (int box = 0; box < 2; box++)
+            {
+               const size_t u = gUndoStack.size();
+               sOp.start = ImVec2(0.0f, 0.0f);
+               sOp.docStart = ImVec2(100.0f, 20.0f);
+               sMouseDoc = box ? ImVec2(160.0f, 220.0f) : ImVec2(100.0f, 20.0f);
+               TextRelease(doc, box ? ImVec2(200.0f, 200.0f) : ImVec2(0.0f, 0.0f));
+               const Layer* nl = doc->FindLayer(sTextEdit);
+               const bool ok = gUndoStack.size() == u + 1 && gUndoStack.back().label == "New Vertical Type Layer" && nl != nullptr &&
+                               nl->vertical && (nl->boxW > 0.0f) == (box == 1);
+               fprintf(stderr, "PROBE vertical type layer (%s): %d\n", box ? "paragraph" : "point", (int)ok);
+               named &= ok;
+               const int nid = sTextEdit;
+               EndTextEdit(doc);
+               if (doc->FindLayer(nid) != nullptr)
+                  doc->RemoveLayer(nid);
+               while (gUndoStack.size() > u)
+                  gUndoStack.pop_back();
+            }
+            sTypeVertical = wasV;
+            expect("parity: vertical text is a new vertical type layer", named && std::string(N::NewTypeLayerName(false, false)) == "New text");
+         }
+         expect("parity: replacing missing family preserves a resolved run with the same label", kept);
+
+         // Default type style: saved from a layer, given to new layers, loaded onto one; Update All re-renders.
+         doc->StyleTextRange(tg, 0, npos, { { "size", "33" }, { "italic", "1" } });
+         const bool defSave = doc->SaveDefaultTypeStyle(tg) && doc->HasDefaultTypeStyle() && doc->DefaultTypeStyle().size == 33.0f;
+         const int td = doc->AddTextLayer("new", tx, ty, 0.0f);
+         const bool defNew = runAt(td, 0).size == 33.0f && runAt(td, 0).italic;
+         doc->StyleTextRange(tk, 0, npos, { { "size", "12" } });
+         const bool defLoad = doc->LoadDefaultTypeStyle(tk) && runAt(tk, 0).size == 33.0f && doc->UpdateAllTextLayers() >= 3;
+         expect("parity: lorem update fonts and default styles", defSave && defNew && defLoad && lorem);
+         fprintf(stderr, "PROBE default type: save %d new %d load %d\n", (int)defSave, (int)defNew, (int)defLoad);
+
+         // Spelling: lists words with suggestions, changes one or all, learns words.
+         const int ts1 = doc->AddTextLayer("teh cat and teh dog", tx, ty, 0.0f);
+         doc->FindLayer(ts1)->name = "Spell One";
+         const int ts2 = doc->AddTextLayer("zqxwv", tx, ty, 0.0f);
+         std::vector<N::Misspelling> ms = doc->CheckSpelling({ ts1 }, {});
+         const bool listed = ms.size() == 2 && ms[0].word == "teh" && ms[0].start == 0 && ms[0].end == 3 && ms[1].start == 12 &&
+                             !ms[0].suggestions.empty();
+         const bool one = doc->SpellChange(ts1, 0, 3, "teh", "the") && doc->FindLayer(ts1)->text == "the cat and teh dog" &&
+                          !doc->SpellChange(ts1, 0, 3, "teh", "the");
+         doc->ReplaceText(ts1, 0, 3, "teh");
+         const int all = doc->SpellChangeAll({ ts1 }, "teh", "the");
+         N::AddToDictionary("zqxwv");
+         const bool learned = doc->CheckSpelling({ ts2 }, {}).empty();
+         N::RemoveFromDictionary("zqxwv");
+         const bool unlearned = doc->CheckSpelling({ ts2 }, {}).size() == 1 && doc->CheckSpelling({ ts2 }, { "zqxwv" }).empty();
+         fprintf(stderr, "PROBE spelling: listed %zu one %d all %d learned %d unlearned %d\n", ms.size(), (int)one, all, (int)learned,
+                 (int)unlearned);
+         expect("parity: lists changes and learns words",
+                listed && one && all == 2 && doc->FindLayer(ts1)->text == "the cat and the dog" && learned && unlearned);
+         const bool byName = doc->TextLayerByName("Spell One") == ts1 && doc->TextLayerByName("No Such Layer") == 0;
+         expect("parity: named layer list and change all resolve a nonactive layer", byName);
+         const std::vector<size_t> co = N::CharOffsets("\xC2\xA9" "ab", { 0, 2, 3, 4 });
+         expect("parity: char offsets matches per offset counting", co.size() == 4 && co[1] == 1 && co[2] == 2 && co[3] == 3);
+         expect("parity: missing named spelling layer is an error for list and change all",
+                doc->TextLayerByName("No Such Layer") == 0 && doc->CheckSpelling({ 999999 }, {}).empty() && doc->SpellChangeAll({ 999999 }, "the", "teh") == 0);
+         doc->ReplaceText(ts1, 0, 3, "teh");
+         const int noLayer = doc->SpellChangeAll({}, "teh", "the");
+         expect("parity: change without layer edits the active type layer", noLayer >= 1 && doc->FindLayer(ts1)->text.rfind("the", 0) == 0);
+         std::string derr2;
+         expect("parity: disabled without type", doc->HasTextLayer() && doc->CheckSpelling({ px }, {}).empty() &&
+                                                    !doc->SpellChange(px, 0, 1, "a", "b", &derr2) && !doc->SetTypeFeature({ px }, "liga", 1, npos, npos));
+
+         // Shared attribute names take both spellings.
+         const bool names = doc->StyleTextRange(tg, 0, npos, { { "align", "centre" } }) && doc->StyleTextRange(tg, 0, npos, { { "align", "center" } }) &&
+                            doc->StyleTextRange(tg, 0, npos, { { "kerning", "optical" } }) && runAt(tg, 0).kernMode == 1 &&
+                            doc->StyleTextRange(tg, 0, npos, { { "caps", "allcaps" } }) && runAt(tg, 0).caps;
+         expect("parity: shared attribute names accept both spellings", names);
+         fprintf(stderr, "PROBE shared names: %d\n", (int)names);
+         for (int id : { ts2, ts1, td, tm, ln, tg, tk, px, tb, ta })
+            doc->RemoveLayer(id);
+         doc->Commit();
       }
       while (gUndoStack.size() > u0)
          Undo();
@@ -24427,6 +27963,114 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       const bool clamped = isWhite(6.5f, my);
       dab(BrushEngine::kClone, 6.0f, my, 6.0f, true, white, -12.0f, 0.0f);
       expect("periodic clone projection is disjoint and matches pixel modulo", clamped && isBlue(6.5f, my));
+      {
+         // The rest of periodic clone (PhotoCraft's periodic clone suite), on a blue disc at the middle.
+         auto red = [&](float x, float y) { float c[3] = { 1, 1, 1 }; doc->Pick(x, y, c, 1, wl); return c[0]; };
+         auto clone = [&](float x, float y, float size, bool wrap, float ox, float oy, float opacity, float flow, bool end) {
+            BrushEngine::Brush b;
+            b.mode = BrushEngine::kClone;
+            b.hardness = 1.0f;
+            b.size = size;
+            b.wrap = wrap;
+            b.opacity = opacity;
+            b.flow = flow;
+            b.sourceOffset[0] = ox;
+            b.sourceOffset[1] = oy;
+            const bool ok = doc->BeginPaint(wl, 0, b, x, y, 1.0f);
+            if (ok && end)
+               doc->EndPaint();
+            return ok;
+         };
+         auto disc = [&]() {
+            doc->FillPixels(wl, white, 1.0f);
+            dab(BrushEngine::kNormal, W * 0.5f, my, 24.0f, false, blue);
+         };
+         // Inside the canvas, under a selection, a wrapped clone is the ordinary one: inside and outside the selection.
+         disc();
+         doc->SelectRect(0.0f, 0.0f, W * 0.25f + 2.0f, H, 0, 0.0f, false);
+         clone(W * 0.25f, my, 10.0f, true, W * 0.25f, 0.0f, 1.0f, 1.0f, true);
+         const float inW = red(W * 0.25f - 2.5f, my), outW = red(W * 0.25f + 3.5f, my);
+         disc();
+         clone(W * 0.25f, my, 10.0f, false, W * 0.25f, 0.0f, 1.0f, 1.0f, true);
+         const float inO = red(W * 0.25f - 2.5f, my), outO = red(W * 0.25f + 3.5f, my);
+         doc->Deselect();
+         fprintf(stderr, "PROBE periodic clone interior: in %.2f/%.2f out %.2f/%.2f\n", inW, inO, outW, outO);
+         expect("parity: periodic clone interior matches ordinary brush masks and transparency",
+                inO < 0.1f && outO > 0.9f && std::fabs(inW - inO) < 0.02f && std::fabs(outW - outO) < 0.02f);
+         // Through a corner: what the live stroke shows is what the commit keeps, on every copy.
+         disc();
+         const float ox = W * 0.5f - 1.0f, oy = my - 1.0f;
+         float live = 1.0f, kept = 1.0f;
+         if (clone(1.0f, 1.0f, 8.0f, true, ox, oy, 1.0f, 1.0f, false))
+         {
+            live = red(W - 0.5f, H - 0.5f);
+            doc->EndPaint();
+            kept = red(W - 0.5f, H - 0.5f);
+         }
+         fprintf(stderr, "PROBE periodic clone corner: live %.2f kept %.2f\n", live, kept);
+         expect("parity: periodic clone live matches commit through a corner", kept < 0.1f && std::fabs(live - kept) < 0.02f);
+         // Low flow: going back over the seam builds up on both sides of it.
+         disc();
+         float once = 1.0f, twice = 1.0f;
+         if (clone(1.0f, my, 6.0f, true, ox, 0.0f, 1.0f, 0.3f, false))
+         {
+            once = red(W - 0.5f, my);
+            doc->PaintTo(3.0f, my, 1.0f);
+            doc->PaintTo(1.0f, my, 1.0f);
+            doc->PaintTo(3.0f, my, 1.0f);
+            doc->PaintTo(1.0f, my, 1.0f);
+            doc->EndPaint();
+            twice = red(W - 0.5f, my);
+         }
+         fprintf(stderr, "PROBE periodic clone flow: once %.2f again %.2f\n", once, twice);
+         expect("parity: periodic clone low flow revisits accumulate across tile aliases", once < 0.98f && twice < once - 0.05f);
+         // A wrapped clone stroke undoes to the very pixels it began on.
+         disc();
+         const float before = red(1.5f, my), beforeAlias = red(W - 0.5f, my);
+         PushUndoCheckpoint("Wrap clone");
+         clone(1.0f, my, 8.0f, true, ox, 0.0f, 1.0f, 1.0f, true);
+         const float after = red(W - 0.5f, my);
+         Undo();
+         doc = FindDoc();
+         const bool back = doc != nullptr && std::fabs(red(1.5f, my) - before) < 0.02f && std::fabs(red(W - 0.5f, my) - beforeAlias) < 0.02f;
+         fprintf(stderr, "PROBE periodic clone undo: after %.2f back %d\n", after, (int)back);
+         expect("parity: periodic clone live offer commits and undoes the same pixels as replay", after < 0.1f && back);
+         if (doc == nullptr)
+            return fails;
+         // Another document as the source (cross-document clone): its pixels, laid on this canvas, are what is copied.
+         const int ew = (int)W, eh = (int)H;
+         std::vector<uint8_t> ext((size_t)ew * eh * 4, 0);
+         for (size_t i = 0; i < ext.size(); i += 4)
+            ext[i] = 255, ext[i + 3] = 255;   // a red page
+         doc->FillPixels(wl, white, 1.0f);
+         doc->SetCloneExternal(ext, ew, eh);
+         float g0 = 0.0f, g1 = 0.0f;
+         float c[3] = { 0, 0, 0 };
+         if (clone(W * 0.5f, my, 10.0f, false, 0.0f, 0.0f, 1.0f, 1.0f, false))
+         {
+            doc->Pick(W * 0.5f, my, c, 1, wl);
+            g0 = c[1];
+            doc->EndPaint();
+         }
+         float k[3] = { 0, 0, 0 };
+         doc->Pick(W * 0.5f, my, k, 1, wl);
+         g1 = k[1];
+         fprintf(stderr, "PROBE cross doc clone: live g %.2f kept %.2f %.2f %.2f\n", g0, k[0], k[1], k[2]);
+         expect("parity: clone from another document samples the layer it was set on", k[0] > 0.9f && k[1] < 0.1f && k[2] < 0.1f);
+         expect("parity: live clone from another document matches the commit", std::fabs(g0 - g1) < 0.02f);
+         // Larger than the canvas, at half opacity, under a selection: half red once over the selection, white past it.
+         doc->FillPixels(wl, white, 1.0f);
+         doc->SelectRect(W * 0.5f, 0.0f, W, H, 0, 0.0f, false);
+         clone(-W, my, 3.0f * std::max(W, H), true, 0.0f, 0.0f, 0.5f, 1.0f, true);
+         doc->Deselect();
+         float in[3] = {}, outS[3] = {};
+         doc->Pick(W * 0.75f, my, in, 1, wl);
+         doc->Pick(W * 0.25f, my, outS, 1, wl);
+         doc->SetCloneExternal({}, 0, 0);
+         fprintf(stderr, "PROBE periodic clone large: in %.2f %.2f out %.2f\n", in[0], in[1], outS[1]);
+         expect("parity: periodic clone large footprint applies opacity once and respects destination masks",
+                in[0] > 0.9f && std::fabs(in[1] - 0.5f) < 0.08f && outS[1] > 0.9f);
+      }
       // Smudge with Wrap on still stops at the edge.
       doc->FillPixels(wl, white, 1.0f);
       dab(BrushEngine::kNormal, W - 3.0f, my, 6.0f, false, blue);
@@ -24441,6 +28085,474 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("Offset: without wrap the pixels leave and the strip clears",
              doc->OffsetPixels(wl, 0, -(int)H, false) == true && !isBlue(2.5f, my + 4.0f) && !isWhite(2.5f, my));
       expect("Offset: nothing to move is refused", !doc->OffsetPixels(wl, 0, 0, true));
+      {
+         // A vector mask over the pixels wraps with them: a mask on the right edge comes back on the left.
+         doc->FillPixels(wl, white, 1.0f);
+         dab(BrushEngine::kNormal, W - 3.0f, my, 6.0f, false, blue);
+         Layer* ml = doc->FindLayer(wl);
+         Scene2DNode::Shape mr;
+         mr.type = Scene2DNode::Shape::kRect;
+         mr.x0 = W - 8.0f, mr.y0 = my - 4.0f, mr.x1 = W, mr.y1 = my + 4.0f;
+         ml->vmask.assign(1, mr);
+         ml->hasVMask = true;
+         doc->Commit();
+         const bool moved = doc->OffsetPixels(wl, 8, 0, true);
+         const Layer* ol = doc->FindLayer(wl);
+         const bool folded = ol != nullptr && ol->vmask.size() == 1 && std::fabs(ol->vmask[0].x0) < 0.01f && std::fabs(ol->vmask[0].x1 - 8.0f) < 0.01f;
+         if (Layer* cl = doc->FindLayer(wl))
+         {
+            cl->vmask.clear();
+            cl->hasVMask = false;
+         }
+         doc->Commit();
+         fprintf(stderr, "PROBE wrap vector mask: moved %d folded %d\n", (int)moved, (int)folded);
+         expect("parity: translate wrap folds a linked vector mask with raster", moved && folded && isBlue(5.5f, my));
+      }
+      // A wrap of a layer that runs past the canvas folds only the canvas part (PhotoCraft's contained wrap): a
+      // sample left of the canvas stays where it is, and so does a vector mask off the canvas.
+      {
+         doc->FillPixels(wl, white, 1.0f);
+         dab(BrushEngine::kNormal, 3.5f, my, 3.0f, false, blue);
+         doc->CropTo(10.0f, 0.0f, W, H);   // x 3.5 is now 6.5 px left of the canvas; nothing deleted
+         Layer* ml = doc->FindLayer(wl);
+         Scene2DNode::Shape mr;
+         mr.type = Scene2DNode::Shape::kRect;
+         mr.x0 = -30, mr.y0 = 0, mr.x1 = -12, mr.y1 = 20;
+         ml->vmask.push_back(mr);
+         ml->hasVMask = true;
+         doc->Commit();
+         const bool moved = doc->OffsetPixels(wl, 5, 0, true);
+         const Layer* ol = doc->FindLayer(wl);
+         const bool maskStays = ol != nullptr && ol->vmask.size() == 1 && ol->vmask[0].x0 == -30.0f && ol->vmask[0].x1 == -12.0f;
+         if (Layer* cl = doc->FindLayer(wl))
+         {
+            cl->vmask.clear();
+            cl->hasVMask = false;
+         }
+         doc->CropTo(-10.0f, 0.0f, W - 10.0f, H);   // the canvas back as it was
+         const bool stays = moved && isBlue(3.5f, my) && !isBlue(8.5f, my);
+         fprintf(stderr, "PROBE wrap off canvas: moved %d stays %d mask %d\n", (int)moved, (int)stays, (int)maskStays);
+         expect("parity: translate wrap leaves off canvas samples in place", stays);
+         expect("parity: translate wrap leaves an off canvas vector mask in place", moved && maskStays);
+      }
+      // Crop with Delete Cropped Pixels: the paint layer loses what lies outside; type and vector layers stay whole,
+      // and inside the new canvas it shows as the same crop without delete.
+      {
+         doc->FillPixels(wl, white, 1.0f);
+         dab(BrushEngine::kNormal, 3.5f, my, 3.0f, false, blue);
+         dab(BrushEngine::kNormal, W * 0.5f, my, 6.0f, false, blue);
+         const int tx = doc->AddTextLayer("Keep", 2.0f, my, 0.0f);
+         int tw0 = 0, th0 = 0;
+         doc->TextSize(*doc->FindLayer(tx), tw0, th0);
+         const float tx0 = doc->FindLayer(tx)->x;
+         doc->CropTo(10.0f, 0.0f, W, H, true);
+         const Layer* tl = doc->FindLayer(tx);
+         int tw1 = 0, th1 = 0;
+         doc->TextSize(*tl, tw1, th1);
+         const bool typeWhole = tl != nullptr && tl->kind == Kind::Text && tl->text == "Keep" && tw1 == tw0 && th1 == th0 &&
+                                std::fabs(tl->x - (tx0 - 10.0f)) < 1e-3f;
+         const bool inside = isBlue(W * 0.5f - 10.0f, my);
+         doc->CropTo(-10.0f, 0.0f, W - 10.0f, H);
+         const bool gone = !isBlue(3.5f, my) && isBlue(W * 0.5f, my);
+         fprintf(stderr, "PROBE crop delete: type whole %d inside %d gone %d\n", (int)typeWhole, (int)inside, (int)gone);
+         expect("parity: delete cropped pixels keeps type and smart objects whole", typeWhole && inside && gone);
+         // Turned: the same crop with and without delete shows the same pixels on the new canvas.
+         doc->FillPixels(wl, white, 1.0f);
+         dab(BrushEngine::kNormal, W * 0.5f, my, 8.0f, false, blue);
+         dab(BrushEngine::kNormal, 2.5f, 2.5f, 4.0f, false, blue);
+         const size_t ut = gUndoStack.size();
+         const float pts[5][2] = { { 0.5f, 0.5f }, { 4.5f, 3.5f }, { W * 0.5f - 6.0f, my }, { W * 0.5f - 6.0f, my + 3.0f }, { W - 20.5f, H - 6.5f } };
+         float keep[5][3] = {}, del[5][3] = {};
+         PushUndoCheckpoint("Crop document");
+         doc->CropRotated(W * 0.5f, H * 0.5f, W - 12.0f, H - 12.0f, 7.0f, false);
+         for (int i = 0; i < 5; i++)
+            doc->Pick(pts[i][0], pts[i][1], keep[i], 1, wl);
+         while (gUndoStack.size() > ut)
+            Undo();
+         doc = FindDoc();
+         doc->Layers();
+         PushUndoCheckpoint("Crop document");
+         doc->CropRotated(W * 0.5f, H * 0.5f, W - 12.0f, H - 12.0f, 7.0f, true);
+         const Layer* tt = doc->FindLayer(tx);
+         float diff = 0.0f;
+         for (int i = 0; i < 5; i++)
+         {
+            doc->Pick(pts[i][0], pts[i][1], del[i], 1, wl);
+            for (int c = 0; c < 3; c++)
+               diff = std::max(diff, std::fabs(keep[i][c] - del[i][c]));
+         }
+         const bool turnedWhole = tt != nullptr && tt->text == "Keep";
+         fprintf(stderr, "PROBE turned crop delete: diff %.3f type %d\n", diff, (int)turnedWhole);
+         expect("parity: turned crop deleting pixels matches turning the whole canvas", diff < 0.02f);
+         expect("parity: turned crop deleting pixels keeps type and smart objects whole", turnedWhole && diff < 0.02f);
+         while (gUndoStack.size() > ut)
+            Undo();
+         doc = FindDoc();
+         doc->Layers();
+      }
+      // Type Mask (PhotoCraft type_mask_cmds, type_mask_off_canvas_tests): the typed text becomes the selection, no
+      // layer is left, the part past the canvas is kept, and it is the shape Select Layer Pixels gives for that text.
+      {
+         using SN = Scene2DNode;
+         auto count = [&]() {
+            size_t n = 0;
+            for (uint8_t v : doc->SelectionPixels())
+               n += v > 127 ? 1 : 0;
+            return doc->HasSelection() ? n : 0;
+         };
+         auto words = [&](const char* t, float x, float y) {
+            const int id = doc->AddTextLayer(t, x, y, 0.0f);
+            if (Layer* l = doc->FindLayer(id))
+               l->fontSize = std::round(H * 0.4f);
+            doc->Commit();
+            return id;
+         };
+         doc->Deselect();
+         int t = words("HI", W * 0.5f, my);
+         doc->SelectLayerPixels(t, SN::kSelNew, 0);
+         const size_t want = count();
+         doc->Deselect();
+         const bool made = doc->TypeMaskSelect(t, SN::kSelNew) && doc->FindLayer(t) == nullptr;
+         const size_t got = count();
+         const bool same = want > 20 && (got > want ? got - want : want - got) <= want / 50 + 2;
+         fprintf(stderr, "PROBE type mask: want %zu got %zu made %d\n", want, got, (int)made);
+         expect("parity: the selection is the glyph shape the type mask of the same text makes", made && same);
+         expect("parity: typed text selects its glyphs without a layer", made && got > 0);
+         // Started on the pasteboard: the glyphs left of the canvas are selected, and come in when the selection moves.
+         doc->Deselect();
+         t = words("HI", 0.0f, my);
+         if (Layer* pl = doc->FindLayer(t))
+         {
+            pl->x -= H * 0.2f;   // the text starts left of the canvas: its first glyph is on the pasteboard
+            doc->Commit();
+         }
+         int ex0 = 0, ey0 = 0, ex1 = 0, ey1 = 0;
+         const size_t onLeft = doc->TypeMaskSelect(t, SN::kSelNew) ? count() : 0;
+         const bool past = doc->SelectionExtent(ex0, ey0, ex1, ey1) && ex0 < 0;
+         doc->ShiftSelection(W * 0.5f, 0.0f);
+         const size_t movedIn = count();
+         fprintf(stderr, "PROBE type mask pasteboard: x0 %d on %zu moved %zu\n", ex0, onLeft, movedIn);
+         expect("parity: a mask started on the pasteboard selects the glyphs left of the canvas", past && movedIn > onLeft + 10);
+         // The same text masked off the left edge and moved on is, pixel for pixel, the mask made there.
+         {
+            const float cx = std::floor(W * 0.5f), shift = std::floor(W * 0.5f);
+            doc->Deselect();
+            t = words("HI", cx - shift, my);
+            doc->TypeMaskSelect(t, SN::kSelNew);
+            doc->ShiftSelection(shift, 0.0f);
+            const std::vector<uint8_t> movedSel = doc->SelectionPixels();
+            doc->Deselect();
+            t = words("HI", cx, my);
+            doc->TypeMaskSelect(t, SN::kSelNew);
+            const std::vector<uint8_t>& there = doc->SelectionPixels();
+            int worst = 255;
+            if (movedSel.size() == there.size())
+            {
+               worst = 0;
+               for (size_t i = 0; i < there.size(); i++)
+                  worst = std::max(worst, std::abs((int)movedSel[i] - (int)there[i]));
+            }
+            fprintf(stderr, "PROBE type mask moved on: worst %d\n", worst);
+            expect("parity: moving the selection onto the canvas shows the whole outline", worst <= 1 && count() > 20);
+         }
+         // Vertical type off the bottom: the part below the canvas is kept, and comes in when moved up.
+         doc->Deselect();
+         t = words("HI", W * 0.5f, H);
+         doc->SetVerticalType(t, true);
+         const size_t onBottom = doc->TypeMaskSelect(t, SN::kSelNew) ? count() : 0;
+         const bool below = doc->SelectionExtent(ex0, ey0, ex1, ey1) && ey1 > (int)H;
+         doc->ShiftSelection(0.0f, -H * 0.5f);
+         const size_t movedUp = count();
+         fprintf(stderr, "PROBE type mask vertical: y1 %d on %zu moved %zu\n", ey1, onBottom, movedUp);
+         expect("parity: a vertical mask keeps the part below the canvas", below && movedUp > onBottom + 10);
+         // No glyphs: Add and Subtract keep an earlier selection, New and Intersect clear it.
+         bool noGlyphs = true;
+         for (int op = 0; op < 4; op++)
+            for (int earlier = 0; earlier < 2; earlier++)
+            {
+               doc->Deselect();
+               if (earlier)
+                  doc->SelectRect(2.0f, 2.0f, 12.0f, 12.0f, SN::kSelNew, 0.0f, false);
+               const size_t before = count();
+               t = words("   ", W * 0.5f, my);
+               doc->TypeMaskSelect(t, op);
+               const bool kept = earlier && (op == SN::kSelAdd || op == SN::kSelSub);
+               noGlyphs = noGlyphs && (kept ? count() == before && before > 0 : count() == 0) && doc->FindLayer(t) == nullptr;
+            }
+         expect("parity: a mask with no glyphs keeps or clears as before", noGlyphs);
+         // A session is one "Type Mask" state: the edits typed during it fold into it.
+         doc->Deselect();
+         const size_t us = gUndoStack.size();
+         const bool maskWas = sTypeMask;
+         sTypeMask = true;
+         sTypeMaskOp = SN::kSelNew;
+         sTextUndo0 = gUndoStack.size();
+         PushUndoCheckpoint("Type Mask");
+         sTextEdit = words("H", W * 0.5f, my);
+         sTextNew = true;
+         PushUndoCheckpoint("Type text");
+         PushUndoCheckpoint("Type text");
+         EndTextEdit(doc);
+         sTypeMask = maskWas;
+         const bool oneState = gUndoStack.size() == us + 1 && gUndoStack.back().label == "Type Mask" && doc->HasSelection();
+         expect("parity: a type mask session is still one type mask state", oneState);
+         doc->Deselect();
+      }
+      // Replace Color (PhotoCraft adjust_cmds): the same clicks as Color Range, in click order, change what Color Range
+      // would select, one undo step.
+      {
+         using SN = Scene2DNode;
+         const float red[3] = { 0.85f, 0.1f, 0.1f }, green[3] = { 0.1f, 0.8f, 0.15f }, black[3] = { 0, 0, 0 };
+         const float g25[3] = { 0.25f, 0.25f, 0.25f }, g65[3] = { 0.65f, 0.65f, 0.65f }, g75[3] = { 0.75f, 0.75f, 0.75f };
+         doc->Deselect();
+         auto sample = [&](float x, float y, bool sub) {
+            SelectMaths::Sample k;
+            float c[3] = {};
+            doc->Pick(x, y, c, 1, wl);
+            std::copy(c, c + 3, k.rgb);
+            k.x = x;
+            k.y = y;
+            k.subtract = sub;
+            return k;
+         };
+         auto rgbAt = [&](float x, float y, float* c) { doc->Pick(x, y, c, 1, wl); };
+         auto moved = [&](const float* a, const float* b) { return std::max({ std::fabs(a[0] - b[0]), std::fabs(a[1] - b[1]), std::fabs(a[2] - b[2]) }) > 0.1f; };
+         auto covered = [&](float x, float y) {
+            const int cx = (int)x, cy = (int)H - 1 - (int)y;
+            const std::vector<uint8_t>& m = doc->SelectionPixels();
+            return doc->HasSelection() && m.size() == (size_t)doc->Doc().w * doc->Doc().h && m[(size_t)cy * doc->Doc().w + cx] > 127;
+         };
+         // The selection's soft weight at a point (0..1): a soft weight changes the pixel only part way.
+         auto weight = [&](float x, float y) {
+            const int cx = (int)x, cy = (int)H - 1 - (int)y;
+            const std::vector<uint8_t>& m = doc->SelectionPixels();
+            return doc->HasSelection() && m.size() == (size_t)doc->Doc().w * doc->Doc().h ? m[(size_t)cy * doc->Doc().w + cx] / 255.0f : 0.0f;
+         };
+         // Agrees with Color Range where the weight is clearly in or out; a weight between moves the pixel part way.
+         auto agrees = [&](const float* a, const float* b, float w) { return w > 0.7f ? moved(a, b) : w < 0.05f ? !moved(a, b) : true; };
+         const float xs[3] = { W * 0.2f, W * 0.5f, W * 0.8f };
+         doc->FillPixels(wl, white, 1.0f);
+         dab(BrushEngine::kNormal, xs[0], my, 12.0f, false, red);
+         dab(BrushEngine::kNormal, xs[1], my, 12.0f, false, blue);
+         dab(BrushEngine::kNormal, xs[2], my, 12.0f, false, green);
+         float before[3][3], after[3][3];
+         for (int i = 0; i < 3; i++)
+            rgbAt(xs[i], my, before[i]);
+         SelectMaths::RangeParams rp;
+         rp.fuzziness = 40.0f;
+         const std::vector<SelectMaths::Sample> two = { sample(xs[0], my, false), sample(xs[1], my, false) };
+         const size_t ur = gUndoStack.size();
+         PushUndoCheckpoint("Replace Color");
+         const bool ran = doc->ReplaceColor(wl, two, rp, 120.0f, 20.0f, 0.0f);
+         for (int i = 0; i < 3; i++)
+            rgbAt(xs[i], my, after[i]);
+         bool addsMatch = ran && moved(after[0], before[0]) && moved(after[1], before[1]) && !moved(after[2], before[2]);
+         Undo();
+         doc = FindDoc();
+         doc->Layers();
+         float back[3];
+         rgbAt(xs[0], my, back);
+         addsMatch = addsMatch && gUndoStack.size() == ur && !moved(back, before[0]);
+         doc->SelectColorRange(two, rp, false, SN::kSelNew, false, wl);
+         addsMatch = addsMatch && covered(xs[0], my) && covered(xs[1], my) && !covered(xs[2], my);
+         doc->Deselect();
+         std::string rerr;
+         const bool refused = !doc->ReplaceColor(wl, { sample(xs[0], my, false), SelectMaths::Sample{ { 0, 0, 0 }, 9999.0f, my, true } }, rp, 120.0f,
+                                                 0.0f, 0.0f, &rerr) &&
+                              rerr.find("replaceColor") != std::string::npos && rerr.find("outside") != std::string::npos;
+         fprintf(stderr, "PROBE replace colour adds: %d refused %d (%s)\n", (int)addsMatch, (int)refused, rerr.c_str());
+         expect("parity: replace color adds and subtracts samples as color range does", addsMatch && refused);
+         // Click order + - +: dark grey, mid grey taken out, light grey; Replace Color changes what Color Range covers.
+         doc->FillPixels(wl, black, 1.0f);
+         const float gx[4] = { W * 0.15f, W * 0.4f, W * 0.65f, W * 0.9f };
+         dab(BrushEngine::kNormal, gx[0], my, 12.0f, false, g25);
+         dab(BrushEngine::kNormal, gx[1], my, 12.0f, false, g65);
+         dab(BrushEngine::kNormal, gx[2], my, 12.0f, false, g75);
+         SelectMaths::RangeParams gp;
+         gp.fuzziness = 20.0f;
+         const std::vector<SelectMaths::Sample> order = { sample(gx[0], my, false), sample(gx[1], my, true), sample(gx[2], my, false) };
+         float gb[4][3], ga[4][3];
+         for (int i = 0; i < 4; i++)
+            rgbAt(gx[i], my, gb[i]);
+         PushUndoCheckpoint("Replace Color");
+         doc->ReplaceColor(wl, order, gp, 0.0f, 0.0f, 50.0f);
+         for (int i = 0; i < 4; i++)
+            rgbAt(gx[i], my, ga[i]);
+         Undo();
+         doc = FindDoc();
+         doc->Layers();
+         doc->SelectColorRange(order, gp, false, SN::kSelNew, false, wl);
+         bool agree = true;
+         float gw[4];
+         for (int i = 0; i < 4; i++)
+         {
+            gw[i] = weight(gx[i], my);
+            agree = agree && agrees(ga[i], gb[i], gw[i]);
+         }
+         // Dark grey in, mid grey taken out then partly re-added by the light grey after it, black out.
+         const bool lightBack = covered(gx[2], my) && !covered(gx[3], my) && gw[0] > 0.7f && gw[1] < gw[2];
+         doc->Deselect();
+         for (int i = 0; i < 4; i++)
+            fprintf(stderr, "PROBE replace colour order %d: before %.3f after %.3f moved %d weight %.2f\n", i, gb[i][0], ga[i][0],
+                    (int)moved(ga[i], gb[i]), gw[i]);
+         fprintf(stderr, "PROBE replace colour order: agree %d light %d\n", (int)agree, (int)lightBack);
+         expect("parity: replace color follows the click order as color range does", agree && lightBack);
+         // A subtract inside a wide added range: the add reaches every grey, the subtract takes the mid grey back out,
+         // and Replace Color leaves exactly what Color Range leaves out.
+         {
+            SelectMaths::RangeParams wp;
+            wp.fuzziness = 200.0f;
+            const std::vector<SelectMaths::Sample> wide = { sample(gx[0], my, false), sample(gx[1], my, true) };
+            float wa[4][3];
+            PushUndoCheckpoint("Replace Color");
+            doc->ReplaceColor(wl, wide, wp, 0.0f, 0.0f, 50.0f);
+            for (int i = 0; i < 4; i++)
+               rgbAt(gx[i], my, wa[i]);
+            Undo();
+            doc = FindDoc();
+            doc->Layers();
+            doc->SelectColorRange(wide, wp, false, SN::kSelNew, false, wl);
+            bool wAgree = true;
+            float ww[4];
+            for (int i = 0; i < 4; i++)
+            {
+               ww[i] = weight(gx[i], my);
+               wAgree = wAgree && agrees(wa[i], gb[i], ww[i]);
+            }
+            // The subtract takes the mid grey (and the light grey next to it) out; the dark grey keeps part of the add.
+            auto shift = [&](int i) { return std::fabs(wa[i][0] - gb[i][0]); };
+            const bool out = ww[1] < 0.05f && !moved(wa[1], gb[1]) && ww[0] > ww[1] + 0.1f && shift(0) > shift(1) + 0.01f;
+            doc->Deselect();
+            fprintf(stderr, "PROBE replace colour subtract inside: agree %d weights %.2f %.2f %.2f %.2f shifts %.3f %.3f %.3f %.3f\n",
+                    (int)wAgree, ww[0], ww[1], ww[2], ww[3], shift(0), shift(1), shift(2), shift(3));
+            expect("parity: replace color subtracting inside the added range takes a colour out", wAgree && out);
+         }
+         // Localized Color Clusters: the same cream left and right, a click on the left with a short range changes only
+         // the left one; without clusters both change; a selection that does not start at the origin keeps the click
+         // where it was made.
+         {
+            const float cream[3] = { 0.9f, 0.88f, 0.79f }, cream2[3] = { 0.88f, 0.86f, 0.76f }, grey[3] = { 0.5f, 0.5f, 0.5f };
+            const float lx = W * 0.1f, rx = W * 0.9f, mx = W * 0.5f, qx = W * 0.3f;
+            auto paintCreams = [&](bool second) {
+               doc->FillPixels(wl, grey, 1.0f);
+               dab(BrushEngine::kNormal, lx, my, 24.0f, false, cream);
+               dab(BrushEngine::kNormal, rx, my, 24.0f, false, cream);
+               if (second)
+                  dab(BrushEngine::kNormal, mx, my, 24.0f, false, cream2);
+               doc->Commit();
+            };
+            paintCreams(false);
+            float b0[3], b1[3], bg[3], a0[3], a1[3], ag[3];
+            rgbAt(lx, my, b0), rgbAt(rx, my, b1), rgbAt(qx, my, bg);
+            SelectMaths::RangeParams cp;
+            cp.fuzziness = 20.0f;
+            const std::vector<SelectMaths::Sample> left = { sample(lx, my, false) };
+            doc->ReplaceColor(wl, left, cp, 180.0f, 60.0f, 0.0f);
+            rgbAt(lx, my, a0), rgbAt(rx, my, a1);
+            const bool everywhere = moved(a0, b0) && moved(a1, b1);
+            paintCreams(false);
+            cp.localized = true;
+            cp.localRange = 30.0f;
+            doc->ReplaceColor(wl, left, cp, 180.0f, 60.0f, 0.0f);
+            rgbAt(lx, my, a0), rgbAt(rx, my, a1), rgbAt(qx, my, ag);
+            const bool nearOnly = moved(a0, b0) && !moved(a1, b1) && !moved(ag, bg);
+            paintCreams(false);
+            doc->SelectRect(2, 4, W - 4, H - 8, SN::kSelNew, 0.0f, false);
+            doc->ReplaceColor(wl, left, cp, 180.0f, 60.0f, 0.0f);
+            rgbAt(lx, my, a0), rgbAt(rx, my, a1);
+            const bool inSel = moved(a0, b0) && !moved(a1, b1);
+            doc->Deselect();
+            std::string lerr;
+            const bool needsClicks = !doc->ReplaceColor(wl, {}, cp, 180.0f, 0.0f, 0.0f, &lerr) && lerr.find("samples") != std::string::npos;
+            fprintf(stderr, "PROBE replace colour clusters: everywhere %d near %d sel %d clicks %d\n", (int)everywhere, (int)nearOnly, (int)inSel,
+                    (int)needsClicks);
+            expect("parity: replace color localized clusters only change the colour near the sample", everywhere && nearOnly && inSel && needsClicks);
+            // Two creams clicked, with clusters: each changes near its click, the far cream and the grey stay; Color
+            // Range covers the same places.
+            paintCreams(true);
+            float c0[3], c1[3], c2[3], c3[3];
+            rgbAt(lx, my, c0), rgbAt(mx, my, c1), rgbAt(rx, my, c2), rgbAt(qx, my, c3);
+            const std::vector<SelectMaths::Sample> both = { sample(lx, my, false), sample(mx, my, false) };
+            SelectMaths::RangeParams np = cp;
+            np.localRange = 20.0f;
+            doc->ReplaceColor(wl, both, np, 180.0f, 60.0f, 0.0f);
+            float d0[3], d1[3], d2[3], d3[3];
+            rgbAt(lx, my, d0), rgbAt(mx, my, d1), rgbAt(rx, my, d2), rgbAt(qx, my, d3);
+            const bool each = moved(d0, c0) && moved(d1, c1) && !moved(d2, c2) && !moved(d3, c3);
+            paintCreams(true);
+            doc->SelectColorRange(both, np, false, SN::kSelNew, false, wl);
+            const bool rangeAgrees = covered(lx, my) && covered(mx, my) && !covered(rx, my) && !covered(qx, my);
+            doc->Deselect();
+            fprintf(stderr, "PROBE replace colour two clusters: each %d range %d\n", (int)each, (int)rangeAgrees);
+            expect("parity: replace color localized clusters with several samples", each && rangeAgrees);
+         }
+         // Subtract-only clicks start from the From colour (null: the foreground); a bad colour changes nothing.
+         {
+            const float rx0 = W * 0.25f, bx0 = W * 0.75f, rgbRed[3] = { 0.85f, 0.1f, 0.1f }, rgbBlue[3] = { 0.1f, 0.15f, 0.85f };
+            auto paintRB = [&]() {
+               doc->FillPixels(wl, rgbRed, 1.0f);
+               dab(BrushEngine::kNormal, bx0, my, 30.0f, false, rgbBlue);
+               doc->Commit();
+            };
+            SelectMaths::RangeParams sp;
+            sp.fuzziness = 40.0f;
+            paintRB();
+            float r0[3], b0[3], r1[3], b1[3];
+            rgbAt(rx0, my, r0), rgbAt(bx0, my, b0);
+            const std::vector<SelectMaths::Sample> takeBlue = { sample(bx0, my, true) };
+            const bool ranFrom = doc->ReplaceColor(wl, takeBlue, sp, 120.0f, 0.0f, 0.0f, nullptr, rgbRed);
+            rgbAt(rx0, my, r1), rgbAt(bx0, my, b1);
+            const bool fromOk = ranFrom && moved(r1, r0) && !moved(b1, b0);
+            expect("parity: replace color subtract only starts from the from colour", fromOk);
+            // The panel passes the foreground as the From colour, so a null colour reads as the foreground.
+            paintRB();
+            float fg0[3];
+            std::copy(sFg, sFg + 3, fg0);
+            std::copy(rgbRed, rgbRed + 3, sFg);
+            const bool ranFg = doc->ReplaceColor(wl, takeBlue, sp, 120.0f, 0.0f, 0.0f, nullptr, sFg);
+            rgbAt(rx0, my, r1);
+            const bool fgOk = ranFg && moved(r1, r0);
+            expect("parity: replace color subtract only reads a null colour as the foreground", fgOk);
+            // Bad From colours: refused with nothing changed and no history step.
+            paintRB();
+            const std::string text0 = doc->DocText();
+            const size_t steps0 = gUndoStack.size();
+            bool badOk = true;
+            const float nanv = std::numeric_limits<float>::quiet_NaN();
+            const float bads[4][3] = { { nanv, 0, 0 }, { 1e30f, 0, 0 }, { -0.5f, 0, 0 }, { 0, 2, 0 } };
+            for (const auto& bc : bads)
+            {
+               std::string berr;
+               badOk = badOk && !doc->ReplaceColor(wl, takeBlue, sp, 90.0f, 0.0f, 0.0f, &berr, bc) && berr.find("bad colour") != std::string::npos;
+            }
+            badOk = badOk && doc->DocText() == text0 && gUndoStack.size() == steps0;
+            std::copy(fg0, fg0 + 3, sFg);
+            fprintf(stderr, "PROBE replace colour from: from %d fg %d bad %d\n", (int)fromOk, (int)fgOk, (int)badOk);
+            expect("parity: replace color null records foreground and bad color does not edit", fgOk && badOk);
+         }
+      }
+      // Type in Shape (PhotoCraft type.fillPath with a shape): area type takes the shape layer's outline, hole and all.
+      {
+         Layer& v = doc->AddLayer(Kind::Vector, 0, 0);
+         Scene2DNode::Shape outer, hole;
+         outer.type = hole.type = Scene2DNode::Shape::kRect;
+         outer.x0 = 20, outer.y0 = 20, outer.x1 = 320, outer.y1 = 220;
+         hole.x0 = 140, hole.y0 = 80, hole.x1 = 200, hole.y1 = 160;
+         hole.op = Scene2DNode::Shape::kSubtract;
+         v.shapes = { outer, hole };
+         const int vid = v.id;
+         doc->Commit();
+         int terr = 0;
+         const size_t pathsWas = doc->Paths().size();
+         const int at = doc->AddTypeInShape(vid, "words words words words words words", vid, &terr);
+         const Layer* al = doc->FindLayer(at);
+         const bool hole2 = al != nullptr && al->typeMode == 2 && al->typePath.size() == 2 && al->typePath[1].op == Scene2DNode::Shape::kSubtract &&
+                            doc->Paths().size() == pathsWas;
+         fprintf(stderr, "PROBE type in shape: id %d subs %zu err %d\n", at, al != nullptr ? al->typePath.size() : (size_t)0, terr);
+         expect("parity: fill path uses a shape layer with its hole", hole2);
+         doc->RemoveLayer(at);
+         doc->RemoveLayer(vid);
+      }
       while (gUndoStack.size() > u0)
          Undo();
       doc = FindDoc();
@@ -24557,6 +28669,605 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          if (doc == nullptr)
             return fails;
       }
+      // Per-dynamic curves and Fade (PhotoCraft brush_dynamics tests): size and opacity each answer pressure through
+      // their own curve, a preset round trip keeps the curve and setting it back gives the linear response; Fade
+      // ramps a dynamic to nothing over its step count.
+      {
+         const float dx = doc->Doc().w * 0.5f, dy = doc->Doc().h * 0.5f;
+         auto dabAt = [&](const BrushEngine::Brush& b, float p, int& width, float& alpha) {
+            const int l = doc->AddPaintLayer();
+            const bool ok = doc->BeginPaint(l, 0, b, dx, dy, p);
+            if (ok)
+               doc->EndPaint();
+            std::vector<uint8_t> px;
+            int pw = 0, ph = 0;
+            width = 0;
+            alpha = 0.0f;
+            if (ok && doc->ReadPaint(l, px, pw, ph) && px.size() >= (size_t)pw * ph * 4)
+            {
+               const int rr = ph - 1 - (int)dy;
+               for (int x = 0; x < pw; x++)
+                  width += px[((size_t)rr * pw + x) * 4 + 3] > 0 ? 1 : 0;
+               alpha = px[((size_t)rr * pw + (int)dx) * 4 + 3] / 255.0f;
+            }
+            doc->RemoveLayer(l);
+            return ok;
+         };
+         BrushEngine::Brush cb;
+         cb.mode = BrushEngine::kNormal;
+         cb.hardness = 1.0f;
+         cb.size = 40.0f;
+         cb.pressureSize = true;
+         cb.pressureOpacity = true;
+         cb.sizeCurveMid = 0.2f;
+         int wCurve = 0, wLin = 0, wBack = 0;
+         float aCurve = 0.0f, aLin = 0.0f, aBack = 0.0f;
+         const bool c1 = dabAt(cb, 0.5f, wCurve, aCurve);
+         BrushEngine::Brush lin = cb;
+         lin.sizeCurveMid = 0.5f;
+         const bool c2 = dabAt(lin, 0.5f, wLin, aLin);
+         fprintf(stderr, "PROBE curves: curve width %d alpha %.2f linear width %d alpha %.2f\n", wCurve, aCurve, wLin, aLin);
+         expect("parity: each dynamic responds through its own curve",
+                c1 && c2 && std::abs(wCurve - 8) <= 2 && std::abs(wLin - 20) <= 2 && std::fabs(aCurve - 0.5f) < 0.06f &&
+                    std::fabs(aLin - 0.5f) < 0.06f);
+         // Round trip through the preset fields, then set the curve back to linear.
+         std::map<std::string, std::vector<float>> kept;
+         BrushFields(cb, [&](const char* n, float* v, int c) { kept[n] = std::vector<float>(v, v + c); });
+         BrushEngine::Brush rt;
+         BrushFields(rt, [&](const char* n, float* v, int c) {
+            auto it = kept.find(n);
+            if (it != kept.end())
+               for (int k = 0; k < c && k < (int)it->second.size(); k++)
+                  v[k] = it->second[k];
+         });
+         const bool kept1 = std::fabs(rt.sizeCurveMid - 0.2f) < 1e-4f && std::fabs(rt.opacityCurveMid - 0.5f) < 1e-4f;
+         rt.sizeCurveMid = 0.5f;
+         const bool c3 = dabAt(rt, 0.5f, wBack, aBack);
+         fprintf(stderr, "PROBE curve preset: kept %d back width %d\n", kept1, wBack);
+         expect("parity: set brush takes a per dynamic curve and a patch resets it", kept1 && c3 && wBack == wLin);
+         // Fade: opacity ramps to nothing over ten dabs, so the far end of a long drag stays clear.
+         BrushEngine::Brush fb;
+         fb.mode = BrushEngine::kNormal;
+         fb.hardness = 1.0f;
+         fb.size = 10.0f;
+         fb.spacing = 0.5f;
+         fb.fadeOpacity = 10;
+         const int fl = doc->AddPaintLayer();
+         const float x0 = dx - 100.0f;
+         bool fok = doc->BeginPaint(fl, 0, fb, x0, dy, 1.0f);
+         if (fok)
+         {
+            for (int k = 1; k <= 40; k++)
+               doc->PaintTo(x0 + 5.0f * k, dy, 1.0f);
+            doc->EndPaint();
+         }
+         std::vector<uint8_t> fp;
+         int fw = 0, fh = 0;
+         float aStart = 0.0f, aMid = 0.0f, aFar = 1.0f;
+         if (fok && doc->ReadPaint(fl, fp, fw, fh) && fp.size() >= (size_t)fw * fh * 4)
+         {
+            const int rr = fh - 1 - (int)dy;
+            auto at = [&](float x) { return fp[((size_t)rr * fw + (int)x) * 4 + 3] / 255.0f; };
+            aStart = at(x0);
+            aMid = at(x0 + 25.0f);
+            aFar = at(x0 + 150.0f);
+         }
+         else
+            fok = false;
+         fprintf(stderr, "PROBE fade: start %.2f mid %.2f far %.2f\n", aStart, aMid, aFar);
+         expect("parity: fade ramps over steps", fok && aStart > 0.5f && aMid > 0.0f && aMid < aStart && aFar == 0.0f);
+         doc->RemoveLayer(fl);
+      }
+      // Pattern stamp parity (PhotoCraft pattern_stamp tests): blend modes, Behind, Impressionist, measured origins, the
+      // live stroke against its commit, the mask target and the tile seam.
+      {
+         const float big = 4.0f * (float)std::max(doc->Doc().w, doc->Doc().h);
+         const float cx = doc->Doc().w * 0.5f, cy = doc->Doc().h * 0.5f;
+         auto solidTile = [&](float r, float g, float bl) {
+            std::vector<uint8_t> t((size_t)16 * 16 * 4, 255);
+            for (size_t i = 0; i < t.size(); i += 4)
+            {
+               t[i] = (uint8_t)std::lround(r * 255.0f);
+               t[i + 1] = (uint8_t)std::lround(g * 255.0f);
+               t[i + 2] = (uint8_t)std::lround(bl * 255.0f);
+            }
+            return doc->SetPattern(t, 16, 16, 0);
+         };
+         auto greyDab = [&](int id, float x, float yy, float size, float g) {
+            BrushEngine::Brush b;
+            b.mode = BrushEngine::kNormal;
+            b.hardness = 1.0f;
+            b.size = size;
+            b.color[0] = b.color[1] = b.color[2] = g;
+            const bool ok = doc->BeginPaint(id, 0, b, x, yy, 1.0f);
+            if (ok)
+               doc->EndPaint();
+            return ok;
+         };
+         auto patBrush = [&](int blend) {
+            BrushEngine::Brush b;
+            b.mode = BrushEngine::kPatternStamp;
+            b.hardness = 1.0f;
+            b.size = big;
+            b.sourceBlend = blend;
+            return b;
+         };
+         auto stampWith = [&](int id, const BrushEngine::Brush& b, float x, float yy) {
+            const bool ok = doc->BeginPaint(id, 0, b, x, yy, 1.0f);
+            if (ok)
+               doc->EndPaint();
+            return ok;
+         };
+         auto near3 = [](const float* c, float r, float g, float bl) {
+            return std::fabs(c[0] - r) < 0.04f && std::fabs(c[1] - g) < 0.04f && std::fabs(c[2] - bl) < 0.04f;
+         };
+         // Other modes still paint over the pixels: red over mid grey multiplies, screens or replaces.
+         {
+            const int bl = doc->AddPaintLayer();
+            float m[3] = {}, s[3] = {}, n[3] = {};
+            const bool ok = solidTile(1.0f, 0.0f, 0.0f) && greyDab(bl, cx, cy, big, 0.5f) && stampWith(bl, patBrush(1), cx, cy) &&
+                            doc->Pick(cx, cy, m, 1, bl) && greyDab(bl, cx, cy, big, 0.5f) && stampWith(bl, patBrush(2), cx, cy) &&
+                            doc->Pick(cx, cy, s, 1, bl) && greyDab(bl, cx, cy, big, 0.5f) && stampWith(bl, patBrush(0), cx, cy) &&
+                            doc->Pick(cx, cy, n, 1, bl);
+            fprintf(stderr, "PROBE pattern blend: multiply %.2f %.2f %.2f screen %.2f %.2f %.2f normal %.2f %.2f %.2f\n", m[0], m[1], m[2], s[0], s[1],
+                    s[2], n[0], n[1], n[2]);
+            expect("parity: other modes still paint over the pixels",
+                   ok && near3(m, 0.5f, 0.0f, 0.0f) && near3(s, 1.0f, 0.5f, 0.5f) && near3(n, 1.0f, 0.0f, 0.0f));
+            doc->RemoveLayer(bl);
+         }
+         // The live picture while a stroke is down equals the picture once it is committed.
+         auto livePicture = [&]() {
+            static int frame = 7400000;
+            doc->CookIfNeeded(++frame);
+            std::vector<uint8_t> px;
+            int w = 0, h = 0;
+            doc->ReadOutput(px, w, h);
+            return px;
+         };
+         auto liveVsCommit = [&](int id, const BrushEngine::Brush& b, float x, float yy, int& diff, bool& changed) {
+            const std::vector<uint8_t> before = livePicture();
+            if (!doc->BeginPaint(id, 0, b, x, yy, 1.0f))
+               return false;
+            doc->PaintTo(x + 4.0f, yy, 1.0f);
+            const std::vector<uint8_t> live = livePicture();
+            doc->EndPaint();
+            const std::vector<uint8_t> done = livePicture();
+            diff = 0;
+            changed = live != before;
+            if (live.size() != done.size() || live.empty())
+               return false;
+            for (size_t i = 0; i < live.size(); i++)
+               diff = std::max(diff, std::abs((int)live[i] - (int)done[i]));
+            return true;
+         };
+         {
+            const int ll = doc->AddPaintLayer();
+            sPatternPick = 0;
+            UsePattern(doc);
+            int diff = 255;
+            bool changed = false;
+            BrushEngine::Brush b = patBrush(0);
+            b.size = 60.0f;
+            const bool ok = liveVsCommit(ll, b, cx, cy, diff, changed);
+            fprintf(stderr, "PROBE pattern live: ok %d changed %d diff %d\n", ok, changed, diff);
+            expect("parity: live pattern stamp matches the commit", ok && changed && diff <= 2);
+            doc->RemoveLayer(ll);
+         }
+         // Behind paints only where the layer is clear, live and committed alike.
+         {
+            const int bh = doc->AddPaintLayer();
+            float under[3] = {}, open[3] = {};
+            const bool ok = solidTile(1.0f, 0.0f, 0.0f) && greyDab(bh, cx, cy, 20.0f, 0.5f) && stampWith(bh, patBrush(7), cx, cy) &&
+                            doc->Pick(cx, cy, under, 1, bh) && doc->Pick(cx + 60.0f, cy, open, 1, bh);
+            expect("parity: pattern stamp behind keeps painted pixels and fills the clear ones", ok && near3(under, 0.5f, 0.5f, 0.5f) && near3(open, 1.0f, 0.0f, 0.0f));
+            const int bh2 = doc->AddPaintLayer();
+            int diff = 255;
+            bool changed = false;
+            const bool ok2 = greyDab(bh2, cx, cy, 20.0f, 0.5f) && liveVsCommit(bh2, patBrush(7), cx, cy, diff, changed);
+            fprintf(stderr, "PROBE pattern behind live: ok %d changed %d diff %d\n", ok2, changed, diff);
+            expect("parity: the live behind stroke matches the commit", ok2 && changed && diff <= 2);
+            doc->RemoveLayer(bh2);
+            doc->RemoveLayer(bh);
+         }
+         // Impressionist: seeded, so the same seed replays the same stroke and another seed scatters differently; with
+         // Behind picked it still paints as in Normal (over painted pixels).
+         {
+            sPatternPick = 0;
+            UsePattern(doc);
+            auto impStroke = [&](int id, uint32_t seed, int blend, std::vector<uint8_t>& px) {
+               BrushEngine::Brush b = patBrush(blend);
+               b.impressionist = true;
+               b.seed = seed;
+               b.size = 6.0f;
+               if (!doc->BeginPaint(id, 0, b, 10.0f, 10.0f, 1.0f))
+                  return false;
+               doc->PaintTo(100.0f, 10.0f, 1.0f);
+               doc->PaintTo(100.0f, 60.0f, 1.0f);
+               doc->EndPaint();
+               int w = 0, h = 0;
+               return doc->ReadPaint(id, px, w, h) && !px.empty();
+            };
+            const int i1 = doc->AddPaintLayer(), i2 = doc->AddPaintLayer(), i3 = doc->AddPaintLayer();
+            std::vector<uint8_t> a, b2, c;
+            const bool ok = impStroke(i1, 1234u, 0, a) && impStroke(i2, 1234u, 0, b2) && impStroke(i3, 99u, 0, c);
+            fprintf(stderr, "PROBE pattern impressionist: ok %d same %d other differs %d\n", ok, a == b2, a != c);
+            expect("parity: pattern stamp impressionist is seeded and replayable", ok && a == b2 && a != c);
+            const int i4 = doc->AddPaintLayer();
+            std::vector<uint8_t> d;
+            float g[3] = {};
+            const bool ok4 = greyDab(i4, cx, cy, big, 0.5f) && impStroke(i4, 1234u, 7, d) && doc->Pick(55.0f, 10.0f, g, 1, i4);
+            fprintf(stderr, "PROBE pattern impressionist behind: %.2f %.2f %.2f\n", g[0], g[1], g[2]);
+            expect("parity: impressionist paints as in normal when behind is picked", ok4 && std::fabs(g[0] - 0.5f) > 0.3f);
+            doc->RemoveLayer(i4);
+            doc->RemoveLayer(i3);
+            doc->RemoveLayer(i2);
+            doc->RemoveLayer(i1);
+         }
+         // Measured origins (PhotoCraft's stamp_phase): not aligned, each axis starts from half its tile plus one pixel,
+         // mirrored about the first point, whatever the tip size. Left half red, right half blue.
+         {
+            const int ml = doc->AddPaintLayer();
+            struct Case { int edge; float first; float origin; };
+            const Case cases[] = { { 20, 5.0f, 6.0f }, { 20, 50.0f, 1.0f }, { 20, 61.0f, 10.0f }, { 20, 45.0f, 6.0f }, { 30, 150.0f, 16.0f } };
+            bool all = doc->Doc().w > 200;
+            for (const Case& k : cases)
+            {
+               std::vector<uint8_t> t((size_t)k.edge * k.edge * 4, 255);
+               for (int ty = 0; ty < k.edge; ty++)
+                  for (int tx = 0; tx < k.edge; tx++)
+                  {
+                     uint8_t* q = &t[((size_t)ty * k.edge + tx) * 4];
+                     q[0] = tx < k.edge / 2 ? 255 : 0;
+                     q[1] = 0;
+                     q[2] = tx < k.edge / 2 ? 0 : 255;
+                  }
+               for (float tip : { big, 0.75f * big })
+               {
+                  BrushEngine::Brush b = patBrush(0);
+                  b.patternAligned = false;
+                  b.size = tip;
+                  float r0[3] = {}, b0[3] = {}, wrapc[3] = {};
+                  const bool ok = doc->SetPattern(t, k.edge, k.edge, 0) && stampWith(ml, b, k.first, 4.5f) && doc->Pick(k.origin + 1.5f, 4.5f, r0, 1, ml) &&
+                                  doc->Pick(k.origin + k.edge / 2 + 1.5f, 4.5f, b0, 1, ml) && doc->Pick(k.origin - 0.5f, 4.5f, wrapc, 1, ml);
+                  const bool hit = ok && near3(r0, 1.0f, 0.0f, 0.0f) && near3(b0, 0.0f, 0.0f, 1.0f) && near3(wrapc, 0.0f, 0.0f, 1.0f);
+                  if (!hit)
+                     fprintf(stderr, "PROBE pattern origin miss: edge %d first %.0f origin %.0f tip %.0f r %.2f b %.2f\n", k.edge, k.first, k.origin, tip, r0[0],
+                             b0[2]);
+                  all = all && hit;
+               }
+            }
+            expect("parity: measured origins paint reference pixels independent of tip size", all);
+            doc->RemoveLayer(ml);
+         }
+         // The tile seam: a row across several repeats equals a direct lookup of the tile, with no seam column.
+         {
+            const int sl = doc->AddPaintLayer();
+            sPatternPick = 0;
+            UsePattern(doc);
+            std::vector<uint8_t> tile;
+            int tw = 0, th = 0;
+            bool ok = Scene2DNode::BuiltinPattern(0, tile, tw, th) && tw > 0 && stampWith(sl, patBrush(0), cx, cy);
+            float first[3] = {};
+            ok = ok && doc->Pick(0.5f, 4.5f, first, 1, sl);
+            int bad = 0;
+            for (int x = 0; ok && x < 3 * tw; x++)
+            {
+               float c[3] = {};
+               if (!doc->Pick(x + 0.5f, 4.5f, c, 1, sl))
+               {
+                  ok = false;
+                  break;
+               }
+               // Within one tile row the checker flips every half tile; the first pixel fixes which row it is.
+               const bool flip = (x % tw) >= tw / 2;
+               const float want = flip ? 1.0f - first[0] : first[0];
+               bad += std::fabs(c[0] - want) > 0.1f ? 1 : 0;
+            }
+            fprintf(stderr, "PROBE pattern seam: tile %d bad %d\n", tw, bad);
+            expect("parity: pattern stamp tile seam matches an untilled reference", ok && bad == 0);
+            doc->RemoveLayer(sl);
+         }
+         // The mask target: the tile paints the layer's mask, the layer's pixels stay as they were.
+         {
+            const int kl = doc->AddPaintLayer();
+            sPatternPick = 0;
+            UsePattern(doc);
+            std::vector<uint8_t> before, after;
+            int w = 0, h = 0;
+            bool ok = greyDab(kl, cx, cy, big, 0.5f) && doc->AddPixelMask(kl) && doc->ReadPaint(kl, before, w, h);
+            const Layer* kL = doc->FindLayer(kl);
+            const std::vector<std::string> m0 = kL != nullptr ? kL->mtiles : std::vector<std::string>();
+            BrushEngine::Brush b = patBrush(0);
+            b.size = 60.0f;
+            ok = ok && doc->BeginPaint(kl, 1, b, cx, cy, 1.0f);
+            if (ok)
+               doc->EndPaint();
+            ok = ok && doc->ReadPaint(kl, after, w, h);
+            kL = doc->FindLayer(kl);
+            const bool maskMoved = kL != nullptr && kL->mtiles != m0;
+            fprintf(stderr, "PROBE pattern mask: ok %d mask changed %d pixels same %d\n", ok, maskMoved, before == after);
+            expect("parity: live pattern stamp paints the targeted mask", ok && maskMoved && before == after);
+            doc->RemoveLayer(kl);
+         }
+         // Protect Texture: picking another preset keeps the grain pattern, its mode comes from the new preset.
+         {
+            BrushEngine::Brush cur, next;
+            cur.grain = 1;
+            cur.grainTex = 77;
+            cur.grainTexW = cur.grainTexH = 32;
+            cur.grainMode = 0;
+            cur.protectTexture = true;
+            next.grain = 2;
+            next.grainMode = 2;
+            const BrushEngine::Brush kept = BrushEngine::WithProtectedTexture(next, cur);
+            BrushEngine::Brush off = cur;
+            off.protectTexture = false;
+            const BrushEngine::Brush plain = BrushEngine::WithProtectedTexture(next, off);
+            expect("parity: protect texture keeps pattern",
+                   kept.grain == 1 && kept.grainTex == 77u && kept.grainTexW == 32 && kept.grainMode == 2 && plain.grain == 2 && plain.grainTex == 0u);
+         }
+         // Sharpen Protect Detail (PhotoCraft retouch_sharpen_protect_detail_tests): a 96 | 160 step and a lone
+         // 160 pixel, one click of a hard 40 px tip at a strength, read back in 8-bit levels.
+         {
+            const int sp = doc->AddPaintLayer();
+            const int ex = (int)cx, ey = (int)cy;
+            auto lv = [&](int x, int y) {
+               float c[3] = {};
+               doc->Pick((float)x + 0.5f, (float)y + 0.5f, c, 1, sp);
+               return (int)std::lround(std::clamp(c[0], 0.0f, 1.0f) * 255.0f);
+            };
+            auto stepImage = [&]() {
+               const float lo[3] = { 96 / 255.0f, 96 / 255.0f, 96 / 255.0f }, hi[3] = { 160 / 255.0f, 160 / 255.0f, 160 / 255.0f };
+               doc->Deselect();
+               bool ok = doc->FillPixels(sp, hi, 1.0f);
+               doc->SelectRect(0.0f, 0.0f, (float)ex, (float)doc->Doc().h, 0, 0.0f, false);
+               ok = ok && doc->FillPixels(sp, lo, 1.0f);
+               doc->Deselect();
+               return ok;
+            };
+            auto sharpen = [&](int mode, float strength, float x0, float x1, int dabs) {
+               BrushEngine::Brush b;
+               b.mode = BrushEngine::kSharpen;
+               b.size = 40.0f;
+               b.hardness = 1.0f;
+               b.opacity = strength;
+               b.sharpMode = mode;
+               bool ok = doc->BeginPaint(sp, 0, b, x0, (float)ey + 0.5f, 1.0f);
+               if (ok)
+               {
+                  for (int k = 1; k < dabs; k++)
+                     doc->PaintTo(x0 + (x1 - x0) * k / (dabs - 1), (float)ey + 0.5f, 1.0f);
+                  doc->EndPaint();
+               }
+               return ok;
+            };
+            auto at = [&](int xd) { return lv(ex + xd - 400, ey); };
+            bool ok = stepImage() && sharpen(3, 1.0f, (float)ex + 0.5f, 0, 1);
+            const int want[7][2] = { { 396, 94 }, { 397, 92 }, { 398, 91 }, { 399, 90 }, { 400, 164 }, { 401, 163 }, { 402, 161 } };
+            bool full = ok;
+            for (const auto& w : want)
+               full = full && std::abs(at(w[0]) - w[1]) <= 3;
+            fprintf(stderr, "PROBE protect step 100: %d %d %d %d | %d %d %d\n", at(396), at(397), at(398), at(399), at(400), at(401), at(402));
+            ok = ok && stepImage() && sharpen(3, 0.5f, (float)ex + 0.5f, 0, 1);
+            const int h399 = at(399), h400 = at(400);
+            ok = ok && stepImage() && sharpen(3, 0.25f, (float)ex + 0.5f, 0, 1);
+            const int q399 = at(399), q400 = at(400);
+            ok = ok && stepImage() && sharpen(3, 0.01f, (float)ex + 0.5f, 0, 1);
+            bool same = ok;
+            for (int x = ex - 20; x < ex + 20 && same; x++)
+               same = lv(x, ey) == (x < ex ? 96 : 160);
+            fprintf(stderr, "PROBE protect step: half %d/%d quarter %d/%d one%% same %d\n", h399, h400, q399, q400, same);
+            expect("parity: one click on the step gives a low halo that follows strength",
+                   full && std::abs(h399 - 93) <= 2 && std::abs(h400 - 162) <= 2 && q399 < 96 && q400 > 160 && same);
+            // A lone pixel: Protect Detail lifts it a little, the plain unsharp mask a lot.
+            auto lone = [&](int mode) {
+               const float lo[3] = { 96 / 255.0f, 96 / 255.0f, 96 / 255.0f }, hi[3] = { 160 / 255.0f, 160 / 255.0f, 160 / 255.0f };
+               doc->Deselect();
+               bool k = doc->FillPixels(sp, lo, 1.0f);
+               doc->SelectRect((float)ex, (float)ey, (float)ex + 1.0f, (float)ey + 1.0f, 0, 0.0f, false);
+               k = k && doc->FillPixels(sp, hi, 1.0f);
+               doc->Deselect();
+               return k && sharpen(mode, 1.0f, (float)ex + 0.5f, 0, 1);
+            };
+            bool lok = lone(3);
+            const int centre = lv(ex, ey);
+            bool ring = lok;
+            for (int dy = -1; dy <= 1; dy++)
+               for (int dx = -1; dx <= 1; dx++)
+                  if (dx != 0 || dy != 0)
+                     ring = ring && lv(ex + dx, ey + dy) >= 93 && lv(ex + dx, ey + dy) <= 95;
+            lok = lok && lone(1);
+            const int offC = lv(ex, ey);
+            fprintf(stderr, "PROBE protect lone: centre %d ring %d off %d\n", centre, ring, offC);
+            expect("parity: one click on a lone pixel lifts it gently",
+                   lok && ring && std::abs(centre - 168) <= 4 && centre > 160 && 2 * (centre - 160) < offC - 160);
+            // Three drags across the step, each a stroke of its own: the halo widens, the sides stay monotone.
+            bool dok = stepImage();
+            int halos[3] = {};
+            bool mono = dok, noRing = dok;
+            for (int d = 0; d < 3 && dok; d++)
+            {
+               dok = sharpen(3, 1.0f, (float)ex - 30.0f, (float)ex + 30.0f, 7);
+               int halo = 0;
+               for (int x = ex - 40; x < ex + 40; x++)
+               {
+                  const int v = lv(x, ey);
+                  halo += std::abs(v - (x < ex ? 96 : 160)) >= 2 ? 1 : 0;
+                  noRing = noRing && (x < ex ? v < 255 : v > 0);
+               }
+               halos[d] = halo;
+               for (int x = ex - 5; x < ex - 1; x++)
+                  mono = mono && lv(x, ey) >= lv(x + 1, ey);
+               for (int x = ex; x < ex + 4; x++)
+                  mono = mono && lv(x, ey) >= lv(x + 1, ey);
+            }
+            fprintf(stderr, "PROBE protect drags: halos %d %d %d mono %d noring %d\n", halos[0], halos[1], halos[2], mono, noRing);
+            expect("parity: three drags widen the halo without ringing between black and white", dok && mono && noRing && halos[0] < halos[2]);
+            doc->RemoveLayer(sp);
+         }
+         // Mixer load (PhotoCraft mixer.rs and brush_cmds tests): a new colour loads the brush, the automatic Clean and
+         // Load run after the stroke, and with Load off a new foreground still loads at the next stroke.
+         {
+            const float blue[3] = { 0.0f, 0.0f, 1.0f }, green[3] = { 0.0f, 1.0f, 0.0f };
+            BrushEngine::MixerState st;
+            float nl[3] = {};
+            bool m = st.NextLoad(blue, nl) && MixerState3(nl, blue);
+            st.BeginStroke(blue);
+            m = m && st.hasRes && MixerState3(st.res, blue) && st.amount == 1.0f;
+            st.EndStroke(blue, true, false);
+            m = m && !st.NextLoad(blue, nl);
+            st.BeginStroke(blue);
+            m = m && !st.hasRes && !st.hasPick;
+            m = m && st.NextLoad(green, nl) && MixerState3(nl, green);
+            st.BeginStroke(green);
+            m = m && st.hasRes && MixerState3(st.res, green) && st.amount == 1.0f;
+            st.amount = 0.1f;
+            st.hasPick = true;
+            st.EndStroke(green, false, true);
+            m = m && st.hasRes && MixerState3(st.res, green) && st.amount == 1.0f && st.hasPick;
+            st.EndStroke(green, true, true);
+            m = m && st.hasRes && MixerState3(st.res, green) && st.amount == 1.0f && !st.hasPick;
+            expect("parity: a new color loads the brush and the automatic options run after the stroke", m);
+            // On the canvas: a red layer, a wet brush with Clean on and Load off.
+            const int mx = doc->AddPaintLayer();
+            const float red[4] = { 1.0f, 0.0f, 0.0f };
+            doc->Deselect();
+            bool ok = doc->FillPixels(mx, red, 1.0f);
+            auto row = [&](const float* col, float yy, float out[3]) {
+               BrushEngine::Brush b;
+               b.mode = BrushEngine::kNormal;
+               b.size = 6.0f;
+               b.hardness = 1.0f;
+               b.spacing = 0.25f;
+               b.wet = 0.5f;
+               b.refill = 0.5f;
+               b.autoClean = true;
+               b.autoLoad = false;
+               std::copy(col, col + 3, b.color);
+               bool k = doc->BeginPaint(mx, 0, b, cx - 95.0f, yy, 1.0f);
+               if (k)
+               {
+                  for (int i = 1; i <= 19; i++)
+                     doc->PaintTo(cx - 95.0f + 10.0f * i, yy, 1.0f);
+                  doc->EndPaint();
+               }
+               return k && doc->Pick(cx, yy, out, 1, mx);
+            };
+            float c1[3] = {}, c2[3] = {}, c3[3] = {};
+            ok = ok && row(blue, cy - 10.0f, c1) && row(green, cy, c2) && row(green, cy + 10.0f, c3);
+            fprintf(stderr, "PROBE mixer load: %.2f %.2f %.2f | %.2f %.2f %.2f | %.2f %.2f %.2f\n", c1[0], c1[1], c1[2], c2[0], c2[1], c2[2], c3[0],
+                    c3[1], c3[2]);
+            expect("parity: with the automatic load off a new foreground loads at the next stroke",
+                   ok && c1[2] > 0.2f && c2[1] > 0.2f && c3[1] < 0.01f && c3[2] < 0.01f && c3[0] > 0.1f);
+            doc->RemoveLayer(mx);
+         }
+         // Smudge modes (PhotoCraft smudge_mode_tests): a drag from the left colour across the boundary into the right.
+         {
+            const float RED[3] = { 200 / 255.0f, 40 / 255.0f, 40 / 255.0f }, BLUE[3] = { 40 / 255.0f, 40 / 255.0f, 200 / 255.0f };
+            const float BLACK[3] = { 0, 0, 0 }, WHITE[3] = { 1, 1, 1 };
+            const int sm = doc->AddPaintLayer();
+            auto lumOf = [](const float* c) { return 0.3f * c[0] + 0.59f * c[1] + 0.11f * c[2]; };
+            auto dragged = [&](const float* l, const float* r, int mode) {
+               doc->Deselect();
+               bool ok = doc->FillPixels(sm, r, 1.0f);
+               doc->SelectRect(0.0f, 0.0f, cx, (float)doc->Doc().h, 0, 0.0f, false);
+               ok = ok && doc->FillPixels(sm, l, 1.0f);
+               doc->Deselect();
+               BrushEngine::Brush b;
+               b.mode = BrushEngine::kSmudge;
+               b.size = 30.0f;
+               b.hardness = 0.5f;
+               b.opacity = b.flow = 1.0f;
+               b.smudgeMode = mode;
+               ok = ok && doc->BeginPaint(sm, 0, b, cx - 40.0f, cy, 1.0f);
+               if (ok)
+               {
+                  for (int k = 1; k <= 8; k++)
+                     doc->PaintTo(cx - 40.0f + 10.0f * k, cy, 1.0f);
+                  doc->EndPaint();
+               }
+               return ok;
+            };
+            const float xs[3] = { cx + 2.5f, cx + 10.5f, cx + 20.5f };
+            struct Row { float c[3][3]; };
+            auto sample = [&](const float* l, const float* r, int mode, Row& out) {
+               bool ok = dragged(l, r, mode);
+               for (int i = 0; i < 3 && ok; i++)
+                  ok = doc->Pick(xs[i], cy, out.c[i], 1, sm);
+               return ok;
+            };
+            Row n {}, dk {}, lt {};
+            bool ok = sample(RED, BLUE, 0, n) && sample(RED, BLUE, 1, dk) && sample(RED, BLUE, 2, lt);
+            bool minmax = ok, differs = false;
+            for (int i = 0; i < 3; i++)
+               for (int c = 0; c < 3; c++)
+               {
+                  minmax = minmax && dk.c[i][c] <= BLUE[c] + 0.02f && lt.c[i][c] >= BLUE[c] - 0.02f;
+                  differs = differs || std::fabs(dk.c[i][c] - n.c[i][c]) > 0.05f;
+               }
+            fprintf(stderr, "PROBE smudge darken/lighten: ok %d minmax %d differs %d dk %.2f %.2f %.2f lt %.2f %.2f %.2f\n", ok, minmax, differs, dk.c[0][0],
+                    dk.c[0][1], dk.c[0][2], lt.c[0][0], lt.c[0][1], lt.c[0][2]);
+            expect("parity: darken keeps the minimum and lighten the maximum", minmax && differs);
+            // Hue, Saturation and Color keep the blue's luminosity; Luminosity keeps a blue with equal red and green.
+            bool comp = ok;
+            Row hu {}, sa {}, co {}, lu {};
+            comp = comp && sample(RED, BLUE, 3, hu) && sample(RED, BLUE, 4, sa) && sample(RED, BLUE, 5, co) && sample(RED, BLUE, 6, lu);
+            for (int i = 0; i < 3 && comp; i++)
+            {
+               comp = std::fabs(lumOf(hu.c[i]) - lumOf(BLUE)) < 0.02f && std::fabs(lumOf(sa.c[i]) - lumOf(BLUE)) < 0.02f &&
+                      std::fabs(lumOf(co.c[i]) - lumOf(BLUE)) < 0.02f;
+               comp = comp && std::fabs(lu.c[i][0] - lu.c[i][1]) < 0.02f && lu.c[i][2] > lu.c[i][0];
+            }
+            expect("parity: component modes take one component from the smudged colour", comp);
+            // At the boundary: Hue and Color turn red at the blue's lightness, Saturation stays a blue, Luminosity a lighter
+            // blue (the reference's [170,10,10], [49,49,130], [70,70,230]); the trail's end and off the stroke stay blue.
+            float endC[3] = {}, offC[3] = {};
+            const bool ends = doc->Pick(cx + 75.5f, cy, endC, 1, sm) && doc->Pick(cx + 10.5f, cy - 40.0f, offC, 1, sm);
+            const float* h0 = hu.c[0];
+            const float* c0 = co.c[0];
+            const float* s0 = sa.c[0];
+            const float* l0 = lu.c[0];
+            const bool boundary = comp && ends && h0[0] > h0[2] + 0.2f && c0[0] > c0[2] + 0.2f && s0[2] > s0[0] + 0.1f && std::fabs(s0[0] - s0[1]) < 0.02f &&
+                                  l0[2] > l0[0] && lumOf(l0) > lumOf(BLUE) + 0.03f && std::fabs(endC[2] - BLUE[2]) < 0.02f && std::fabs(offC[2] - BLUE[2]) < 0.01f &&
+                                  std::fabs(offC[0] - BLUE[0]) < 0.01f;
+            fprintf(stderr, "PROBE smudge boundary: hue %.2f %.2f %.2f sat %.2f %.2f %.2f color %.2f %.2f %.2f lum %.2f %.2f %.2f\n", h0[0], h0[1], h0[2], s0[0],
+                    s0[1], s0[2], c0[0], c0[1], c0[2], l0[0], l0[1], l0[2]);
+            expect("parity: component modes match the reference at the boundary", boundary);
+            // Black into white: Lighten, Hue, Saturation and Color leave it; Darken and Luminosity give Normal's greys.
+            Row bn {}, tmp {};
+            bool bw = sample(BLACK, WHITE, 0, bn);
+            const bool normalMoved = bw && bn.c[0][0] < 0.9f;
+            for (int mode : { 2, 3, 4, 5 })
+            {
+               bw = bw && sample(BLACK, WHITE, mode, tmp);
+               for (int i = 0; i < 3 && bw; i++)
+                  bw = tmp.c[i][0] > 0.98f && tmp.c[i][1] > 0.98f && tmp.c[i][2] > 0.98f;
+            }
+            for (int mode : { 1, 6 })
+            {
+               bw = bw && sample(BLACK, WHITE, mode, tmp);
+               for (int i = 0; i < 3 && bw; i++)
+                  bw = std::fabs(tmp.c[i][0] - tmp.c[i][1]) < 0.02f && std::fabs(tmp.c[i][1] - tmp.c[i][2]) < 0.02f && std::fabs(tmp.c[i][0] - bn.c[i][0]) < 0.03f;
+            }
+            expect("parity: black into white changes only in normal darken and luminosity", bw && normalMoved);
+            // Smudge paints the surface as it goes, so the live stroke already shows the mode it commits.
+            {
+               dragged(RED, BLUE, 0);
+               BrushEngine::Brush b;
+               b.mode = BrushEngine::kSmudge;
+               b.size = 30.0f;
+               b.smudgeMode = 1;
+               b.spacing = 0.03f;   // several dabs over the short drag (the first dab only picks up)
+               int diff = 255;
+               bool changed = false;
+               // Where the earlier drag left red fading into blue, so Darken has something to keep.
+               const bool lv = liveVsCommit(sm, b, cx + 28.0f, cy, diff, changed);
+               fprintf(stderr, "PROBE smudge live: ok %d changed %d diff %d\n", lv, changed, diff);
+               expect("parity: the live stroke previews the mode", lv && changed && diff <= 2);
+            }
+            doc->RemoveLayer(sm);
+         }
+      }
       while (gUndoStack.size() > u0)
          Undo();
       doc = FindDoc();
@@ -24624,6 +29335,90 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("Presets: next brush wraps from the last saved to the first built-in", sUserPick == -1 && sBrushPreset >= 0);
       StepPreset(-1);
       expect("Presets: previous brush wraps back to the last saved", sUserPick == 1 && sBrush.size == 55.0f);
+      {
+         // Capture boxes (PhotoCraft presets_save_captures_size_tool_settings_and_color_as_asked).
+         sUserPresets.clear();
+         const float fgWas[3] = { sFg[0], sFg[1], sFg[2] };
+         sBrush.size = 40.0f;
+         sBrush.opacity = 0.5f;
+         sBrush.flow = 0.25f;
+         sBrush.mode = BrushEngine::kMultiply;
+         sBrush.pressureSize = false;
+         sFg[0] = 1.0f, sFg[1] = 0.0f, sFg[2] = 0.0f;
+         sSaveCapSize = sSaveCapTool = true, sSaveCapColour = false;
+         const int legacy = SaveUserPreset(sBrush, false);
+         sSaveCapSize = sSaveCapTool = false;
+         const int bare = SaveUserPreset(sBrush, false);
+         sSaveCapSize = sSaveCapTool = true, sSaveCapColour = true;
+         const int red = SaveUserPreset(sBrush, false);
+         sSaveCapColour = false;
+         ParseUserPresets(UserPresetText());   // the boxes survive a reload
+         auto other = [&]() {
+            sBrush.size = 9.0f;
+            sBrush.opacity = 1.0f;
+            sBrush.flow = 1.0f;
+            sBrush.mode = BrushEngine::kNormal;
+            sBrush.pressureSize = true;
+            sFg[0] = 0.0f, sFg[1] = 0.0f, sFg[2] = 1.0f;
+         };
+         other();
+         PickUserPreset(legacy, sBrush);
+         const bool all = sBrush.size == 40.0f && sBrush.opacity == 0.5f && sBrush.flow == 0.25f && sBrush.mode == BrushEngine::kMultiply &&
+                          !sBrush.pressureSize && sFg[2] == 1.0f;
+         other();
+         PickUserPreset(bare, sBrush);
+         const bool own = sBrush.size == 9.0f && sBrush.opacity == 1.0f && sBrush.flow == 1.0f && sBrush.mode == BrushEngine::kNormal &&
+                          sBrush.pressureSize;
+         other();
+         PickUserPreset(red, sBrush);
+         const bool colour = sFg[0] == 1.0f && sFg[2] == 0.0f && sBrush.size == 40.0f;
+         std::copy(fgWas, fgWas + 3, sFg);
+         fprintf(stderr, "PROBE preset captures: all %d own %d colour %d\n", (int)all, (int)own, (int)colour);
+         expect("parity: presets save captures size tool settings and color as asked", all && own && colour);
+         // Every built-in round-trips through the saved text, and every painting one paints.
+         bool trip = true, paints = true;
+         std::string bad;
+         for (const auto& p : BrushEngine::Presets())
+         {
+            sUserPresets.clear();
+            sUserPresets.push_back({ p.name, p.brush, p.brush.mode == BrushEngine::kErase });
+            const std::string text = UserPresetText();
+            ParseUserPresets(text);
+            BrushEngine::Brush a = p.brush, b = sUserPresets.empty() ? BrushEngine::Brush() : sUserPresets[0].brush;
+            std::vector<float> va, vb;
+            BrushFields(a, [&](const char*, float* v, int c) { va.insert(va.end(), v, v + c); });
+            BrushFields(b, [&](const char*, float* v, int c) { vb.insert(vb.end(), v, v + c); });
+            bool same = sUserPresets.size() == 1 && sUserPresets[0].name == p.name && va.size() == vb.size();
+            for (size_t k = 0; same && k < va.size(); k++)
+               same = std::fabs(va[k] - vb[k]) <= 1e-4f * std::max(1.0f, std::fabs(va[k]));
+            if (!same && bad.empty())
+               bad = p.name;
+            trip = trip && same;
+            if (p.brush.mode == BrushEngine::kNormal && doc != nullptr)
+            {
+               const int pl = doc->AddPaintLayer();
+               BrushEngine::Brush pb = p.brush;
+               pb.color[0] = pb.color[1] = pb.color[2] = 0.2f;
+               const float py = doc->Doc().h * 0.5f, px0 = doc->Doc().w * 0.25f;
+               bool any = false;
+               if (doc->BeginPaint(pl, 0, pb, px0, py, 0.8f))
+               {
+                  for (int k = 1; k < 20; k++)
+                     doc->PaintTo(px0 + k * 8.0f, py, 0.8f);
+                  doc->EndPaint();
+                  float c[3] = {};
+                  for (int k = 0; k < 20 && !any; k++)
+                     any = doc->Pick(px0 + k * 8.0f, py, c, 9, pl);
+               }
+               if (!any && bad.empty())
+                  bad = std::string(p.name) + " (paints nothing)";
+               paints = paints && any;
+               doc->RemoveLayer(pl);
+            }
+         }
+         fprintf(stderr, "PROBE presets round trip: trip %d paints %d first bad '%s'\n", (int)trip, (int)paints, bad.c_str());
+         expect("parity: presets render and round trip", trip && paints);
+      }
       sUserPresets = keep;
       sUserPick = keepPick;
       sUserPickErase = keepPickE;
@@ -25133,6 +29928,7 @@ std::string View2DAuditState(int i)
    if (doc == nullptr || i < 0 || i >= View2DAuditStateCount())
       return std::string();
    sAuditState = i;
+   sAuditFrozen = true;
    sSideOpen = true;
    sOp = Op();
    sRename = 0;
@@ -25431,7 +30227,7 @@ std::string View2DAuditRanges()
 }
 
 // Puts the panel back as the current state had it (a poke may have changed the tool, tab or selection).
-void View2DAuditEnd() { sAuditState = -1; }
+void View2DAuditEnd() { sAuditState = -1; sAuditFrozen = false; }
 
 void View2DAuditRestore()
 {

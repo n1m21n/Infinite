@@ -1,6 +1,7 @@
 // Scene 2D paint: paint-layer surfaces and their tiles, pixel masks, the
 // document selection, bucket, gradient and pick. Plan: internal/plans/2d-view (Block B).
 #include "Scene2DNode.h"
+#include "ColorSpace.h"
 #include "ArtHistory.h"
 #include "GLUtil.h"
 
@@ -50,6 +51,13 @@ namespace
       "uniform int uLock;\n"
       "uniform int uExtend;\n"
       "uniform int uDither;\n"
+      "uniform int uMethod;\n"
+      // Smooth: Photoshop's measured Classic black-to-white curve every tenth, and Foreground-to-Transparent's opacity
+      // every quarter (PhotoCraft paint_gradient_sample_tests / gradient_alpha_method_tests, Apache 2.0).
+      "const float kSmoothC[11] = float[11](0.0, 2.0, 17.0, 42.0, 70.0, 99.0, 129.0, 162.0, 196.0, 228.0, 255.0);\n"
+      "const float kSmoothA[5] = float[5](0.0, 76.0, 155.0, 220.0, 255.0);\n"
+      "float SmoothC(float t) { float f = clamp(t, 0.0, 1.0) * 10.0; int i = min(int(f), 9); return mix(kSmoothC[i], kSmoothC[i + 1], f - float(i)) / 255.0; }\n"
+      "float SmoothA(float t) { float f = clamp(t, 0.0, 1.0) * 4.0; int i = min(int(f), 3); return mix(kSmoothA[i], kSmoothA[i + 1], f - float(i)) / 255.0; }\n"
       "void main() {\n"
       "   vec2 sp = vUv * uSurfSize;\n"
       "   vec2 bp = vec2(sp.x * uBox.x / uSurfSize.x, (uSurfSize.y - sp.y) * uBox.y / uSurfSize.y);\n"
@@ -82,6 +90,7 @@ namespace
       "      if (uExtend == 1) t = fract(t);\n"                       // repeat
       "      else if (uExtend == 2) t = 1.0 - abs(mod(t, 2.0) - 1.0);\n"   // reflect
       "      c = mix(uColA, uColB, clamp(t, 0.0, 1.0));\n"
+      "      if (uMethod == 1) c = vec4(mix(uColA.rgb, uColB.rgb, SmoothC(t)), mix(uColA.a, uColB.a, SmoothA(t)));\n"
       "      if (uDither == 1) c.rgb += (fract(sin(dot(sp, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;\n"
       "   }\n"
       "   float a = clamp(c.a * cov * sel * uOpacity, 0.0, 1.0);\n"
@@ -477,6 +486,394 @@ bool Scene2DNode::HealRegion(std::vector<uint8_t>& px, int w, int h, const std::
    const std::vector<float> orig = img;
    PushPull(img, hole, cw, chh);
    return HealTiled(px, w, h, img, orig, hole, m8, cx0, cy0, cw, chh, bx0 - cx0, by0 - cy0, bw, bh, !autoOff, ox, oy);
+}
+
+// Crop Fill: Content-Aware, after PhotoCraft engine/src/crop_fill.rs (Apache 2.0, (c) the PhotoCraft authors): coverage
+// by the crop's map, uncovered pieces labelled 8-connected, each filled on its own.
+double Scene2DNode::CropMargin(const double m[6], bool rotated)
+{
+   return 0.5 * (std::fabs(m[0]) + std::fabs(m[1])) + (rotated ? 1.0 : 0.0);
+}
+
+bool Scene2DNode::CropCovered(const double m[6], double ow, double oh, int u, int v, double margin)
+{
+   const double cu = u + 0.5, cv = v + 0.5;
+   const double x = m[0] * cu + m[1] * cv + m[4], y = m[2] * cu + m[3] * cv + m[5];
+   return x >= margin && y >= margin && x <= ow - margin && y <= oh - margin;
+}
+
+std::vector<std::array<int, 4>> Scene2DNode::LabelComponents(std::vector<uint32_t>& l, int w, int h)
+{
+   std::vector<std::array<int, 4>> pieces;
+   if (w <= 0 || h <= 0 || l.size() < (size_t)w * h)
+      return pieces;
+   std::vector<int> stack;
+   for (int start = 0; start < w * h; start++)
+   {
+      if (l[start] != kUnlabelled)
+         continue;
+      const uint32_t k = (uint32_t)pieces.size() + 1;
+      int x0 = w, y0 = h, x1 = -1, y1 = -1;
+      l[start] = k;
+      stack.push_back(start);
+      while (!stack.empty())
+      {
+         const int i = stack.back();
+         stack.pop_back();
+         const int x = i % w, y = i / w;
+         x0 = std::min(x0, x), y0 = std::min(y0, y), x1 = std::max(x1, x), y1 = std::max(y1, y);
+         for (int dy = -1; dy <= 1; dy++)
+            for (int dx = -1; dx <= 1; dx++)
+            {
+               const int nx = x + dx, ny = y + dy;
+               if ((dx == 0 && dy == 0) || nx < 0 || ny < 0 || nx >= w || ny >= h)
+                  continue;
+               const int j = ny * w + nx;
+               if (l[j] == kUnlabelled)
+               {
+                  l[j] = k;
+                  stack.push_back(j);
+               }
+            }
+      }
+      pieces.push_back({ x0, y0, x1 + 1, y1 + 1 });
+   }
+   return pieces;
+}
+
+// Crop and Straighten Photos, after PhotoCraft algo/src/scancrop.rs (Apache 2.0, (c) the PhotoCraft authors): background
+// = border median, foreground by Otsu on the colour distance, closed and opened, 8-connected pieces, then the
+// minimum-area rectangle of each piece's hull (Freeman and Shapira 1975), shrunk by a px.
+namespace
+{
+   float OtsuThreshold(const std::vector<float>& v)
+   {
+      constexpr int B = 256;
+      double hist[B] = {};
+      for (float x : v)
+         hist[(int)(std::clamp(x, 0.0f, 1.0f) * (B - 1))] += 1.0;
+      double total = 0, sum = 0;
+      for (int i = 0; i < B; i++)
+         total += hist[i], sum += i * hist[i];
+      double wb = 0, sb = 0, best = 0;
+      int thr = 0;
+      for (int i = 0; i < B; i++)
+      {
+         wb += hist[i];
+         if (wb == 0)
+            continue;
+         const double wf = total - wb;
+         if (wf == 0)
+            break;
+         sb += i * hist[i];
+         const double mb = sb / wb, mf = (sum - sb) / wf, between = wb * wf * (mb - mf) * (mb - mf);
+         if (between > best)
+            best = between, thr = i;
+      }
+      return (thr + 0.5f) / (B - 1);
+   }
+
+   std::vector<uint8_t> Morph(int w, int h, const std::vector<uint8_t>& m, int r, bool dilate)
+   {
+      auto pass = [&](const std::vector<uint8_t>& src, bool horizontal) {
+         std::vector<uint8_t> out((size_t)w * h, 0);
+         for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+               bool acc = !dilate;
+               for (int d = -r; d <= r; d++)
+               {
+                  const int xx = horizontal ? x + d : x, yy = horizontal ? y : y + d;
+                  const bool v = xx >= 0 && yy >= 0 && xx < w && yy < h && src[(size_t)yy * w + xx] != 0;
+                  acc = dilate ? (acc || v) : (acc && v);
+               }
+               out[(size_t)y * w + x] = acc ? 1 : 0;
+            }
+         return out;
+      };
+      return pass(pass(m, true), false);
+   }
+
+   std::vector<std::array<double, 2>> ConvexHull(std::vector<std::array<double, 2>> pts)
+   {
+      std::sort(pts.begin(), pts.end());
+      pts.erase(std::unique(pts.begin(), pts.end()), pts.end());
+      if (pts.size() < 3)
+         return pts;
+      auto cross = [](const std::array<double, 2>& o, const std::array<double, 2>& a, const std::array<double, 2>& b) {
+         return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+      };
+      std::vector<std::array<double, 2>> lo, up;
+      for (const auto& p : pts)
+      {
+         while (lo.size() >= 2 && cross(lo[lo.size() - 2], lo.back(), p) <= 0)
+            lo.pop_back();
+         lo.push_back(p);
+      }
+      for (auto it = pts.rbegin(); it != pts.rend(); ++it)
+      {
+         while (up.size() >= 2 && cross(up[up.size() - 2], up.back(), *it) <= 0)
+            up.pop_back();
+         up.push_back(*it);
+      }
+      lo.pop_back();
+      up.pop_back();
+      lo.insert(lo.end(), up.begin(), up.end());
+      return lo;
+   }
+}
+
+std::vector<Scene2DNode::FoundPhoto> Scene2DNode::FindPhotos(int w, int h, const std::vector<uint8_t>& rgba)
+{
+   std::vector<FoundPhoto> out;
+   if (w < 8 || h < 8 || rgba.size() < (size_t)w * h * 4)
+      return out;
+   const int k = std::max(1, (std::max(w, h) + 799) / 800);
+   const int sw = (w + k - 1) / k, sh = (h + k - 1) / k;
+   std::vector<std::array<float, 3>> small((size_t)sw * sh, { 0, 0, 0 });
+   std::vector<int> cnt((size_t)sw * sh, 0);
+   for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
+      {
+         const size_t i = (size_t)(y / k) * sw + x / k;
+         const uint8_t* p = &rgba[((size_t)y * w + x) * 4];
+         for (int c = 0; c < 3; c++)
+            small[i][c] += p[c] / 255.0f;
+         cnt[i]++;
+      }
+   for (size_t i = 0; i < small.size(); i++)
+      for (float& v : small[i])
+         v /= (float)std::max(1, cnt[i]);
+   std::vector<std::array<float, 3>> border;
+   for (int x = 0; x < sw; x++)
+      border.push_back(small[x]), border.push_back(small[(size_t)(sh - 1) * sw + x]);
+   for (int y = 0; y < sh; y++)
+      border.push_back(small[(size_t)y * sw]), border.push_back(small[(size_t)y * sw + sw - 1]);
+   float bg[3];
+   for (int c = 0; c < 3; c++)
+   {
+      std::vector<float> v;
+      for (const auto& p : border)
+         v.push_back(p[c]);
+      std::sort(v.begin(), v.end());
+      bg[c] = v[v.size() / 2];
+   }
+   std::vector<float> dist(small.size());
+   for (size_t i = 0; i < small.size(); i++)
+   {
+      const float a = small[i][0] - bg[0], b = small[i][1] - bg[1], c = small[i][2] - bg[2];
+      dist[i] = std::sqrt(a * a + b * b + c * c) / std::sqrt(3.0f);
+   }
+   const float thr = std::max(OtsuThreshold(dist), 0.04f);
+   std::vector<uint8_t> mask(small.size());
+   for (size_t i = 0; i < mask.size(); i++)
+      mask[i] = dist[i] > thr ? 1 : 0;
+   const int r = std::max(1, std::max(sw, sh) / 200);
+   mask = Morph(sw, sh, Morph(sw, sh, mask, r, true), r, false);
+   mask = Morph(sw, sh, Morph(sw, sh, mask, 1, false), 1, true);
+   std::vector<uint32_t> label(mask.size());
+   for (size_t i = 0; i < mask.size(); i++)
+      label[i] = mask[i] ? kUnlabelled : 0;
+   LabelComponents(label, sw, sh);
+   uint32_t n = 0;
+   for (uint32_t v : label)
+      n = std::max(n, v);
+   std::vector<std::vector<int>> comps(n);
+   for (size_t i = 0; i < label.size(); i++)
+      if (label[i] != 0)
+         comps[label[i] - 1].push_back((int)i);
+   const double total = (double)sw * sh;
+   for (const auto& c : comps)
+   {
+      if ((double)c.size() <= total * 0.01)
+         continue;
+      std::vector<std::array<double, 2>> pts;
+      for (int i : c)
+      {
+         const int x = i % sw, y = i / sw;
+         const bool edge = x == 0 || y == 0 || x + 1 == sw || y + 1 == sh || !mask[i - 1] || !mask[i + 1] || !mask[i - sw] || !mask[i + sw];
+         if (!edge)
+            continue;
+         for (int dy = 0; dy <= 1; dy++)
+            for (int dx = 0; dx <= 1; dx++)
+               pts.push_back({ (double)(x + dx) * k, (double)(y + dy) * k });
+      }
+      const auto hull = ConvexHull(pts);
+      if (hull.size() < 3)
+         continue;
+      double best = 1e300, bcx = 0, bcy = 0, bw = 0, bh = 0, ang = 0;
+      for (size_t i = 0; i < hull.size(); i++)
+      {
+         const auto& a = hull[i];
+         const auto& b = hull[(i + 1) % hull.size()];
+         const double th = std::atan2(b[1] - a[1], b[0] - a[0]), sn = std::sin(th), cs = std::cos(th);
+         double x0 = 1e300, y0 = 1e300, x1 = -1e300, y1 = -1e300;
+         for (const auto& p : hull)
+         {
+            const double u = cs * p[0] + sn * p[1], v = -sn * p[0] + cs * p[1];
+            x0 = std::min(x0, u), x1 = std::max(x1, u), y0 = std::min(y0, v), y1 = std::max(y1, v);
+         }
+         const double area = (x1 - x0) * (y1 - y0);
+         if (area < best)
+         {
+            const double cu = (x0 + x1) * 0.5, cv = (y0 + y1) * 0.5;
+            best = area, bcx = cs * cu - sn * cv, bcy = sn * cu + cs * cv, bw = x1 - x0, bh = y1 - y0, ang = th * 180.0 / 3.14159265358979;
+         }
+      }
+      while (ang > 45.0)
+         ang -= 90.0, std::swap(bw, bh);
+      while (ang < -45.0)
+         ang += 90.0, std::swap(bw, bh);
+      FoundPhoto f;
+      f.cx = bcx, f.cy = bcy, f.w = std::max(1.0, bw - 2.0 * k), f.h = std::max(1.0, bh - 2.0 * k), f.angle = ang;
+      f.area = (double)c.size() / total;
+      out.push_back(f);
+   }
+   // Reading order: rows by centre y (bands of a third of the smallest photo), then x.
+   double band = 1e300;
+   for (const auto& f : out)
+      band = std::min(band, std::min(f.w, f.h));
+   band = std::max(band, 1.0) / 3.0;
+   std::sort(out.begin(), out.end(), [band](const FoundPhoto& a, const FoundPhoto& b) {
+      const double ra = std::floor(a.cy / band), rb = std::floor(b.cy / band);
+      return ra != rb ? ra < rb : a.cx < b.cx;
+   });
+   return out;
+}
+
+int Scene2DNode::StraightenPhotos(int id)
+{
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> px;
+   static int sScanFrame = 1 << 26;
+   if (FindLayer(id) == nullptr || !RenderSet({ id }, ++sScanFrame, px) || px.size() < (size_t)W * H * 4)
+      return 0;
+   // Look only inside the scan's own box: the empty canvas around a smaller scan is not its background.
+   float blo[2] = { 0, 0 }, bhi[2] = { (float)W, (float)H };
+   Bounds(id, blo, bhi);
+   const int bx0 = std::clamp((int)std::floor(blo[0]), 0, W), by0 = std::clamp((int)std::floor(blo[1]), 0, H);
+   const int bx1 = std::clamp((int)std::ceil(bhi[0]), bx0, W), by1 = std::clamp((int)std::ceil(bhi[1]), by0, H);
+   std::vector<FoundPhoto> found;
+   if (bx1 - bx0 >= 2 && by1 - by0 >= 2)
+   {
+      const int bw = bx1 - bx0, bh = by1 - by0;
+      std::vector<uint8_t> sub((size_t)bw * bh * 4);
+      for (int y = 0; y < bh; y++)
+         std::memcpy(&sub[(size_t)y * bw * 4], &px[((size_t)(by0 + y) * W + bx0) * 4], (size_t)bw * 4);
+      found = FindPhotos(bw, bh, sub);
+      for (FoundPhoto& f : found)
+      {
+         f.cx += bx0;
+         f.cy += by0;
+      }
+   }
+   int made = 0;
+   for (const FoundPhoto& f : found)
+   {
+      const int pw = std::max(1, (int)std::lround(f.w)), ph = std::max(1, (int)std::lround(f.h));
+      const double r = f.angle * 3.14159265358979 / 180.0, cs = std::cos(r), sn = std::sin(r);
+      std::vector<uint8_t> up((size_t)pw * ph * 4, 0);
+      for (int y = 0; y < ph; y++)
+         for (int x = 0; x < pw; x++)
+         {
+            // The upright photo's pixel in the scan: along the photo's own axes from its centre, bilinear.
+            const double u = x + 0.5 - pw * 0.5, v = y + 0.5 - ph * 0.5;
+            const double sx = f.cx + cs * u - sn * v - 0.5, sy = f.cy + sn * u + cs * v - 0.5;
+            const int x0 = (int)std::floor(sx), y0 = (int)std::floor(sy);
+            const double fx = sx - x0, fy = sy - y0;
+            for (int c = 0; c < 4; c++)
+            {
+               double acc = 0;
+               for (int j = 0; j <= 1; j++)
+                  for (int i = 0; i <= 1; i++)
+                  {
+                     const int xx = std::clamp(x0 + i, 0, W - 1), yy = std::clamp(y0 + j, 0, H - 1);
+                     acc += px[((size_t)yy * W + xx) * 4 + c] * (i ? fx : 1 - fx) * (j ? fy : 1 - fy);
+                  }
+               up[((size_t)y * pw + x) * 4 + c] = (uint8_t)std::lround(std::clamp(acc, 0.0, 255.0));
+            }
+         }
+      const int nid = AddFileLayer(0, "Photo " + std::to_string(made + 1), (int)std::lround(f.cx - pw * 0.5),
+                                   (int)std::lround(f.cy - ph * 0.5), pw, ph, up, id);
+      if (nid > 0)
+         made++;
+   }
+   std::fprintf(stderr, "PROBE straighten photos: found %zu made %d\n", found.size(), made);
+   if (made > 0)
+      Commit();
+   return made;
+}
+
+void Scene2DNode::SetCloneExternal(const std::vector<uint8_t>& rgba, int w, int h)
+{
+   if (w <= 0 || h <= 0 || rgba.size() < (size_t)w * h * 4)
+   {
+      mCloneExt.clear();
+      mCloneExtW = mCloneExtH = 0;
+      return;
+   }
+   mCloneExt.assign(rgba.begin(), rgba.begin() + (size_t)w * h * 4);
+   mCloneExtW = w;
+   mCloneExtH = h;
+}
+
+int Scene2DNode::CropContentAware(int id, float x0, float y0, float x1, float y1, float deg, bool deletePixels)
+{
+   if (x1 < x0) std::swap(x0, x1);
+   if (y1 < y0) std::swap(y0, y1);
+   const double ow = mDoc.w, oh = mDoc.h;
+   const double cx = (x0 + x1) * 0.5, cy = (y0 + y1) * 0.5;
+   const bool rotated = std::fabs(std::remainder((double)deg, 360.0)) > 1e-4;
+   if (rotated)
+      CropRotated((float)cx, (float)cy, x1 - x0, y1 - y0, deg, deletePixels);
+   else
+      CropTo(x0, y0, x1, y1, deletePixels);
+   const int W = mDoc.w, H = mDoc.h;
+   // The new canvas's (u, v) in the old document: the box's centre plus the box offset turned back by deg.
+   const double r = deg * 3.14159265358979 / 180.0, cs = rotated ? std::cos(r) : 1.0, sn = rotated ? std::sin(r) : 0.0;
+   const double hw = W * 0.5, hh = H * 0.5;
+   const double m[6] = { cs, -sn, sn, cs, cx - (cs * hw - sn * hh), cy - (sn * hw + cs * hh) };
+   const double margin = CropMargin(m, rotated);
+   std::vector<uint32_t> labels((size_t)W * H, 0);
+   bool any = false;
+   for (int v = 0; v < H; v++)
+      for (int u = 0; u < W; u++)
+         if (!CropCovered(m, ow, oh, u, v, margin))
+            labels[(size_t)v * W + u] = kUnlabelled, any = true;
+   if (!any || FindLayer(id) == nullptr)
+      return 0;
+   const std::vector<std::array<int, 4>> pieces = LabelComponents(labels, W, H);
+   std::vector<uint8_t> px;
+   static int sCropFillFrame = 1 << 25;
+   if (!RenderSet({ id }, ++sCropFillFrame, px) || px.size() < (size_t)W * H * 4)
+      return 0;
+   std::vector<uint8_t> hole((size_t)W * H);
+   for (size_t k = 0; k < pieces.size(); k++)
+   {
+      for (size_t i = 0; i < hole.size(); i++)
+         hole[i] = labels[i] == k + 1 ? 255 : 0;
+      RemoveRegion(px, W, H, hole);
+   }
+   Layer& nl = AddLayer(Kind::Paint, 0, id);
+   nl.name = "Crop fill";
+   const int nid = nl.id;
+   SyncSurfaces();
+   // Only the rebuilt pixels, bottom row first as the surface holds them.
+   std::vector<uint8_t> up((size_t)W * H * 4, 0);
+   for (int y = 0; y < H; y++)
+      for (int x = 0; x < W; x++)
+         if (labels[(size_t)y * W + x] != 0)
+            std::copy(&px[((size_t)y * W + x) * 4], &px[((size_t)y * W + x) * 4] + 4, &up[((size_t)(H - 1 - y) * W + x) * 4]);
+   auto dt = mSurfaces.find(nid);
+   Layer* dl = FindLayer(nid);
+   if (dt == mSurfaces.end() || dl == nullptr)
+      return 0;
+   WriteRect(dt->second.fbo, 0, 0, W, H, up.data());
+   const int all[4] = { 0, 0, W, H };
+   StoreTiles(dt->second, dl->tiles, all);
+   std::fprintf(stderr, "PROBE crop fill: %zu pieces into layer %d\n", pieces.size(), nid);
+   Commit();
+   return nid;
 }
 
 // The Remove tool's fill: as HealRegion with automatic sources, but the base colour is a membrane fill (exact on
@@ -1414,6 +1811,7 @@ void Scene2DNode::ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned
       glUniform1i(GLUtil::UniformLoc(prog, "uLock"), (EffectiveLock(l) & kLockAlpha) != 0 ? 1 : 0);
       glUniform1i(GLUtil::UniformLoc(prog, "uExtend"), mGradExtend);
       glUniform1i(GLUtil::UniformLoc(prog, "uDither"), mGradDither ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uMethod"), mGradMethod);
    });
    GLint prevRead = 0;
    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
@@ -1547,6 +1945,34 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
       ApplyFill(tmp, surf->w, surf->h, *l, 0, nullptr, nullptr, -2, nullptr, nullptr, 1.0f);
       brush.sourceTex = mCloneSrc.tex;
    }
+   if (target == 0 && brush.mode == BrushEngine::kClone && !mCloneExt.empty() && mCloneExtW > 0 && mCloneExtH > 0 &&
+       GLUtil::EnsureFbo(mCloneSrc, surf->w, surf->h, GL_RGBA8, "Scene2DCloneSrc"))
+   {
+      // Another document's pixels laid onto this surface's px through the layer's placing, repeated at the source's own
+      // edges under Wrap, clear past them otherwise.
+      const int sw = surf->w, sh = surf->h, ew = mCloneExtW, eh = mCloneExtH;
+      float p0x = 0, p0y = 0, p1x = 1, p1y = 0, p2x = 0, p2y = 1, sc = 1;
+      DocToSurface(*l, 0, 0.0f, 0.0f, p0x, p0y, sc);
+      DocToSurface(*l, 0, 1.0f, 0.0f, p1x, p1y, sc);
+      DocToSurface(*l, 0, 0.0f, 1.0f, p2x, p2y, sc);
+      const double ax = p1x - p0x, ay = p1y - p0y, bx = p2x - p0x, by = p2y - p0y, det = ax * by - bx * ay;
+      std::vector<uint8_t> up((size_t)sw * sh * 4, 0);
+      if (std::fabs(det) > 1e-9)
+         for (int y = 0; y < sh; y++)
+            for (int x = 0; x < sw; x++)
+            {
+               const double qx = x + 0.5 - p0x, qy = y + 0.5 - p0y;
+               int dx = (int)std::floor((by * qx - bx * qy) / det), dy = (int)std::floor((-ay * qx + ax * qy) / det);
+               if (brush.wrap)
+                  dx = ((dx % ew) + ew) % ew, dy = ((dy % eh) + eh) % eh;
+               if (dx < 0 || dy < 0 || dx >= ew || dy >= eh)
+                  continue;
+               const uint8_t* e = &mCloneExt[((size_t)dy * ew + dx) * 4];
+               std::copy(e, e + 4, &up[((size_t)y * sw + x) * 4]);
+            }
+      WriteRect(mCloneSrc, 0, 0, sw, sh, up.data());
+      brush.sourceTex = mCloneSrc.tex;
+   }
    if (target == 0 && brush.mode == BrushEngine::kUndo)
    {
       const GLUtil::Fbo* src = HistorySourceSurface(*l);
@@ -1563,12 +1989,38 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
       {
          // Not aligned: the tile starts at this stroke's first dab; a new stroke starts it again. An explicit phase
          // still shifts it, in both modes.
-         brush.patternPhase[0] -= sx;
-         brush.patternPhase[1] -= sy;
+         // Not aligned: each axis starts from half its tile plus one pixel, mirrored about the stroke's first point, so
+         // one phase holds for the whole stroke whatever the tip size (ported from PhotoCraft's stamp_phase, Apache 2.0).
+         // An explicit phase still shifts it, in both modes.
+         auto origin = [](float first, int edge) {
+            const float e = (float)std::max(1, edge);
+            const float o = std::fmod((float)(edge / 2 + 1) - first, e);
+            return o < 0.0f ? o + e : o;
+         };
+         brush.patternPhase[0] -= origin(sx, mPattern.w);
+         brush.patternPhase[1] -= origin(sy, mPattern.h);
+      }
+      if (brush.impressionist && !mPatternCpu.empty() && mPattern.w > 0 && mPattern.h > 0)
+      {
+         // Impressionist paints each dab in the tile's colour under it, jittered by the stroke's seed; it paints as in
+         // Normal, so Behind and the other modes are ignored (as PhotoCraft does).
+         brush.patternRgba = mPatternCpu.data();
+         brush.patternW = mPattern.w;
+         brush.patternH = mPattern.h;
+         brush.mode = BrushEngine::kNormal;
+         brush.sourceBlend = 0;
+         brush.sourceTex = 0;
       }
    }
    ApplyBrushSources(brush, true);
    mStroke.SetMirrors(SurfaceMirrors(target == 2 ? Layer() : *l, target));
+   mBgSnap.clear();
+   mBgPts.clear();
+   if (target == 0 && brush.mode == BrushEngine::kBgErase && brush.bgContiguous)
+   {
+      ReadRect(*surf, 0, 0, surf->w, surf->h, mBgSnap);
+      mBgPts = { sx, sy };
+   }
    mStroke.Begin(*surf, brush, sx, sy, pressure, sel);
    return mStroke.Active();
 }
@@ -1618,7 +2070,88 @@ void Scene2DNode::PaintTo(float x, float y, float pressure)
       return;
    float sx = 0, sy = 0, scale = 1;
    if (DocToSurface(mPaintTarget == 2 ? Layer() : *l, mPaintTarget, x, y, sx, sy, scale))
+   {
       mStroke.MoveTo(sx, sy, pressure);
+      if (!mBgSnap.empty())
+      {
+         mBgPts.push_back(sx);
+         mBgPts.push_back(sy);
+      }
+   }
+}
+
+// Contiguous background erase: the erasable colour is flooded from the stroke's path over the picture as it was before
+// the stroke, and every pixel the stroke changed that the flood did not reach is put back (PhotoCraft background eraser
+// Limits: Contiguous).
+void Scene2DNode::BgContiguousRestore(GLUtil::Fbo& fbo, int dirty[4])
+{
+   const int w = fbo.w, h = fbo.h;
+   if (mBgSnap.size() != (size_t)w * h * 4 || mBgPts.size() < 2)
+      return;
+   const BrushEngine::Brush& b = mStroke.CurrentBrush();
+   float tol = std::max(0.005f, b.keyTolerance * 1.7320508f);   // as the merge shader
+   auto dist = [](const float* a, const float* c) {
+      return std::sqrt((a[0] - c[0]) * (a[0] - c[0]) + (a[1] - c[1]) * (a[1] - c[1]) + (a[2] - c[2]) * (a[2] - c[2]));
+   };
+   if (b.protectFg)
+      tol = std::min(tol, dist(b.key, b.color));
+   auto erasable = [&](size_t i) {
+      const float c[3] = { mBgSnap[i * 4] / 255.0f, mBgSnap[i * 4 + 1] / 255.0f, mBgSnap[i * 4 + 2] / 255.0f };
+      return mBgSnap[i * 4 + 3] > 0 && dist(c, b.key) < tol;
+   };
+   std::vector<uint8_t> reached((size_t)w * h, 0);
+   std::vector<int> stack;
+   auto seed = [&](float fx, float fy) {
+      const int x = (int)std::floor(fx), y = (int)std::floor(fy);
+      if (x < 0 || y < 0 || x >= w || y >= h)
+         return;
+      const size_t i = (size_t)y * w + x;
+      if (!reached[i] && erasable(i))
+      {
+         reached[i] = 1;
+         stack.push_back((int)i);
+      }
+   };
+   seed(mBgPts[0], mBgPts[1]);
+   for (size_t k = 2; k + 1 < mBgPts.size(); k += 2)
+   {
+      const float ax = mBgPts[k - 2], ay = mBgPts[k - 1], bx = mBgPts[k], by = mBgPts[k + 1];
+      const int n = std::max(1, (int)std::ceil(std::max(std::fabs(bx - ax), std::fabs(by - ay))));
+      for (int j = 1; j <= n; j++)
+         seed(ax + (bx - ax) * j / n, ay + (by - ay) * j / n);
+   }
+   while (!stack.empty())
+   {
+      const int i = stack.back();
+      stack.pop_back();
+      const int x = i % w, y = i / w;
+      const int nx[4] = { x - 1, x + 1, x, x }, ny[4] = { y, y, y - 1, y + 1 };
+      for (int q = 0; q < 4; q++)
+         if (nx[q] >= 0 && ny[q] >= 0 && nx[q] < w && ny[q] < h)
+         {
+            const size_t j = (size_t)ny[q] * w + nx[q];
+            if (!reached[j] && erasable(j))
+            {
+               reached[j] = 1;
+               stack.push_back((int)j);
+            }
+         }
+   }
+   std::vector<uint8_t> px;
+   ReadRect(fbo, 0, 0, w, h, px);
+   bool put = false;
+   for (int y = std::max(0, dirty[1]); y < std::min(h, dirty[3]); y++)
+      for (int x = std::max(0, dirty[0]); x < std::min(w, dirty[2]); x++)
+      {
+         const size_t i = (size_t)y * w + x;
+         if (!reached[i] && std::memcmp(&px[i * 4], &mBgSnap[i * 4], 4) != 0)
+         {
+            std::memcpy(&px[i * 4], &mBgSnap[i * 4], 4);
+            put = true;
+         }
+      }
+   if (put)
+      WriteRect(fbo, 0, 0, w, h, px.data());
 }
 
 void Scene2DNode::PaintFollow(const BrushEngine::Brush& b)
@@ -1692,6 +2225,10 @@ void Scene2DNode::EndPaint()
    }
    const bool inpaint = mStroke.CurrentBrush().mode == BrushEngine::kInpaint && mPaintTarget == 0;
    mStroke.End(it->second.fbo, dirty);
+   if (!mBgSnap.empty() && mPaintTarget == 0)
+      BgContiguousRestore(it->second.fbo, dirty);
+   mBgSnap.clear();
+   mBgPts.clear();
    if (inpaint && dirty[2] > dirty[0] && dirty[3] > dirty[1])
    {
       // Inpainting: where the stroke went is rebuilt from around it.
@@ -1832,7 +2369,7 @@ bool Scene2DNode::BucketPattern(int id, float x, float y, float opacity, int tol
 }
 
 bool Scene2DNode::Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], int kind, float opacity,
-                           int extend, bool dither)
+                           int extend, bool dither, int method, float smoothness)
 {
    Layers();
    Layer* l = FindLayer(id);
@@ -1846,9 +2383,13 @@ bool Scene2DNode::Gradient(int id, float ax, float ay, float bx, float by, const
    const float p0[2] = { ax, ay }, p1[2] = { bx, by };
    mGradExtend = std::clamp(extend, 0, 2);
    mGradDither = dither;
+   mGradMethod = method == 1 && smoothness >= 0.999f ? 1 : 0;
+   if (method != 0)
+      std::fprintf(stderr, "PROBE gradient method %d smoothness %.2f: %s\n", method, smoothness, mGradMethod == 1 ? "smooth curves" : "straight");
    ApplyFill(it->second, l->pw, l->ph, *l, 0, a, b, std::clamp(kind, 1, 5), p0, p1, opacity);
    mGradExtend = 0;
    mGradDither = false;
+   mGradMethod = 0;
    const int all[4] = { 0, 0, l->pw, l->ph };
    StoreTiles(it->second, l->tiles, all);
    Commit();
@@ -1905,30 +2446,138 @@ bool Scene2DNode::OffsetPixels(int id, int dx, int dy, bool wrap)
    const int W = l->pw, H = l->ph;
    std::vector<uint8_t> px;
    ReadRect(it->second.fbo, 0, 0, W, H, px);
-   std::vector<uint8_t> out(px.size(), 0);
+   // The tile that moves, in surface px (rows bottom first): the whole surface, or for a wrap of a plain layer that
+   // runs past the canvas, the part on the canvas (PhotoCraft's contained wrap): what lies outside stays where it is.
+   int tx0 = 0, ty0 = 0, tw = W, th = H;
+   if (wrap && l->sx == 1.0f && l->sy == 1.0f && l->angle == 0.0f && l->shear == 0.0f && !l->flipX && !l->flipY && !l->is3d)
+   {
+      const float fx = l->x - l->ax * W, fy = l->y - l->ay * H;
+      const int ox = (int)std::lround(fx), oy = (int)std::lround(fy);
+      if (std::fabs(fx - ox) < 1e-3f && std::fabs(fy - oy) < 1e-3f)
+      {
+         // Canvas columns [-ox, W-ox); canvas rows top-down [-oy, H-oy) are surface rows (H-1-y).
+         const int cx0 = std::max(0, -ox), cx1 = std::min(W, mDoc.w - ox);
+         const int cy0 = std::max(0, -oy), cy1 = std::min(H, mDoc.h - oy);
+         if (cx1 > cx0 && cy1 > cy0)
+         {
+            tx0 = cx0;
+            tw = cx1 - cx0;
+            ty0 = H - cy1;
+            th = cy1 - cy0;
+         }
+      }
+   }
+   std::vector<uint8_t> out = px;
+   for (int y = ty0; y < ty0 + th; y++)
+      std::memset(&out[((size_t)y * W + tx0) * 4], 0, (size_t)tw * 4);
    // Surface rows run bottom first, so a move down is a move to a lower row.
-   for (int y = 0; y < H; y++)
+   for (int y = 0; y < th; y++)
    {
       int sy = y + dy;   // destination row y takes source row y + dy (bottom-first rows)
       if (wrap)
-         sy = ((sy % H) + H) % H;
-      else if (sy < 0 || sy >= H)
+         sy = ((sy % th) + th) % th;
+      else if (sy < 0 || sy >= th)
          continue;
-      for (int x = 0; x < W; x++)
+      for (int x = 0; x < tw; x++)
       {
          int sx = x - dx;
          if (wrap)
-            sx = ((sx % W) + W) % W;
-         else if (sx < 0 || sx >= W)
+            sx = ((sx % tw) + tw) % tw;
+         else if (sx < 0 || sx >= tw)
             continue;
-         std::memcpy(&out[((size_t)y * W + x) * 4], &px[((size_t)sy * W + sx) * 4], 4);
+         std::memcpy(&out[((size_t)(ty0 + y) * W + tx0 + x) * 4], &px[((size_t)(ty0 + sy) * W + tx0 + sx) * 4], 4);
       }
    }
    WriteRect(it->second.fbo, 0, 0, W, H, out.data());
    const int all[4] = { 0, 0, W, H };
    StoreTiles(it->second, l->tiles, all);
+   // The vector mask goes with its pixels (PhotoCraft: a linked vector mask wraps with the raster): a shape wholly
+   // inside the moving tile moves by the same step and, under wrap, a shape pushed wholly past the tile comes back
+   // on the other side. One outside the tile stays where it is, as its pixels do.
+   if (l->hasVMask && !l->vmask.empty())
+   {
+      float bw = 1, bh = 1;
+      LayerBox(*l, bw, bh);
+      const float kx = bw / (float)W, ky = bh / (float)H;
+      const float t0x = tx0 * kx, t1x = (tx0 + tw) * kx, t0y = (H - ty0 - th) * ky, t1y = (H - ty0) * ky;
+      const float mx = dx * kx, my = dy * ky, e = 1e-3f;
+      for (Shape& sh : l->vmask)
+      {
+         float lo[2], hi[2];
+         if (!ShapeBounds(sh, lo, hi) || lo[0] < t0x - e || hi[0] > t1x + e || lo[1] < t0y - e || hi[1] > t1y + e)
+            continue;
+         float sx = mx, sy = my;
+         if (wrap)
+         {
+            const float wx = t1x - t0x, wy = t1y - t0y;
+            if (lo[0] + sx >= t1x - e)
+               sx -= wx;
+            else if (hi[0] + sx <= t0x + e)
+               sx += wx;
+            if (lo[1] + sy >= t1y - e)
+               sy -= wy;
+            else if (hi[1] + sy <= t0y + e)
+               sy += wy;
+         }
+         sh.x0 += sx;
+         sh.x1 += sx;
+         sh.y0 += sy;
+         sh.y1 += sy;
+         for (size_t i = 0; i < sh.pts.size(); i++)
+            sh.pts[i] += (i % 2) == 0 ? sx : sy;
+      }
+   }
    Commit();
    return true;
+}
+
+void Scene2DNode::ClearPaintOffCanvas()
+{
+   // Delete Cropped Pixels (PhotoCraft image_cmds: crop with delete): only pixel data goes. A surface pixel whose
+   // footprint lies wholly outside the canvas is cleared; one that touches it stays, so what shows is unchanged.
+   SyncSurfaces();
+   const float W = (float)mDoc.w, H = (float)mDoc.h;
+   for (Layer& l : mLayers)
+   {
+      if (l.kind != Kind::Paint || l.pw <= 0 || l.ph <= 0 || l.warpOn || l.is3d)
+         continue;
+      auto it = mSurfaces.find(l.id);
+      if (it == mSurfaces.end())
+         continue;
+      float bw = 1, bh = 1, m[6];
+      LayerBox(l, bw, bh);
+      LayerMatrix(l, m);
+      const int sw = l.pw, sh = l.ph;
+      const float kx = bw / (float)sw, ky = bh / (float)sh;
+      // A pixel's footprint reaches at most half its turned diagonal from its centre.
+      const float reach = 0.5f * (std::fabs(m[0]) * kx + std::fabs(m[1]) * ky + std::fabs(m[3]) * kx + std::fabs(m[4]) * ky) + 1.0f;
+      std::vector<uint8_t> px;
+      ReadRect(it->second.fbo, 0, 0, sw, sh, px);
+      bool any = false;
+      for (int row = 0; row < sh; row++)
+      {
+         const float by = ((float)(sh - 1 - row) + 0.5f) * ky;   // rows bottom first; the box runs y down
+         for (int x = 0; x < sw; x++)
+         {
+            uint8_t* p = &px[((size_t)row * sw + x) * 4];
+            if (p[3] == 0)
+               continue;
+            const float bx = ((float)x + 0.5f) * kx;
+            const float dx = m[0] * bx + m[1] * by + m[2], dy = m[3] * bx + m[4] * by + m[5];
+            if (dx < -reach || dy < -reach || dx > W + reach || dy > H + reach)
+            {
+               std::memset(p, 0, 4);
+               any = true;
+            }
+         }
+      }
+      if (!any)
+         continue;
+      WriteRect(it->second.fbo, 0, 0, sw, sh, px.data());
+      const int all[4] = { 0, 0, sw, sh };
+      StoreTiles(it->second, l.tiles, all);
+      std::fprintf(stderr, "PROBE crop delete layer %d cleared off-canvas pixels\n", l.id);
+   }
 }
 
 bool Scene2DNode::BucketSelection(float x, float y, float value, int tolerance, bool contiguous)
@@ -2200,6 +2849,9 @@ bool Scene2DNode::Pick(float x, float y, float rgb[3], int size, int layer, floa
       if (l != nullptr && l->kind == Kind::Paint && it != mSurfaces.end() && DocToSurface(*l, 0, x, y, sx, sy, scale))
       {
          src = &it->second.fbo;
+         // Mid-stroke the layer shows the stroke merged over it: read what is on screen, as the commit will keep it.
+         if (mStroke.Active() && mPaintId == layer && mPaintTarget == 0)
+            src = &mStroke.DisplayFbo(it->second.fbo);
          px = (int)std::floor(sx);
          py = (int)std::floor(sy);
       }
@@ -2574,6 +3226,109 @@ void Scene2DNode::ShiftSelection(float dx, float dy)
    StoreSelection();
 }
 
+// ---- Type Mask -----------------------------------------------------------------------------------------------
+// The text's own bitmap, read through the layer's box (bilinear, as it draws), over every document px its box covers:
+// the canvas does not cut it. The text colour's alpha is taken out, so the glyphs select fully.
+bool Scene2DNode::TextCoverage(int id, SelApron& out)
+{
+   Layers();
+   out = SelApron();
+   const Layer* l = FindConst(id);
+   if (l == nullptr || l->kind != Kind::Text)
+      return false;
+   int tw = 0, th = 0;
+   if (!TextSize(*l, tw, th))
+      return true;   // no text: no glyphs
+   auto it = mTextBoxes.find(id);
+   float bw = 1, bh = 1;
+   if (it == mTextBoxes.end() || it->second.rgba.size() != (size_t)tw * th * 4 || !LayerBox(*l, bw, bh))
+      return false;
+   const std::vector<uint8_t>& px = it->second.rgba;
+   const Layer box = *l;
+   float lo[2] = { 1e30f, 1e30f }, hi[2] = { -1e30f, -1e30f };
+   for (int c = 0; c < 4; c++)
+   {
+      float x = 0, y = 0;
+      BoxToDoc(box, (c == 1 || c == 2) ? bw : 0.0f, c >= 2 ? bh : 0.0f, x, y);
+      lo[0] = std::min(lo[0], x);
+      lo[1] = std::min(lo[1], y);
+      hi[0] = std::max(hi[0], x);
+      hi[1] = std::max(hi[1], y);
+   }
+   const int W = mDoc.w, H = mDoc.h;
+   // No further than SetSelectionFromApron keeps (one canvas past each edge).
+   const int x0 = std::max(-W, (int)std::floor(lo[0]) - 1), y0 = std::max(-H, (int)std::floor(lo[1]) - 1);
+   const int x1 = std::min(2 * W, (int)std::ceil(hi[0]) + 1), y1 = std::min(2 * H, (int)std::ceil(hi[1]) + 1);
+   if (x1 <= x0 || y1 <= y0)
+      return true;
+   const float alpha = std::clamp(l->textC[3], 1.0f / 255.0f, 1.0f);
+   auto at = [&](int x, int y) -> float {
+      return x < 0 || y < 0 || x >= tw || y >= th ? 0.0f : px[((size_t)y * tw + x) * 4 + 3];
+   };
+   out.x0 = x0;
+   out.y0 = y0;
+   out.w = x1 - x0;
+   out.h = y1 - y0;
+   out.a.assign((size_t)out.w * out.h, 0);
+   for (int y = y0; y < y1; y++)
+      for (int x = x0; x < x1; x++)
+      {
+         float bx = 0, by = 0;
+         DocToBox(box, x + 0.5f, y + 0.5f, bx, by);
+         const float u = bx * tw / bw - 0.5f, v = by * th / bh - 0.5f;
+         const int iu = (int)std::floor(u), iv = (int)std::floor(v);
+         const float fu = u - iu, fv = v - iv;
+         const float a = (at(iu, iv) * (1 - fu) + at(iu + 1, iv) * fu) * (1 - fv) + (at(iu, iv + 1) * (1 - fu) + at(iu + 1, iv + 1) * fu) * fv;
+         out.a[(size_t)(y - y0) * out.w + (x - x0)] = (uint8_t)std::clamp((int)std::lround(a / alpha), 0, 255);
+      }
+   return true;
+}
+
+bool Scene2DNode::TypeMaskSelect(int textLayer, int op, std::string* err)
+{
+   SelApron cov;
+   if (!TextCoverage(textLayer, cov))
+   {
+      if (err != nullptr)
+         *err = "not a text layer";
+      return false;
+   }
+   // The earlier selection with what lies past the canvas, and the glyphs, on one frame that holds the canvas too.
+   const SelApron prev = ApronOrCanvas();
+   const int W = mDoc.w, H = mDoc.h;
+   int x0 = 0, y0 = 0, x1 = W, y1 = H;
+   for (const SelApron* p : { &prev, static_cast<const SelApron*>(&cov) })
+      if (!p->a.empty())
+      {
+         x0 = std::min(x0, p->x0);
+         y0 = std::min(y0, p->y0);
+         x1 = std::max(x1, p->x0 + p->w);
+         y1 = std::max(y1, p->y0 + p->h);
+      }
+   SelApron u;
+   u.x0 = x0;
+   u.y0 = y0;
+   u.w = x1 - x0;
+   u.h = y1 - y0;
+   u.a.assign((size_t)u.w * u.h, 0);
+   auto read = [](const SelApron& p, int x, int y) -> int {
+      const int ax = x - p.x0, ay = y - p.y0;
+      return p.a.empty() || ax < 0 || ay < 0 || ax >= p.w || ay >= p.h ? 0 : p.a[(size_t)ay * p.w + ax];
+   };
+   for (int y = y0; y < y1; y++)
+      for (int x = x0; x < x1; x++)
+      {
+         const int p = read(prev, x, y), c = read(cov, x, y);
+         const int v = op == kSelAdd ? std::max(p, c) : op == kSelSub ? p * (255 - c) / 255 : op == kSelIntersect ? std::min(p, c) : c;
+         u.a[(size_t)(y - y0) * u.w + (x - x0)] = (uint8_t)v;
+      }
+   RemoveLayer(textLayer);
+   SetSelectionFromApron(std::move(u));
+   StoreSelection();
+   Commit();
+   return true;
+}
+
 bool Scene2DNode::SelectionExtent(int& x0, int& y0, int& x1, int& y1) const
 {
    if (ApronMatches())
@@ -2801,6 +3556,19 @@ namespace
       "uniform sampler2D uSel;\n"  // the selection on this surface (red); outside it the pixels stay as they began
       "uniform int uUseSel;\n"
       "uniform int uIsMask;\n"   // the surface is a mask (grey, white shows)
+      // A shrinking warp is prefiltered: an area average over the pixel's footprint in the source (PhotoCraft
+      // a_shrinking_mesh_warp_is_prefiltered), as the compositor does for a layer shrunk by its transform.
+      "vec4 areaTex(sampler2D t, vec2 uv, vec2 du, vec2 dv) {\n"
+      "   vec2 ts = vec2(textureSize(t, 0));\n"
+      "   float nx = clamp(ceil(length(du * ts) - 0.25), 1.0, 8.0), ny = clamp(ceil(length(dv * ts) - 0.25), 1.0, 8.0);\n"
+      "   if (nx * ny < 2.0) return texture(t, uv);\n"
+      "   vec4 s = vec4(0.0);\n"
+      "   for (int j = 0; j < 8; j++) { if (float(j) >= ny) break;\n"
+      "      for (int i = 0; i < 8; i++) { if (float(i) >= nx) break;\n"
+      "         vec2 o = (vec2(float(i), float(j)) + 0.5) / vec2(nx, ny) - 0.5;\n"
+      "         s += texture(t, uv + du * o.x + dv * o.y); } }\n"
+      "   return s / (nx * ny);\n"
+      "}\n"
       "vec2 disp(vec2 p) {\n"
       "   vec2 g = clamp((vec2(p.x, 1.0 - p.y) - uR.xy) / max(uR.zw - uR.xy, vec2(1e-6)), 0.0, 1.0);\n"
       "   int i = 0, j = 0;\n"
@@ -2812,8 +3580,9 @@ namespace
       "void main() {\n"
       "   vec2 p = vUv;\n"
       "   for (int it = 0; it < 12; it++) p = vUv - disp(p);\n"   // where this pixel came from
+      "   vec2 du = dFdx(p), dv = dFdy(p);\n"
       "   bool off = p.x < 0.0 || p.y < 0.0 || p.x > 1.0 || p.y > 1.0;\n"
-      "   vec4 w = off ? vec4(0.0) : texture(uSrc, p);\n"
+      "   vec4 w = off ? vec4(0.0) : areaTex(uSrc, p, du, dv);\n"
       "   if (uUseSel != 1) { fragColor = w; return; }\n"
       // A selection floats what it holds: the pulled part lands over the rest, and where it left reads empty
       // (pixels clear, a mask white: revealed), as Photoshop and PhotoCraft #4175 leave it.
@@ -3313,6 +4082,7 @@ bool Scene2DNode::SetPattern(const std::vector<uint8_t>& rgba, int w, int h, uin
    for (int y = 0; y < h; y++)
       std::copy(rgba.begin() + (size_t)(h - 1 - y) * row, rgba.begin() + (size_t)(h - y) * row, up.begin() + (size_t)y * row);
    WriteRect(mPattern, 0, 0, w, h, up.data());
+   mPatternCpu = std::move(up);
    mPatternKey = key;
    return true;
 }
@@ -4174,6 +4944,7 @@ void Scene2DNode::CombineSelection(const std::vector<uint8_t>& region, int op)
 bool Scene2DNode::ReadSelectPicture(bool sampleAll, int layerId, std::vector<uint8_t>& px)
 {
    Layers();
+   SyncSurfaces();   // after an undo the surfaces still hold the undone pixels until synced
    const int W = mDoc.w, H = mDoc.h;
    px.clear();
    const Layer* l = FindConst(layerId);
@@ -4539,6 +5310,323 @@ bool Scene2DNode::SelectColorRange(const std::vector<SelectMaths::Sample>& s, co
    return true;
 }
 
+namespace
+{
+   // Replace Color's shift on one colour, 0..1: hue turns, saturation and lightness move toward 1 (or 0) by their share.
+   void ReplaceShift(float rgb[3], float hue, float sat, float light)
+   {
+      const float r = rgb[0], g = rgb[1], b = rgb[2];
+      const float mx = std::max({ r, g, b }), mn = std::min({ r, g, b }), d = mx - mn;
+      float h = 0.0f, l = (mx + mn) * 0.5f, s = 0.0f;
+      if (d > 1e-6f)
+      {
+         s = l > 0.5f ? d / (2.0f - mx - mn) : d / (mx + mn);
+         if (mx == r) h = (g - b) / d + (g < b ? 6.0f : 0.0f);
+         else if (mx == g) h = (b - r) / d + 2.0f;
+         else h = (r - g) / d + 4.0f;
+         h /= 6.0f;
+      }
+      h = std::fmod(h + hue / 360.0f + 1.0f, 1.0f);
+      const float ks = std::clamp(sat / 100.0f, -1.0f, 1.0f), kl = std::clamp(light / 100.0f, -1.0f, 1.0f);
+      s = ks >= 0 ? s + (1.0f - s) * ks : s * (1.0f + ks);
+      l = kl >= 0 ? l + (1.0f - l) * kl : l * (1.0f + kl);
+      auto ch = [](float p, float q, float t) {
+         t = t < 0 ? t + 1 : (t > 1 ? t - 1 : t);
+         if (t < 1.0f / 6) return p + (q - p) * 6 * t;
+         if (t < 0.5f) return q;
+         if (t < 2.0f / 3) return p + (q - p) * (2.0f / 3 - t) * 6;
+         return p;
+      };
+      if (s <= 1e-6f)
+      {
+         rgb[0] = rgb[1] = rgb[2] = l;
+         return;
+      }
+      const float q = l < 0.5f ? l * (1 + s) : l + s - l * s, pp = 2 * l - q;
+      rgb[0] = ch(pp, q, h + 1.0f / 3);
+      rgb[1] = ch(pp, q, h);
+      rgb[2] = ch(pp, q, h - 1.0f / 3);
+   }
+}
+
+bool Scene2DNode::ReplaceColor(int layerId, const std::vector<SelectMaths::Sample>& s, const SelectMaths::RangeParams& p,
+                               float hue, float sat, float light, std::string* err, const float* fromRgb)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   auto fail = [&](const char* why) {
+      if (err != nullptr)
+         *err = std::string("replaceColor: ") + why;
+      return false;
+   };
+   Layer* l = FindLayer(layerId);
+   if (l == nullptr || l->kind != Kind::Paint)
+      return fail("not a paint layer");
+   if ((EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
+      return fail("the layer's pixels are locked");
+   if (fromRgb != nullptr)
+      for (int j = 0; j < 3; j++)
+         if (!std::isfinite(fromRgb[j]) || fromRgb[j] < 0.0f || fromRgb[j] > 1.0f)
+            return fail("bad colour");
+   if (s.empty() && fromRgb == nullptr)
+      return fail("no samples");
+   for (const SelectMaths::Sample& k : s)
+      if (!(k.x >= 0 && k.y >= 0 && k.x < (float)W && k.y < (float)H))
+         return fail("a sample is outside the document");
+   std::vector<SelectMaths::Sample> clicks = s;
+   if (fromRgb != nullptr && std::none_of(s.begin(), s.end(), [](const SelectMaths::Sample& k) { return !k.subtract; }))
+   {
+      SelectMaths::Sample f;
+      std::copy(fromRgb, fromRgb + 3, f.rgb);
+      clicks.insert(clicks.begin(), f);   // the From colour, then the clicks that take colours out of it
+      std::fprintf(stderr, "PROBE replace colour from %.3f %.3f %.3f before %zu subtracts\n", fromRgb[0], fromRgb[1], fromRgb[2], s.size());
+   }
+   SyncSurfaces();
+   auto it = mSurfaces.find(layerId);
+   const bool plain = l->sx == 1.0f && l->sy == 1.0f && l->angle == 0.0f && l->shear == 0.0f && !l->flipX && !l->flipY &&
+                      !l->is3d && !l->warpOn && std::fabs(l->x - l->ax * W) < 1e-3f && std::fabs(l->y - l->ay * H) < 1e-3f;
+   if (it == mSurfaces.end() || l->pw != W || l->ph != H || !plain)
+      return fail("the layer must fill the document, unmoved");
+   std::vector<uint8_t> px;
+   ReadRect(it->second.fbo, 0, 0, W, H, px);
+   std::vector<SelectMaths::Sample> flip = clicks;   // the surface is bottom row first
+   for (SelectMaths::Sample& k : flip)
+      k.y = (float)H - k.y;
+   std::vector<uint8_t> region;
+   SelectMaths::ColorRange(px.data(), W, H, flip, p, region);
+   const bool limit = mSelAny && mSel.size() == region.size();
+   size_t n = 0;
+   for (size_t i = 0; i < region.size(); i++)
+   {
+      const float k = (limit ? std::min(region[i], mSel[i]) : region[i]) / 255.0f;
+      uint8_t* q = &px[i * 4];
+      if (k <= 0.0f || q[3] == 0)
+         continue;
+      float c[3] = { q[0] / 255.0f, q[1] / 255.0f, q[2] / 255.0f };
+      ReplaceShift(c, hue, sat, light);
+      for (int j = 0; j < 3; j++)
+         q[j] = (uint8_t)std::lround(std::clamp(q[j] + (c[j] * 255.0f - q[j]) * k, 0.0f, 255.0f));
+      n++;
+   }
+   WriteRect(it->second.fbo, 0, 0, W, H, px.data());
+   const int all[4] = { 0, 0, W, H };
+   StoreTiles(it->second, l->tiles, all);
+   std::fprintf(stderr, "PROBE replace colour layer %d changed %zu px\n", layerId, n);
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::ApplyAdjustment(int layerId, const Layer& adj, std::string* err)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   auto fail = [&](const char* why) {
+      if (err != nullptr)
+         *err = std::string("applyAdjustment: ") + why;
+      std::fprintf(stderr, "PROBE apply adjustment refused: %s\n", why);
+      return false;
+   };
+   if (adj.adjType < 0 || adj.adjType >= kAdjCount || adj.adjType == kAdjLensBlur)
+      return fail("not an adjustment that can be applied");
+   Layer* l = FindLayer(layerId);
+   if (l == nullptr || l->kind != Kind::Paint)
+      return fail("not a paint layer");
+   if ((EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
+      return fail("the layer's pixels are locked");
+   SyncSurfaces();
+   auto it = mSurfaces.find(layerId);
+   const bool plain = l->sx == 1.0f && l->sy == 1.0f && l->angle == 0.0f && l->shear == 0.0f && !l->flipX && !l->flipY &&
+                      !l->is3d && !l->warpOn && std::fabs(l->x - l->ax * W) < 1e-3f && std::fabs(l->y - l->ay * H) < 1e-3f;
+   if (it == mSurfaces.end() || l->pw != W || l->ph != H || !plain)
+      return fail("the layer must fill the document, unmoved");
+   Layer a = adj;
+   a.kind = Kind::Adjust;
+   a.adjDrive = 0;   // a baked edit takes the amount as set, never a drive's
+   // A layer's pixels are display-encoded; the composite feeds the shader linear light. Run it on the encoded
+   // values as a non-linear document would, so the baked pixels match what the live layer showed.
+   const bool wasLinear = mDoc.linear;
+   mDoc.linear = false;
+   const bool ran = RunAdjust(a, it->second.fbo.tex);
+   mDoc.linear = wasLinear;
+   if (!ran)
+      return fail("the adjustment did not run");
+   std::vector<uint8_t> px, done;
+   ReadRect(it->second.fbo, 0, 0, W, H, px);
+   ReadRect(mAdjFbo, 0, 0, W, H, done);
+   const bool limit = mSelAny && mSel.size() == (size_t)W * H;
+   size_t n = 0;
+   for (size_t i = 0; i < (size_t)W * H; i++)
+   {
+      const float k = limit ? mSel[i] / 255.0f : 1.0f;
+      if (k <= 0.0f)
+         continue;
+      uint8_t* q = &px[i * 4];
+      const uint8_t* d = &done[i * 4];
+      bool any = false;
+      for (int j = 0; j < 4; j++)
+      {
+         const uint8_t v = (uint8_t)std::lround(q[j] + (d[j] - q[j]) * k);
+         any = any || v != q[j];
+         q[j] = v;
+      }
+      n += any ? 1 : 0;
+   }
+   WriteRect(it->second.fbo, 0, 0, W, H, px.data());
+   const int all[4] = { 0, 0, W, H };
+   StoreTiles(it->second, l->tiles, all);
+   std::fprintf(stderr, "PROBE apply adjustment %d to layer %d: %zu px changed, selection %d\n", adj.adjType, layerId, n, limit ? 1 : 0);
+   Commit();
+   return true;
+}
+
+namespace
+{
+   // CIELab (D65) from display sRGB and back, for Match Color.
+   void SrgbToLab(const float c[3], float lab[3])
+   {
+      float l[3];
+      for (int i = 0; i < 3; i++)
+         l[i] = ColorSpace::SrgbToLinear(std::clamp(c[i], 0.0f, 1.0f));
+      const float X = (0.4124564f * l[0] + 0.3575761f * l[1] + 0.1804375f * l[2]) / 0.95047f;
+      const float Y = 0.2126729f * l[0] + 0.7151522f * l[1] + 0.0721750f * l[2];
+      const float Z = (0.0193339f * l[0] + 0.1191920f * l[1] + 0.9503041f * l[2]) / 1.08883f;
+      auto f = [](float t) { return t > 0.008856f ? std::cbrt(t) : 7.787f * t + 16.0f / 116.0f; };
+      const float fx = f(X), fy = f(Y), fz = f(Z);
+      lab[0] = 116.0f * fy - 16.0f;
+      lab[1] = 500.0f * (fx - fy);
+      lab[2] = 200.0f * (fy - fz);
+   }
+   void LabToSrgb(const float lab[3], float c[3])
+   {
+      const float fy = (lab[0] + 16.0f) / 116.0f, fx = fy + lab[1] / 500.0f, fz = fy - lab[2] / 200.0f;
+      auto g = [](float t) { return t * t * t > 0.008856f ? t * t * t : (t - 16.0f / 116.0f) / 7.787f; };
+      const float X = g(fx) * 0.95047f, Y = g(fy), Z = g(fz) * 1.08883f;
+      const float l[3] = { 3.2404542f * X - 1.5371385f * Y - 0.4985314f * Z, -0.9692660f * X + 1.8760108f * Y + 0.0415560f * Z,
+                           0.0556434f * X - 0.2040259f * Y + 1.0572252f * Z };
+      for (int i = 0; i < 3; i++)
+         c[i] = ColorSpace::LinearToSrgb(std::clamp(l[i], 0.0f, 1.0f));
+   }
+   struct LabStats
+   {
+      double mean[3] = { 0, 0, 0 }, sd[3] = { 0, 0, 0 };
+      size_t n = 0;
+   };
+   LabStats StatsOf(const uint8_t* px, size_t count, bool linear)
+   {
+      LabStats s;
+      double sum[3] = { 0, 0, 0 }, sq[3] = { 0, 0, 0 };
+      for (size_t i = 0; i < count; i++)
+      {
+         const uint8_t* q = &px[i * 4];
+         if (q[3] == 0)
+            continue;
+         float c[3] = { q[0] / 255.0f, q[1] / 255.0f, q[2] / 255.0f }, lab[3];
+         if (linear)
+            for (float& v : c)
+               v = ColorSpace::LinearToSrgb(v);
+         SrgbToLab(c, lab);
+         for (int k = 0; k < 3; k++)
+         {
+            sum[k] += lab[k];
+            sq[k] += (double)lab[k] * lab[k];
+         }
+         s.n++;
+      }
+      for (int k = 0; k < 3 && s.n > 0; k++)
+      {
+         s.mean[k] = sum[k] / (double)s.n;
+         s.sd[k] = std::sqrt(std::max(0.0, sq[k] / (double)s.n - s.mean[k] * s.mean[k]));
+      }
+      return s;
+   }
+}
+
+// Ported from PhotoCraft algo/src/tone.rs match_color (Apache 2.0).
+bool Scene2DNode::MatchColor(int layerId, const uint8_t* srcRgba, size_t srcPixels, float luminance, float intensity, float fade,
+                             bool neutralize, std::string* err)
+{
+   Layers();
+   auto fail = [&](const char* why) {
+      if (err != nullptr)
+         *err = std::string("matchColor: ") + why;
+      std::fprintf(stderr, "PROBE match color refused: %s\n", why);
+      return false;
+   };
+   if (!std::isfinite(luminance) || !std::isfinite(intensity) || !std::isfinite(fade))
+      return fail("bad option");
+   Layer* l = FindLayer(layerId);
+   if (l == nullptr || l->kind != Kind::Paint)
+      return fail("not a paint layer");
+   if ((EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
+      return fail("the layer's pixels are locked");
+   SyncSurfaces();
+   auto it = mSurfaces.find(layerId);
+   if (it == mSurfaces.end() || it->second.fbo.fbo == 0)
+      return fail("no pixels");
+   const int W = l->pw, H = l->ph;
+   std::vector<uint8_t> px;
+   ReadRect(it->second.fbo, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return fail("no pixels");
+   const bool lin = false;   // 8-bit surfaces hold display values, as Pick and ApplyAdjustment read them
+   const LabStats tgt = StatsOf(px.data(), (size_t)W * H, lin);
+   if (tgt.n == 0)
+      return fail("the layer is empty");
+   LabStats src = tgt;
+   if (srcRgba != nullptr)
+   {
+      src = StatsOf(srcRgba, srcPixels, false);
+      if (src.n == 0)
+         return fail("the source is empty");
+   }
+   const bool plain = l->sx == 1.0f && l->sy == 1.0f && l->angle == 0.0f && l->shear == 0.0f && !l->flipX && !l->flipY && !l->is3d &&
+                      !l->warpOn && W == mDoc.w && H == mDoc.h && std::fabs(l->x - l->ax * W) < 1e-3f && std::fabs(l->y - l->ay * H) < 1e-3f;
+   const bool limit = mSelAny && mSel.size() == (size_t)mDoc.w * mDoc.h;
+   if (limit && !plain)
+      return fail("a selection needs the layer to fill the document, unmoved");
+   const float lum = luminance / 100.0f, inten = intensity / 100.0f, fd = std::clamp(fade / 100.0f, 0.0f, 1.0f);
+   double scale[3], dst[3] = { src.mean[0], src.mean[1], src.mean[2] };
+   for (int k = 0; k < 3; k++)
+      scale[k] = tgt.sd[k] > 1e-4 ? src.sd[k] / tgt.sd[k] : 1.0;
+   if (neutralize)
+      dst[1] = dst[2] = 0.0;
+   size_t n = 0;
+   for (size_t i = 0; i < (size_t)W * H; i++)
+   {
+      uint8_t* q = &px[i * 4];
+      const float k = limit ? mSel[i] / 255.0f : 1.0f;
+      if (q[3] == 0 || k <= 0.0f)
+         continue;
+      float c[3] = { q[0] / 255.0f, q[1] / 255.0f, q[2] / 255.0f }, lab[3], o[3];
+      if (lin)
+         for (float& v : c)
+            v = ColorSpace::LinearToSrgb(v);
+      SrgbToLab(c, lab);
+      const float out[3] = { std::clamp((float)(((lab[0] - tgt.mean[0]) * scale[0] + dst[0]) * lum), 0.0f, 100.0f),
+                             (float)(((lab[1] - tgt.mean[1]) * scale[1] + dst[1]) * inten),
+                             (float)(((lab[2] - tgt.mean[2]) * scale[2] + dst[2]) * inten) };
+      LabToSrgb(out, o);
+      bool any = false;
+      for (int j = 0; j < 3; j++)
+      {
+         float v = std::clamp(o[j] + (c[j] - o[j]) * fd, 0.0f, 1.0f);
+         if (lin)
+            v = ColorSpace::SrgbToLinear(v);
+         const uint8_t b = (uint8_t)std::lround(q[j] + (v * 255.0f - q[j]) * k);
+         any = any || b != q[j];
+         q[j] = b;
+      }
+      n += any ? 1 : 0;
+   }
+   WriteRect(it->second.fbo, 0, 0, W, H, px.data());
+   const int all[4] = { 0, 0, W, H };
+   StoreTiles(it->second, l->tiles, all);
+   std::fprintf(stderr, "PROBE match color layer %d: %zu px changed (source %s, fade %.0f, neutralize %d)\n", layerId, n,
+                srcRgba != nullptr ? "picture" : "none", fade, (int)neutralize);
+   Commit();
+   return true;
+}
+
 bool Scene2DNode::SelectObjectPoint(float x, float y, int op, bool sampleAll, int layerId)
 {
    std::vector<uint8_t> px;
@@ -4884,6 +5972,17 @@ namespace
       return true;
    }
 
+   // Every line of k is one of want's, the first and last among them (a Default grid with some thirds gone).
+   bool LinesWithin(const std::vector<float>& k, const float* want, int n)
+   {
+      if (k.size() < 2 || std::fabs(k.front() - want[0]) > kLineEps || std::fabs(k.back() - want[n - 1]) > kLineEps)
+         return false;
+      for (float v : k)
+         if (std::none_of(want, want + n, [&](float w) { return std::fabs(v - w) <= kLineEps; }))
+            return false;
+      return true;
+   }
+
    // A new line at fraction f: column (axis 0) or row (axis 1), its points on the bilinear pieces either side.
    bool InsertLine(WarpGrid& g, int axis, float f)
    {
@@ -4987,17 +6086,29 @@ bool Scene2DNode::SplitWarpGrid(WarpGrid& moved, WarpGrid& rest, float s, float 
          return false;
       RemoveLine(moved, axis, axis == 0 ? iu : iv);
       RemoveLine(rest, axis, axis == 0 ? iu : iv);
-      // Thirds one way and no lines the other: the Default grid again (its missing thirds put back unbent).
-      const float ends[2] = { 0.0f, 1.0f };
-      const bool cols = LinesAre(moved.us, kThirds, 4) && LinesAre(moved.vs, ends, 2);
-      const bool rows = LinesAre(moved.vs, kThirds, 4) && LinesAre(moved.us, ends, 2);
+      // Thirds one way and only thirds the other: the Default grid again, its missing thirds put back unbent (where
+      // they rest), so a grid bent before a split comes back as it was bent.
+      const bool cols = LinesAre(moved.us, kThirds, 4) && LinesWithin(moved.vs, kThirds, 4);
+      const bool rows = LinesAre(moved.vs, kThirds, 4) && LinesWithin(moved.us, kThirds, 4);
       if (cols || rows)
-         for (WarpGrid* g : { &moved, &rest })
+      {
+         const int ax = cols ? 1 : 0;
+         for (int third = 1; third <= 2; third++)
          {
-            InsertLine(*g, cols ? 1 : 0, kThirds[1]);
-            InsertLine(*g, cols ? 1 : 0, kThirds[2]);
-            g->deflt = true;
+            if (!InsertLine(rest, ax, kThirds[third]) || !InsertLine(moved, ax, kThirds[third]))
+               continue;
+            const std::vector<float>& k = ax == 0 ? moved.us : moved.vs;
+            const int at = (int)(std::find_if(k.begin(), k.end(), [&](float v) { return std::fabs(v - kThirds[third]) <= kLineEps; }) - k.begin());
+            const int nx = moved.Nx(), n = ax == 0 ? moved.Ny() : nx;
+            for (int m = 0; m < n; m++)
+            {
+               const size_t i = ax == 0 ? (size_t)m * nx + at : (size_t)at * nx + m;
+               moved.pts[i * 2] = rest.pts[i * 2];
+               moved.pts[i * 2 + 1] = rest.pts[i * 2 + 1];
+            }
          }
+         moved.deflt = rest.deflt = true;
+      }
       return true;
    }
    // A one-way split of the Default grid: the thirds it replaces go, when no point on them was moved.
@@ -5213,6 +6324,66 @@ bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const W
    return true;
 }
 
+bool Scene2DNode::CanTransferEffects(int from, int to, int effect, bool copy)
+{
+   Layers();
+   const Layer* a = FindConst(from);
+   const Layer* b = FindConst(to);
+   if (a == nullptr || b == nullptr || a == b || (b->lock & kLockAll) != 0 || (!copy && (a->lock & kLockAll) != 0))
+      return false;
+   const int extra = effect - kFxCount;
+   if (effect == -1)
+      return a->AnyFx();
+   if (effect >= 0 && effect < kFxCount)
+      return a->fx[effect].on;
+   return extra >= 0 && extra < (int)a->fxMore.size() && a->fxMore[(size_t)extra].second.on;
+}
+
+bool Scene2DNode::TransferEffects(int from, int to, int effect, bool copy)
+{
+   if (!CanTransferEffects(from, to, effect, copy))
+   {
+      std::fprintf(stderr, "PROBE transfer effects %d->%d: effect %d refused\n", from, to, effect);
+      return false;
+   }
+   Layer* a = FindLayer(from);
+   Layer* b = FindLayer(to);
+   const int extra = effect - kFxCount;
+   const bool whole = effect == -1;
+   const bool kind = effect >= 0 && effect < kFxCount;
+   if (whole)
+   {
+      for (int k = 0; k < kFxCount; k++)
+         b->fx[k] = a->fx[k];
+      b->fxMore = a->fxMore;
+      if (!copy)
+      {
+         for (int k = 0; k < kFxCount; k++)
+            a->fx[k] = FxDefault(k);
+         a->fxMore.clear();
+      }
+   }
+   else
+   {
+      const int type = kind ? effect : a->fxMore[(size_t)extra].first;
+      const Fx f = kind ? a->fx[effect] : a->fxMore[(size_t)extra].second;
+      if (b->fx[type].on)
+         b->fxMore.push_back({ type, f });
+      else
+         b->fx[type] = f;
+      if (!copy)
+      {
+         if (kind)
+            a->fx[effect] = FxDefault(effect);
+         else
+            a->fxMore.erase(a->fxMore.begin() + extra);
+      }
+   }
+   std::fprintf(stderr, "PROBE transfer effects %d->%d: effect %d %s\n", from, to, effect, copy ? "copied" : "moved");
+   Commit();
+   return true;
+}
+
 bool Scene2DNode::CopyLayerStyle(int from, int to, int parts)
 {
    Layers();
@@ -5254,6 +6425,9 @@ bool Scene2DNode::CopyLayerStyle(int from, int to, int parts)
          {
             t.strokeOn = f.strokeOn;
             std::copy(f.strokeC, f.strokeC + 4, t.strokeC);
+            t.strokeType = f.strokeType;
+            t.strokeAngle = f.strokeAngle;
+            t.strokeStops = f.strokeStops;
             t.width = f.width;
             t.cap = f.cap;
             t.join = f.join;

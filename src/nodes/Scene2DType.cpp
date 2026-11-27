@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <map>
 #include <string>
@@ -328,14 +329,17 @@ bool Scene2DNode::TypeGlyphAnchors(const Layer& l, std::vector<std::vector<float
       InkX(cs, lx0, lx1);
       const float wide = (lx1 - lx0) * k;
       float off = l.pathOffset - std::floor(l.pathOffset);
-      float start = off * L + (l.align == 1 ? (L - wide) * 0.5f : l.align == 2 ? L - wide : 0.0f);
+      // An end point on an open path: the text sits (and aligns) between start and end; past the end is hidden.
+      const float stop = !closed && l.pathEnd >= 0.0f ? std::clamp(l.pathEnd, 0.0f, 1.0f) * L : L;
+      const float room = std::max(0.0f, stop - (closed ? 0.0f : std::min(off, 1.0f) * L));
+      float start = off * L + (l.align == 1 ? (room - wide) * 0.5f : l.align == 2 ? room - wide : 0.0f);
       for (const Glyph& g : glyphs)
       {
          const float cx = (g.x0 + g.x1) * 0.5f;
          float s = start + (cx - lx0) * k;
          if (closed)
             s = std::fmod(std::fmod(s, L) + L, L);
-         else if (s < 0.0f || s > L)
+         else if (s < 0.0f || s > stop)
             continue;   // overflow past the ends is hidden
          size_t i = (size_t)(std::upper_bound(cum.begin(), cum.end(), s) - cum.begin());
          i = std::clamp<size_t>(i, 1, n - 1);
@@ -909,6 +913,30 @@ int Scene2DNode::AddTypeOnPath(const std::string& path, const std::string& text,
    return id;
 }
 
+int Scene2DNode::AddTypeInShape(int shapeLayer, const std::string& text, int above, int* err)
+{
+   Layers();
+   const Layer* v = FindConst(shapeLayer);
+   if (v == nullptr || v->kind != Kind::Vector)
+   {
+      if (err != nullptr)
+         *err = kTypePathNoPath;
+      return 0;
+   }
+   // Borrow the Work Path for the layer's outline, then put back what was there.
+   std::vector<DocPath> keep = mPaths;
+   int id = 0;
+   if (MakeWorkPathFromLayer(shapeLayer))
+      id = AddTypeOnPath(kWorkPath, text, true, above, err);
+   else if (err != nullptr)
+      *err = kTypePathNoPath;
+   mPaths.swap(keep);
+   if (id > 0)
+      std::fprintf(stderr, "PROBE type in shape %d subpaths %zu\n", id, FindConst(id)->typePath.size());
+   Commit();
+   return id;
+}
+
 bool Scene2DNode::ReleaseTypePath(int id)
 {
    Layers();
@@ -948,6 +976,7 @@ bool Scene2DNode::ReleaseTypePath(int id)
    l->typeMode = 0;
    l->typePath.clear();
    l->pathOffset = 0.0f;
+   l->pathEnd = -1.0f;
    l->pathFlip = false;
    Commit();
    return true;
@@ -971,6 +1000,12 @@ bool Scene2DNode::SetWarpText(int id, int style, float bend, float hd, float vd,
    if (l == nullptr || l->kind != Kind::Text || style < 0 || style >= kWarpStyleCount || !std::isfinite(bend) ||
        !std::isfinite(hd) || !std::isfinite(vd))
       return false;
+   // Warp Text has no cylinder: the cylinder warp needs its own values (a paint layer's Warp Style), as in PhotoCraft.
+   if (style == kWarpStyleCount - 1)
+   {
+      std::fprintf(stderr, "PROBE warp text: cylinder refused on type layer %d\n", id);
+      return false;
+   }
    l->warpStyle = style;
    l->warpBend = std::clamp(bend, -100.0f, 100.0f);
    l->warpH = std::clamp(hd, -100.0f, 100.0f);

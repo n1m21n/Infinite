@@ -704,6 +704,24 @@ namespace
            "float grain(vec2 px) { uvec2 q = uvec2(max(px, vec2(0.0)));\n"
            "   uint n = q.x * 374761393u + q.y * 668265263u; n = (n ^ (n >> 13u)) * 1274126177u;\n"
            "   return float((n ^ (n >> 16u)) & 65535u) / 65535.0; }\n"
+           "vec2 gDu = vec2(0.0), gDv = vec2(0.0);\n"
+           "// Downscale prefilter: an area average over the output pixel's footprint in the texture (du, dv = the uv step\n"
+           "// per document pixel), so a layer shrunk far comes out its average, not point-sampled moire (PhotoCraft).\n"
+           "vec4 areaTex(sampler2D t, vec2 uv, vec2 du, vec2 dv, vec2 ts) {\n"
+           "   float nx = clamp(ceil(length(du * ts) - 0.25), 1.0, 8.0), ny = clamp(ceil(length(dv * ts) - 0.25), 1.0, 8.0);\n"
+           "   if (nx * ny < 2.0) return texture(t, uv);\n"
+           "   vec4 s = vec4(0.0);\n"
+           "   for (int j = 0; j < 8; j++) { if (float(j) >= ny) break;\n"
+           "      for (int i = 0; i < 8; i++) { if (float(i) >= nx) break;\n"
+           "         vec2 o = (vec2(float(i), float(j)) + 0.5) / vec2(nx, ny) - 0.5;\n"
+           "         s += texture(t, uv + du * o.x + dv * o.y); } }\n"
+           "   return s / (nx * ny);\n"
+           "}\n"
+           "vec2 uvAt(vec2 pp) {\n"
+           "   vec3 q = vec3(dot(uInvA, vec3(pp, 1.0)), dot(uInvB, vec3(pp, 1.0)), dot(uInvC, vec3(pp, 1.0)));\n"
+           "   vec2 b = q.xy / max(q.z, 1e-12) / uBox;\n"
+           "   return vec2(b.x, 1.0 - b.y);\n"
+           "}\n"
            "vec4 fillAt(vec2 uvb) {\n"
            "   if (uKind == 1) return uColA;\n"
            "   if (uKind == 2) {\n"
@@ -735,7 +753,7 @@ namespace
            "      ivec2 px = ivec2(clamp(floor(uv * uTexSize), vec2(0.0), uTexSize - 1.0));\n"
            "      return texelFetch(uTex, px, 0);\n"
            "   }\n"
-           "   return texture(uTex, uv);\n"
+           "   return areaTex(uTex, uv, gDu, gDv, uTexSize);\n"
            "}\n"
            "void main() {\n"
            "   vec4 acc = uDirect == 1 ? vec4(0.0, 0.0, 0.0, 1.0) : texture(uAcc, vUv);\n"
@@ -747,6 +765,8 @@ namespace
            "   vec2 b = q.xy / max(q.z, 1e-12);\n"
            "   vec2 uvb = b / uBox;\n"
            "   vec2 uv = vec2(uvb.x, 1.0 - uvb.y);\n"
+           "   gDu = uvAt(p + vec2(1.0, 0.0)) - uv;\n"
+           "   gDv = uvAt(p + vec2(0.0, 1.0)) - uv;\n"
            "   vec4 layer;\n"
            "   vec2 gUv = (vUv - uGeoUv.xy) / max(uGeoUv.zw - uGeoUv.xy, vec2(1e-6));\n"
            "   if (uKind == 4) {\n"
@@ -817,6 +837,7 @@ namespace
          "uniform int uType;\n"
          "uniform float uAmt;\n"
          "uniform int uMap;\n"
+         "uniform int uGmDither;\n"
          "uniform vec4 uColA;\n"
          "uniform vec4 uColB;\n"
          "uniform int uLinear;\n"
@@ -1191,7 +1212,16 @@ namespace
          "      float g = mn + (md - mn) * uP[se] + (mx - md) * uP[pr];\n"
          "      g = (uHead == 1 ? max(g, 0.0) : clamp(g, 0.0, 1.0));\n"
          "      vec3 bw = vec3(g);\n"
-         "      if (uP[6] > 0.5) bw = mix(bw, SoftPs(bw, uColA.rgb), 0.75);\n"
+         // Photoshop tints like the Color blend mode: the tint's hue and saturation at the grey's W3C luminosity, then
+         // ClipColor (PhotoCraft compose/adjust.rs BlackWhite, Apache 2.0); a headroom document keeps values over 1 only for a grey already over 1.
+         "      if (uP[6] > 0.5) {\n"
+         "         const vec3 W3 = vec3(0.3, 0.59, 0.11);\n"
+         "         vec3 t = uColA.rgb + (g - dot(uColA.rgb, W3));\n"
+         "         float L = dot(t, W3), n = min(t.r, min(t.g, t.b)), x = max(t.r, max(t.g, t.b));\n"
+         "         if (n < 0.0) t = L + (t - L) * L / max(L - n, 1e-6);\n"
+         "         if (x > 1.0 && (uHead != 1 || L <= 1.0)) t = L + (t - L) * (1.0 - L) / max(x - L, 1e-6);\n"
+         "         bw = (uHead == 1 ? max(t, 0.0) : clamp(t, 0.0, 1.0));\n"
+         "      }\n"
          "      c = mix(c, bw, uAmt);\n"
          "   } else if (uType == 19) {\n"   // photo filter: through a coloured glass, lightness kept if asked
          // Photoshop's (PhotoCraft photo_filter_matrix): the pixel's D50 XYZ times the filter's, relative to white,
@@ -1365,6 +1395,7 @@ namespace
          "      c = SrgbEncode(max(acc / wsum, 0.0));\n"
          "   }\n"
          "   if (uType == 4 || (uMap == 1 && uType != 29)) c = gradAt(clamp(LumaPs(c), 0.0, 1.0), uColA, uColB).rgb;\n"
+         "   if (uType == 4 && uGmDither == 1) c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;\n"
          "   c = uHead == 1 && uLinear == 1 ? max(c, 0.0) : clamp(c, 0.0, 1.0);\n"
          "   fragColor = vec4(uLinear == 1 ? SrgbDecode(c) : c, src.a);\n"
          "}\n";
@@ -1541,6 +1572,12 @@ Scene2DNode::Layer& Scene2DNode::AddLayer(Kind kind, uint64_t uid, int above)
       l.tiles.assign(n, "-");
    }
    int at = (int)mLayers.size();
+   // A new group one level past the nesting cap goes beside the enclosing group instead.
+   while (kind == Kind::Group && FindConst(above) != nullptr && FindConst(above)->parent != 0 && Depth(above) + 1 > kMaxGroupDepth)
+   {
+      above = FindConst(above)->parent;
+      std::fprintf(stderr, "PROBE new group: too deep, placed beside group %d\n", above);
+   }
    if (const Layer* ref = FindConst(above))
    {
       l.parent = ref->parent;
@@ -1698,11 +1735,59 @@ int Scene2DNode::Depth(int id)
    return d;
 }
 
+int Scene2DNode::GroupHeight(int id)
+{
+   const Layer* l = FindConst(id);
+   if (l == nullptr || l->kind != Kind::Group)
+      return 0;
+   const int base = Depth(id);
+   int deepest = 0;
+   for (const Layer& c : Layers())
+      if (c.id != id && IsInside(c.id, id) && c.kind == Kind::Group)
+         deepest = std::max(deepest, Depth(c.id) - base);
+   return 1 + deepest;
+}
+
+int Scene2DNode::MaxGroupDepth()
+{
+   int d = 0;
+   for (const Layer& l : Layers())
+      if (l.kind == Kind::Group)
+         d = std::max(d, Depth(l.id) + 1);
+   return d;
+}
+
+bool Scene2DNode::CanGroup(const std::vector<int>& ids)
+{
+   Layers();
+   int top = 0, topIndex = -1;
+   for (int i = 0; i < (int)mLayers.size(); i++)
+      if (std::find(ids.begin(), ids.end(), mLayers[i].id) != ids.end())
+      {
+         topIndex = i;
+         top = mLayers[i].id;
+      }
+   if (topIndex < 0)
+      return false;
+   // The new group sits where the topmost picked layer is; every picked layer goes one level inside it.
+   const int groupLevel = Depth(top) + 1;
+   int levels = groupLevel;
+   for (int id : ids)
+      if (FindConst(id) != nullptr)
+         levels = std::max(levels, groupLevel + GroupHeight(id));
+   return levels <= kMaxGroupDepth;
+}
+
 void Scene2DNode::MoveLayer(int id, int target, bool below, bool into, bool settleClips)
 {
    Layers();
    if (id == target || FindConst(id) == nullptr || FindConst(target) == nullptr || IsInside(target, id))
       return;
+   if ((into ? Depth(target) + 1 : Depth(target)) + GroupHeight(id) > kMaxGroupDepth)
+   {
+      std::fprintf(stderr, "PROBE move layer %d: refused, groups would nest deeper than %d\n", id, kMaxGroupDepth);
+      return;
+   }
    const ClipsBefore before = settleClips ? ReadClips({ id }) : ClipsBefore();
    // Pull out the moving layer and everything under it, in order.
    std::vector<Layer> moving, rest;
@@ -1735,11 +1820,38 @@ void Scene2DNode::MoveLayer(int id, int target, bool below, bool into, bool sett
    Commit();
 }
 
+int Scene2DNode::GroupLayersWith(const std::vector<int>& ids, const GroupOptions& o)
+{
+   const int g = GroupLayers(ids);
+   Layer* gl = g != 0 ? FindLayer(g) : nullptr;
+   if (gl == nullptr)
+      return 0;
+   if (!o.name.empty())
+      gl->name = o.name;
+   gl->label = std::clamp(o.label, 0, 7);
+   gl->blend = o.blend;
+   gl->opacity = std::isfinite(o.opacity) ? std::clamp(o.opacity, 0.0f, 1.0f) : 1.0f;
+   gl->open = false;
+   if (o.labelLayers && gl->label != 0)
+      for (int id : ids)
+         if (Layer* l = FindLayer(id))
+            l->label = gl->label;
+   std::fprintf(stderr, "PROBE group from layers %d: name '%s' label %d blend %d opacity %.2f\n", g, gl->name.c_str(), gl->label,
+                gl->blend, gl->opacity);
+   Commit();
+   return g;
+}
+
 int Scene2DNode::GroupLayers(const std::vector<int>& ids)
 {
    Layers();
    if (ids.empty())
       return 0;
+   if (!CanGroup(ids))
+   {
+      std::fprintf(stderr, "PROBE group layers: refused, groups would nest deeper than %d\n", kMaxGroupDepth);
+      return 0;
+   }
    // The group takes the place of the topmost picked layer.
    int top = ids[0], topIndex = -1;
    for (int i = 0; i < (int)mLayers.size(); i++)
@@ -1813,7 +1925,7 @@ int Scene2DNode::Duplicate(int id)
       for (auto& r : remap)
          if (c.parent == r.first)
             c.parent = r.second;
-   if (!copies.empty() && !copies[0].name.empty())
+   if (!copies.empty() && !copies[0].name.empty() && sCopySuffix)
       copies[0].name = CopyName(copies[0].name);
    mLayers.insert(mLayers.begin() + last + 1, copies.begin(), copies.end());
    Commit();
@@ -1954,6 +2066,31 @@ std::vector<int> Scene2DNode::PasteLayers(const std::vector<Layer>& clip, int ab
    int parentOfPaste = 0;
    if (const Layer* a = FindConst(above))
       parentOfPaste = (a->kind == Kind::Group && a->open) ? a->id : a->parent;   // into an open group, on top
+   // The pasted groups' own nesting (levels under the paste point); too deep and they go out beside the enclosing group.
+   int pasteLevels = 0;
+   for (const Layer& c : clip)
+      if (c.kind == Kind::Group)
+      {
+         int d = 1;
+         for (int p = c.parent, hops = 0; p != 0 && hops < 64; hops++)
+         {
+            const Layer* up = nullptr;
+            for (const Layer& o : clip)
+               if (o.id == p)
+                  up = &o;
+            if (up == nullptr)
+               break;
+            d++;
+            p = up->parent;
+         }
+         pasteLevels = std::max(pasteLevels, d);
+      }
+   while (parentOfPaste != 0 && Depth(parentOfPaste) + 1 + pasteLevels > kMaxGroupDepth)
+   {
+      above = parentOfPaste;
+      parentOfPaste = FindConst(parentOfPaste)->parent;
+      std::fprintf(stderr, "PROBE paste: groups too deep, placed beside group %d\n", above);
+   }
    for (Layer& c : copies)
    {
       bool inside = false;
@@ -2233,7 +2370,125 @@ void Scene2DNode::ImageSize(int w, int h)
    StoreSelection();   // commits
 }
 
-void Scene2DNode::CropTo(float x0, float y0, float x1, float y1)
+void Scene2DNode::ImageSizeDpi(int w, int h, float dpi, bool keepPrintSize, bool nearest)
+{
+   Layers();
+   if (nearest)
+      for (Layer& l : mLayers)
+         if (l.kind == Kind::Paint)
+            l.nearest = true;
+   const float was = mDoc.dpi > 0 ? mDoc.dpi : 72.0f, now = dpi > 0 ? dpi : was;
+   if (w <= 0 && h <= 0 && keepPrintSize)
+   {
+      w = (int)std::lround(mDoc.w * now / was);
+      h = (int)std::lround(mDoc.h * now / was);
+   }
+   else if (w > 0 && h <= 0)
+      h = (int)std::lround((double)w * mDoc.h / mDoc.w);
+   else if (h > 0 && w <= 0)
+      w = (int)std::lround((double)h * mDoc.w / mDoc.h);
+   mDoc.dpi = now;
+   if (w > 0 && h > 0 && (w != mDoc.w || h != mDoc.h))
+      ImageSize(w, h);   // commits
+   else
+      Commit();
+}
+
+void Scene2DNode::CropToTarget(float x0, float y0, float x1, float y1, float deg, int tw, int th, float dpi)
+{
+   if (deg != 0.0f)
+      CropRotated((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, std::fabs(x1 - x0), std::fabs(y1 - y0), deg);
+   else
+      CropTo(x0, y0, x1, y1);
+   if (dpi > 0)
+      mDoc.dpi = dpi;
+   if (tw <= 0 && th <= 0)
+   {
+      Commit();
+      return;
+   }
+   if (tw > 0 && th <= 0)
+      th = (int)std::lround((double)tw * mDoc.h / mDoc.w);
+   else if (th > 0 && tw <= 0)
+      tw = (int)std::lround((double)th * mDoc.w / mDoc.h);
+   tw = std::clamp(tw, 1, GLUtil::kMaxTargetSide);
+   th = std::clamp(th, 1, GLUtil::kMaxTargetSide);
+   // The crop tool's one step (Photoshop's Delete Cropped Pixels, on by default there): a plain paint layer's canvas
+   // part is resampled on its own, Bicubic with its edges held, so a fill reaching the frame fills the result to its
+   // corners. Layers that are turned, scaled, warped or masked keep the transform route below.
+   struct Baked { int id; float x, y; };
+   std::vector<Baked> baked;
+   const int DW = mDoc.w, DH = mDoc.h, kT = TileStore::kTile;
+   Layers();
+   SyncSurfaces();
+   for (Layer& l : mLayers)
+   {
+      if (l.kind != Kind::Paint || l.pw <= 0 || l.ph <= 0 || l.sx != 1.0f || l.sy != 1.0f || l.angle != 0.0f || l.shear != 0.0f ||
+          l.flipX || l.flipY || l.warpOn || l.is3d || l.HasPixelMask() || l.fmw > 0)
+         continue;
+      float bw = 1, bh = 1;
+      LayerBox(l, bw, bh);
+      const float fx = l.x - l.ax * bw, fy = l.y - l.ay * bh;
+      const int ox = (int)std::lround(fx), oy = (int)std::lround(fy);
+      if (bw != (float)l.pw || bh != (float)l.ph || std::fabs(fx - ox) > 1e-3f || std::fabs(fy - oy) > 1e-3f)
+         continue;
+      std::vector<uint8_t> src;
+      int sw = 0, sh = 0;
+      if (!ReadPaint(l.id, src, sw, sh) || sw != l.pw || sh != l.ph)
+         continue;
+      // The canvas part, rows top first; what lies off the surface is clear.
+      std::vector<uint8_t> region((size_t)DW * DH * 4, 0);
+      for (int y = 0; y < DH; y++)
+      {
+         const int sy = y - oy;
+         if (sy < 0 || sy >= sh)
+            continue;
+         const int srow = sh - 1 - sy;   // surface rows bottom first
+         for (int x = 0; x < DW; x++)
+         {
+            const int sx = x - ox;
+            if (sx >= 0 && sx < sw)
+               std::memcpy(&region[((size_t)y * DW + x) * 4], &src[((size_t)srow * sw + sx) * 4], 4);
+         }
+      }
+      const std::vector<uint8_t> up = ResampleRgba(region, DW, DH, tw, th, l.nearest ? 0 : 2);
+      const int cols = (tw + kT - 1) / kT, rows = (th + kT - 1) / kT;
+      std::vector<std::string> keys((size_t)cols * rows, "-");
+      std::vector<uint8_t> tile;
+      for (size_t i = 0; i < keys.size(); i++)
+      {
+         const int tx0 = (int)(i % cols) * kT, ty0 = (int)(i / cols) * kT;
+         const int tww = std::min(kT, tw - tx0), thh = std::min(kT, th - ty0);
+         tile.assign((size_t)tww * thh * 4, 0);
+         bool any = false;
+         for (int y = 0; y < thh; y++)
+         {
+            const int row = th - 1 - (ty0 + y);   // tile rows bottom first, from the top-first result
+            std::memcpy(&tile[(size_t)y * tww * 4], &up[((size_t)row * tw + tx0) * 4], (size_t)tww * 4);
+            for (int x = 0; x < tww && !any; x++)
+               any = tile[((size_t)y * tww + x) * 4 + 3] != 0;
+         }
+         if (any)
+            keys[i] = TileStore::Put(tile.data(), tww, thh);
+      }
+      l.pw = tw;
+      l.ph = th;
+      l.tiles = std::move(keys);
+      baked.push_back({ l.id, l.ax * (float)tw, l.ay * (float)th });
+   }
+   if (tw != mDoc.w || th != mDoc.h)
+      ImageSize(tw, th);   // commits; it scales every layer, so the baked ones are put back after
+   for (const Baked& b : baked)
+      if (Layer* l = FindLayer(b.id))
+      {
+         l->x = b.x;
+         l->y = b.y;
+         l->sx = l->sy = 1.0f;
+      }
+   Commit();
+}
+
+void Scene2DNode::CropTo(float x0, float y0, float x1, float y1, bool deletePixels)
 {
    Layers();
    if (x1 < x0) std::swap(x0, x1);
@@ -2251,10 +2506,12 @@ void Scene2DNode::CropTo(float x0, float y0, float x1, float y1)
    ReframeSelection(0, 0, 0, 0);   // cropping drops the selection (Photoshop, PhotoCraft)
    mDoc.w = w;
    mDoc.h = h;
+   if (deletePixels)
+      ClearPaintOffCanvas();
    StoreSelection();   // commits
 }
 
-void Scene2DNode::CropRotated(float cx, float cy, float w, float h, float deg)
+void Scene2DNode::CropRotated(float cx, float cy, float w, float h, float deg, bool deletePixels)
 {
    Layers();
    const float turn = -deg;
@@ -2291,7 +2548,7 @@ void Scene2DNode::CropRotated(float cx, float cy, float w, float h, float deg)
       mDoc.guidesX.clear();
       mDoc.guidesY.clear();
    }
-   CropTo(cx - w * 0.5f, cy - h * 0.5f, cx + w * 0.5f, cy + h * 0.5f);
+   CropTo(cx - w * 0.5f, cy - h * 0.5f, cx + w * 0.5f, cy + h * 0.5f, deletePixels);
 }
 
 namespace
@@ -2486,7 +2743,9 @@ bool Scene2DNode::PerspectiveCrop(const float qf[8], int w, int h)
    // Every layer's new corner warp first, so a layer past the horizon (or a 3D card, whose map moves with the
    // document size) leaves the document untouched.
    struct Plan { int index; float warp[8]; };
+   struct Bake { int id; std::vector<uint8_t> px; };
    std::vector<Plan> plans;
+   std::vector<Bake> bakes;
    for (int i = 0; i < (int)mLayers.size(); i++)
    {
       Layer& l = mLayers[i];
@@ -2501,8 +2760,9 @@ bool Scene2DNode::PerspectiveCrop(const float qf[8], int w, int h)
          return false;
       LayerMatrix(l, m);
       Plan p{ i, {} };
+      bool past = false;
       const float box[8] = { 0, 0, bw, 0, bw, bh, 0, bh };
-      for (int k = 0; k < 4; k++)
+      for (int k = 0; k < 4 && !past; k++)
       {
          const float bx = box[k * 2], by = box[k * 2 + 1];
          const float z = hNow[6] * bx + hNow[7] * by + hNow[8];
@@ -2511,18 +2771,85 @@ bool Scene2DNode::PerspectiveCrop(const float qf[8], int w, int h)
          const double dx = (hNow[0] * bx + hNow[1] * by + hNow[2]) / z, dy = (hNow[3] * bx + hNow[4] * by + hNow[5]) / z;
          float ox = 0, oy = 0;
          if (!map(dx, dy, ox, oy))
-            return false;
+         {
+            past = true;   // this corner lies beyond the quad's horizon: no corner warp can carry the layer
+            break;
+         }
          // The plain (unwarped) corner, and the pull that puts it where the map sends it.
          p.warp[k * 2] = ox - (m[0] * bx + m[1] * by + m[2]);
          p.warp[k * 2 + 1] = oy - (m[3] * bx + m[4] * by + m[5]);
       }
-      plans.push_back(p);
+      if (!past)
+      {
+         plans.push_back(p);
+         continue;
+      }
+      // PhotoCraft #7557: a layer reaching past the horizon is resampled through the quad (bilinear, premultiplied)
+      // into a paint layer of the new size, as Photoshop resamples, instead of refusing the crop.
+      const int bakeId = l.id;   // RenderLayerAlone puts the layer list back: l may not survive it
+      std::vector<uint8_t> pic;
+      if (!RenderLayerAlone(bakeId, 0, pic) || pic.size() != (size_t)mDoc.w * mDoc.h * 4)
+         return false;
+      Bake b{ bakeId, std::vector<uint8_t>((size_t)W * Hh * 4, 0) };
+      const int DW = mDoc.w, DH = mDoc.h;
+      for (int oy = 0; oy < Hh; oy++)
+         for (int ox = 0; ox < W; ox++)
+         {
+            const double u = ox + 0.5, v = oy + 0.5, z = toDoc[6] * u + toDoc[7] * v + toDoc[8];
+            if (!(std::fabs(z) > 1e-12))
+               continue;
+            const double sx = (toDoc[0] * u + toDoc[1] * v + toDoc[2]) / z - 0.5, sy = (toDoc[3] * u + toDoc[4] * v + toDoc[5]) / z - 0.5;
+            if (!(sx > -1.0 && sy > -1.0 && sx < DW && sy < DH))
+               continue;
+            const int x0 = (int)std::floor(sx), y0 = (int)std::floor(sy);
+            const double fx = sx - x0, fy = sy - y0;
+            double acc[4] = { 0, 0, 0, 0 };
+            for (int t = 0; t < 4; t++)
+            {
+               const int xx = x0 + (t & 1), yy = y0 + (t >> 1);
+               if (xx < 0 || yy < 0 || xx >= DW || yy >= DH)
+                  continue;
+               const double wgt = ((t & 1) ? fx : 1.0 - fx) * ((t >> 1) ? fy : 1.0 - fy);
+               const uint8_t* s = &pic[((size_t)yy * DW + xx) * 4];
+               const double a = s[3] / 255.0;
+               for (int c = 0; c < 3; c++)
+                  acc[c] += wgt * s[c] * a;
+               acc[3] += wgt * a;
+            }
+            if (acc[3] <= 0.0)
+               continue;
+            uint8_t* d = &b.px[((size_t)oy * W + ox) * 4];
+            for (int c = 0; c < 3; c++)
+               d[c] = (uint8_t)std::clamp((int)std::lround(acc[c] / acc[3]), 0, 255);
+            d[3] = (uint8_t)std::clamp((int)std::lround(acc[3] * 255.0), 0, 255);
+         }
+      bakes.push_back(std::move(b));
    }
    for (const Plan& p : plans)
    {
       Layer& l = mLayers[p.index];
       l.warpOn = true;
       std::copy(p.warp, p.warp + 8, l.warp);
+   }
+   for (Bake& b : bakes)
+   {
+      const Layer* old = FindConst(b.id);
+      if (old == nullptr)
+         continue;
+      const std::string name = old->name;
+      const float opacity = old->opacity;
+      const int blend = old->blend;
+      const bool visible = old->visible, clip = old->clip;
+      const int nid = AddFileLayer(old->parent, name, 0, 0, W, Hh, b.px, b.id);
+      if (Layer* nl = FindLayer(nid))
+      {
+         nl->opacity = opacity;
+         nl->blend = blend;
+         nl->visible = visible;
+         nl->clip = clip;
+      }
+      RemoveLayer(b.id);
+      std::fprintf(stderr, "PROBE perspective crop resampled layer %d past the horizon into %d\n", b.id, nid);
    }
    mDoc.guidesX.clear();
    mDoc.guidesY.clear();
@@ -2554,6 +2881,8 @@ void Scene2DNode::Serialize()
      << d.bgColor[2] << " " << +d.ratioLock << " " << +d.rulers << " " << +d.grid << " " << +d.snap << " "
      << +d.guidesOn << " " << d.gridSize << " " << d.gridSubdiv << " " << d.fps << " " << d.seconds << " "
      << +d.linear << " " << +d.headroom << "\n";
+   if (d.dpi != 72.0f)
+      o << "dpi " << d.dpi << "\n";
    if (!d.guidesX.empty())
    {
       o << "guidesx";
@@ -2639,6 +2968,8 @@ void Scene2DNode::Serialize()
       if (l.kind == Kind::Adjust)
          o << "adj " << l.id << " " << l.adjType << " " << l.adjAmt << " " << l.adjTo << " " << l.adjDrive << " " << +l.adjMap
            << "\n";
+      if (l.kind == Kind::Adjust && l.adjDither)
+         o << "gmdither " << l.id << " 1\n";
       if (l.kind == Kind::Adjust && l.adjType == kAdjLevels)
          o << "levels " << l.id << " " << l.levels[0] << " " << l.levels[1] << " " << l.levels[2] << " " << l.levels[3] << "\n";
       if (l.kind == Kind::Adjust && l.adjType == kAdjCurves)
@@ -2692,11 +3023,15 @@ void Scene2DNode::Serialize()
          o << " " << sh.miter << " " << sh.dashPhase << " " << +sh.balanced << " " << sh.arrowS << " " << sh.arrowE << " "
            << sh.arrowSize << " " << sh.taperS << " " << sh.taperE << " " << sh.pressMin << " " << +sh.behind << " "
            << +sh.scaleStroke << " " << sh.arrowConcave;
+         o << " " << sh.strokeType << " " << sh.strokeAngle;
+         WriteStops(o, sh.strokeStops);
          o << "\n";
       };
       if (l.kind == Kind::Vector)
       {
          o << "vsize " << l.id << " " << l.pw << " " << l.ph << "\n";
+         if (l.SoftShape())
+            o << "vsoft " << l.id << " " << l.shapeFeather << " " << l.shapeDensity << "\n";
          for (const Shape& sh : l.shapes)
             shapeLine("shape", sh);
       }
@@ -2734,6 +3069,9 @@ void Scene2DNode::Serialize()
               << l.spaceAfter << "\n";
          if (l.typeMode != 0 || l.vertical || l.pathOffset != 0 || l.pathFlip)
             o << "ttype " << l.id << " " << l.typeMode << " " << l.pathOffset << " " << +l.pathFlip << " " << +l.vertical << "\n";
+         // The end point only when set, so files without it stay as they were (and load as "the path's end").
+         if (l.pathEnd >= 0.0f)
+            o << "tpend " << l.id << " " << l.pathEnd << "\n";
          for (const Shape& sh : l.typePath)
          {
             o << "tpath " << l.id << " " << sh.op << " " << +sh.closed << " " << sh.pts.size() / 6;
@@ -2744,13 +3082,18 @@ void Scene2DNode::Serialize()
             o << "twarp " << l.id << " " << l.warpStyle << " " << l.warpBend << " " << l.warpH << " " << l.warpV << " "
               << +l.warpVert << "\n";
          // Styled runs, only when the text is not one plain run: "trun layer len charStyle font size tracking r g b a b i u".
-         if (l.runs.size() > 1 || (l.runs.size() == 1 && l.runs[0].st.charStyle != 0))
+         // Tail (optional, newer files): features (- = none) kernMode kern caps.
+         if (l.runs.size() > 1 || (l.runs.size() == 1 && !l.runs[0].st.Plain()))
             for (const TextRun& r : l.runs)
             {
                o << "trun " << l.id << " " << r.len << " " << r.st.charStyle << " " << EscapeToken(r.st.font) << " " << r.st.size
                  << " " << r.st.tracking;
                for (float v : r.st.c) o << " " << v;
-               o << " " << +r.st.bold << " " << +r.st.italic << " " << +r.st.underline << "\n";
+               o << " " << +r.st.bold << " " << +r.st.italic << " " << +r.st.underline;
+               if (!r.st.features.empty() || r.st.kernMode != 0 || r.st.kern != 0.0f || r.st.caps)
+                  o << " " << (r.st.features.empty() ? std::string("-") : EscapeToken(r.st.features)) << " " << r.st.kernMode << " "
+                    << r.st.kern << " " << +r.st.caps;
+               o << "\n";
             }
          if (l.paraStyle != 0)
             o << "tpstyle " << l.id << " " << l.paraStyle << "\n";
@@ -2921,6 +3264,12 @@ void Scene2DNode::Parse()
          std::string name;
          if (s >> name)
             mClipPath = UnescapeToken(name);
+      }
+      else if (key == "dpi")
+      {
+         float v = 72.0f;
+         if (s >> v && v > 0 && std::isfinite(v))
+            mDoc.dpi = v;
       }
       else if (key == "guidesx" || key == "guidesy")
       {
@@ -3133,6 +3482,12 @@ void Scene2DNode::Parse()
             l->adjDrive = std::clamp(l->adjDrive, 0, kDrives);
             l->adjMap = map != 0;
          }
+         else if (key == "gmdither")
+         {
+            int on = 0;
+            s >> on;
+            l->adjDither = on != 0;
+         }
          else if (key == "relief")
          {
             s >> l->reliefMat >> l->reliefLight >> l->reliefElev >> l->reliefDepth;
@@ -3184,6 +3539,14 @@ void Scene2DNode::Parse()
             s >> l->pw >> l->ph;
             l->pw = std::clamp(l->pw, 1, GLUtil::kMaxTargetSide);
             l->ph = std::clamp(l->ph, 1, GLUtil::kMaxTargetSide);
+         }
+         else if (key == "vsoft")
+         {
+            float feather = 0.0f, density = 1.0f;
+            s >> feather >> density;
+            // Hostile values render as the nearest valid ones (PhotoCraft hostile_values_render).
+            l->shapeFeather = std::isfinite(feather) ? std::clamp(feather, 0.0f, 128.0f) : 0.0f;
+            l->shapeDensity = std::isfinite(density) ? std::clamp(density, 0.0f, 1.0f) : 1.0f;
          }
          else if (key == "vmask")
          {
@@ -3254,6 +3617,14 @@ void Scene2DNode::Parse()
                      sh.arrowConcave = std::clamp(std::round(cc), -Shape::kArrowConcaveMax, Shape::kArrowConcaveMax);
                   sh.noise = std::clamp(sh.noise, 0.0f, 1.0f);
                   sh.miter = std::clamp(sh.miter, 1.0f, 100.0f);
+                  int stype = 0;
+                  float sangle = 90.0f;
+                  if (s >> stype >> sangle && std::isfinite(sangle))
+                  {
+                     sh.strokeType = std::clamp(stype, 0, 4);
+                     sh.strokeAngle = sangle;
+                     ReadStops(s, sh.strokeStops);
+                  }
                }
             }
             (key == "shape" ? l->shapes : l->vmask).push_back(sh);
@@ -3330,6 +3701,16 @@ void Scene2DNode::Parse()
                r.st.bold = b != 0;
                r.st.italic = i != 0;
                r.st.underline = u != 0;
+               std::string feats;
+               int km = 0, cp = 0;
+               float kv = 0.0f;
+               if (s >> feats >> km >> kv >> cp)
+               {
+                  r.st.features = feats == "-" ? std::string() : UnescapeToken(feats);
+                  r.st.kernMode = std::clamp(km, 0, 2);
+                  r.st.kern = std::isfinite(kv) ? std::clamp(kv, -1000.0f, 10000.0f) : 0.0f;
+                  r.st.caps = cp != 0;
+               }
                l->runs.push_back(r);
             }
          }
@@ -3346,6 +3727,12 @@ void Scene2DNode::Parse()
                l->pathFlip = flip != 0;
                l->vertical = vert != 0;
             }
+         }
+         else if (key == "tpend")
+         {
+            float e = -1.0f;
+            if (s >> e)
+               l->pathEnd = std::isfinite(e) && e >= 0.0f ? std::min(e, 1.0f) : -1.0f;
          }
          else if (key == "tpath")
          {
@@ -3440,6 +3827,23 @@ void Scene2DNode::Parse()
       const Layer* p = l.parent != 0 ? find(l.parent) : nullptr;
       if (l.parent != 0 && (p == nullptr || p->kind != Kind::Group || p == &l))
          l.parent = 0;
+   }
+   // A hand-written file nested past the group cap: each layer too deep moves up to the deepest group it may sit in.
+   for (Layer& l : mLayers)
+   {
+      int chain[kMaxGroupDepth + 2], n = 0;
+      for (int q = l.parent; q != 0 && n < kMaxGroupDepth + 1; )
+      {
+         chain[n++] = q;
+         const Layer* g = find(q);
+         q = g != nullptr ? g->parent : 0;
+      }
+      const int cap = l.kind == Kind::Group ? kMaxGroupDepth - 1 : kMaxGroupDepth;
+      if (n > cap)
+      {
+         l.parent = cap > 0 ? chain[n - cap] : 0;
+         std::fprintf(stderr, "PROBE load: layer %d nested past %d groups, moved up to %d\n", l.id, kMaxGroupDepth, l.parent);
+      }
    }
 }
 
@@ -3660,6 +4064,23 @@ namespace
             s += "uniform sampler2D uT" + std::to_string(k) + ";\n";
          s += GLUtil::kSrgbGlsl;
          s += BlendModes::kBlendGLSL;
+         s += "// Downscale prefilter: an area average over the output pixel's footprint in the texture (du, dv = the uv step\n"
+              "// per document pixel), so a layer shrunk far comes out its average, not point-sampled moire (PhotoCraft).\n"
+              "vec4 areaTex(sampler2D t, vec2 uv, vec2 du, vec2 dv, vec2 ts) {\n"
+              "   float nx = clamp(ceil(length(du * ts) - 0.25), 1.0, 8.0), ny = clamp(ceil(length(dv * ts) - 0.25), 1.0, 8.0);\n"
+              "   if (nx * ny < 2.0) return texture(t, uv);\n"
+              "   vec4 s = vec4(0.0);\n"
+              "   for (int j = 0; j < 8; j++) { if (float(j) >= ny) break;\n"
+              "      for (int i = 0; i < 8; i++) { if (float(i) >= nx) break;\n"
+              "         vec2 o = (vec2(float(i), float(j)) + 0.5) / vec2(nx, ny) - 0.5;\n"
+              "         s += texture(t, uv + du * o.x + dv * o.y); } }\n"
+              "   return s / (nx * ny);\n"
+              "}\n";
+         s += "vec2 uvAtK(vec2 pp, int k) {\n"
+              "   vec3 q = vec3(dot(uInvA[k], vec3(pp, 1.0)), dot(uInvB[k], vec3(pp, 1.0)), dot(uInvC[k], vec3(pp, 1.0)));\n"
+              "   vec2 b = q.xy / max(q.z, 1e-12) / uBox[k];\n"
+              "   return vec2(b.x, 1.0 - b.y);\n"
+              "}\n";
          s += "vec4 over(vec4 acc, sampler2D t, int k) {\n"
               "   vec4 r = uRect[k];\n"
               "   if (gl_FragCoord.x < r.x || gl_FragCoord.y < r.y || gl_FragCoord.x > r.z || gl_FragCoord.y > r.w) return acc;\n"
@@ -3672,7 +4093,7 @@ namespace
               "   vec4 layer;\n"
               "   if (uvb.x < c.x || uvb.x > c.z || uvb.y < c.y || uvb.y > c.w) layer = vec4(0.0);\n"
               "   else if (uNearest[k] == 1) layer = texelFetch(t, ivec2(clamp(floor(uv * uTexSize[k]), vec2(0.0), uTexSize[k] - 1.0)), 0);\n"
-              "   else layer = texture(t, uv);\n"
+              "   else layer = areaTex(t, uv, uvAtK(p + vec2(1.0, 0.0), k) - uv, uvAtK(p + vec2(0.0, 1.0), k) - uv, uTexSize[k]);\n"
               "   if (uLinear == 1 && uSrgb[k] == 1) layer.rgb = SrgbDecode(layer.rgb);\n"
               "   float amt = uOpacity[k] * layer.a;\n"
               "   vec3 cs = mix(layer.rgb, blendModeImage(uMode[k], acc.rgb, layer.rgb, 1, uHead), acc.a);\n"
@@ -4096,8 +4517,8 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
          return;
    }
    // A vector layer shows only where its items are: crop to their bounds (miter tips and filtering padded),
-   // same reason as paint above.
-   if (l.kind == Kind::Vector && !l.shapes.empty() && l.pw > 0 && l.ph > 0)
+   // same reason as paint above. A soft shape's fill reaches past its paths (Density shows it over the whole layer).
+   if (l.kind == Kind::Vector && !l.shapes.empty() && l.pw > 0 && l.ph > 0 && !l.SoftShape())
    {
       float x0 = 1e30f, y0 = 1e30f, x1 = -1e30f, y1 = -1e30f;
       for (const Shape& s : l.shapes)
@@ -4245,6 +4666,7 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
       glUniform1i(GLUtil::UniformLoc(prog, "uType"), l.adjType);
       glUniform1f(GLUtil::UniformLoc(prog, "uAmt"), AdjAmount(l));
       glUniform1i(GLUtil::UniformLoc(prog, "uMap"), l.adjMap ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uGmDither"), l.adjDither ? 1 : 0);
       glUniform4fv(GLUtil::UniformLoc(prog, "uColA"), 1, l.colorA);
       glUniform4fv(GLUtil::UniformLoc(prog, "uColB"), 1, l.colorB);
       glUniform1i(GLUtil::UniformLoc(prog, "uLinear"), mDoc.linear ? 1 : 0);

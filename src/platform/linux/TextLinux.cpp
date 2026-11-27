@@ -300,6 +300,23 @@ namespace Platform
       return out;
    }
 
+   bool FontFaceInstalled(const std::string& postscriptName)
+   {
+      if (postscriptName.empty())
+         return false;
+      std::lock_guard<std::mutex> lock(gFtMutex);
+      FcPattern* pat = FcPatternCreate();
+      FcPatternAddString(pat, FC_POSTSCRIPT_NAME, (const FcChar8*)postscriptName.c_str());
+      FcObjectSet* os = FcObjectSetBuild(FC_POSTSCRIPT_NAME, nullptr);
+      FcFontSet* set = FcFontList(nullptr, pat, os);
+      const bool found = set != nullptr && set->nfont > 0;
+      if (set != nullptr)
+         FcFontSetDestroy(set);
+      FcObjectSetDestroy(os);
+      FcPatternDestroy(pat);
+      return found;
+   }
+
    const std::vector<std::string>& AvailableFontFamilies()
    {
       static std::vector<std::string> sFamilies;
@@ -337,6 +354,9 @@ namespace Platform
       return sFamilies;
    }
 
+   float PairKerning(const std::string&, float, const std::string&, const std::string&) { return 0.0f; }
+   bool CheckWord(const std::string&, const std::string&) { return true; }
+   std::vector<std::string> SpellSuggestions(const std::string&, int, const std::string&) { return {}; }
    bool AddFontFile(const std::string& path, std::string& family)
    {
       family.clear();

@@ -855,7 +855,27 @@ namespace app
          gHistoryRollback.dirty = gPatchDirty;
          gHistoryRollback.redo = std::move(gRedoStack);
       }
-      if (!gHistoryRollback.redo.empty() && !chain)
+      // Non-linear history (PhotoCraft history options): the undone states stay in the list, in order, and the new
+      // step comes after the last of them, so stepping back from it reaches them. A timeline-only or Clear History
+      // step among them keeps the linear rule.
+      bool keepLater = gHistoryOptions.nonLinear && !chain && !gHistoryRollback.redo.empty();
+      for (const UndoEntry& r : gHistoryRollback.redo)
+         keepLater = keepLater && !r.arrangeOnly && !r.cleared;
+      if (keepLater)
+      {
+         Patch::Data prev = std::move(snapshot);
+         GestureRecorder::PlaybackMap prevG = GestureRecorder::Instance().Playbacks();
+         for (auto it = gHistoryRollback.redo.rbegin(); it != gHistoryRollback.redo.rend(); ++it)
+         {
+            gUndoStack.push_back({ std::move(prev), std::move(prevG) });
+            gUndoStack.back().label = it->label;
+            prev = it->patch;
+            prevG = it->gestures;
+         }
+         snapshot = std::move(prev);
+         fprintf(stderr, "PROBE history non-linear kept %zu later states\n", gHistoryRollback.redo.size());
+      }
+      else if (!gHistoryRollback.redo.empty() && !chain)
          HistoryDiscardedStates(HistoryCurrentDepth() + 1);
       gUndoStack.push_back({ std::move(snapshot), GestureRecorder::Instance().Playbacks() });
       if (label != nullptr)

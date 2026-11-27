@@ -975,12 +975,52 @@ namespace
          out.insert(out.end(), { c[(size_t)(n - 1) * 2], c[(size_t)(n - 1) * 2 + 1] });
       c = std::move(out);
    }
-   // Puts a point at (x, y): the one already near x moves, else a new one goes in (16 at most).
+   // A black (or white) point picked past the room the curve keeps (x beyond `limit`): the end point cannot move
+   // there without collapsing the points, so every point at or above the one just under x (at or below the one just
+   // over it, for white) goes to the end's output instead; the point positions stay (PhotoCraft's endpoint fallback,
+   // adjust_params, Apache 2.0). Inside the room it is SetCurveEnd.
+   void PickCurveEnd(std::vector<float>& c, bool white, float x, float limit)
+   {
+      if (c.size() < 4)
+         c = { 0.0f, 0.0f, 1.0f, 1.0f };
+      const float y = white ? 1.0f : 0.0f;
+      if (white ? x >= limit : x <= limit)
+      {
+         SetCurveEnd(c, white, white ? std::min(x, 1.0f) : std::max(x, 0.0f), y);
+         return;
+      }
+      const int n = (int)c.size() / 2;
+      int below = 0, above = n - 1;
+      for (int i = 0; i < n; i++)
+      {
+         if (c[(size_t)i * 2] <= x)
+            below = i;
+         if (c[(size_t)(n - 1 - i) * 2] >= x)
+            above = n - 1 - i;
+      }
+      for (int i = 0; i < n; i++)
+         if (white ? i <= above : i >= below)
+            c[(size_t)i * 2 + 1] = y;
+      std::fprintf(stderr, "PROBE curve end fallback: %s at %.4f, %d points kept\n", white ? "white" : "black", x, n);
+   }
+   // Puts a point at (x, y): the one already near x moves, else a new one goes in (16 at most). Two points closer than
+   // the room a new one needs either side of x become a plateau at y instead, so none moves into the other
+   // (PhotoCraft's grey-point fallback).
    void SetCurveMid(std::vector<float>& c, float x, float y)
    {
       const int n = (int)c.size() / 2;
       if (n < 2)
          return;
+      for (int i = 0; i + 1 < n; i++)
+      {
+         const float a = c[(size_t)i * 2], b = c[(size_t)(i + 1) * 2];
+         if (a <= x && x <= b && b - a < 2.0f * kPointGap && i > 0 && i + 1 < n - 1)
+         {
+            c[(size_t)i * 2 + 1] = c[(size_t)(i + 1) * 2 + 1] = y;
+            std::fprintf(stderr, "PROBE curve grey fallback: plateau %.4f..%.4f at %.4f\n", a, b, y);
+            return;
+         }
+      }
       for (int i = 1; i < n - 1; i++)
          if (std::fabs(c[(size_t)i * 2] - x) < kPointGap * 1.5f)
          {
@@ -1052,25 +1092,31 @@ void Scene2DNode::WhiteBalanceFromPick(const float disp[3], float amt, float& te
    tint = bti;
 }
 
-void Scene2DNode::PointFromPick(int adjType, float adjAmt, float levels[4], float levelsCh[3][4], std::vector<float>& adjP,
-                                std::vector<float>& curve, std::vector<float> curveCh[3], const float disp[3], int point)
+bool Scene2DNode::PointFromPick(int adjType, float adjAmt, float levels[4], float levelsCh[3][4], std::vector<float>& adjP,
+                                std::vector<float>& curve, std::vector<float> curveCh[3], const float disp[3], int point, bool isInput)
 {
-   // The picked pixel already has the adjustment on it: each channel's forward map is run backwards to the colour
-   // that went in, and the point is set from that (Photoshop's eyedroppers act on the colour before the adjustment).
+   if ((adjType != kAdjLevels && adjType != kAdjCurves) || point < 1 || point > 3 || !std::isfinite(disp[0]) ||
+       !std::isfinite(disp[1]) || !std::isfinite(disp[2]))
+   {
+      std::fprintf(stderr, "PROBE point from pick refused: type %d point %d\n", adjType, point);
+      return false;
+   }
+   // The picked pixel already has the adjustment on it (unless isInput: it was read under the adjustment): each
+   // channel's forward map is run backwards to the colour that went in, and the point is set from that (Photoshop's eyedroppers act on the colour before the adjustment).
    const std::vector<float> def = AdjParamDefault(adjType);
    for (size_t i = adjP.size(); i < def.size(); i++)
       adjP.push_back(def[i]);
    if (adjType == kAdjLevels)
    {
       if (adjP.size() < 3)
-         return;
+         return false;
       float e[3], o[3];
       for (int ch = 0; ch < 3; ch++)
       {
          const float* C = levelsCh[ch];
          const float g = adjP[(size_t)ch];
          auto f = [&](float v) { return LevelsStage(C, g, LevelsStage(levels, adjAmt, v)); };
-         const float pre = InvertMonotone(f, disp[ch]);
+         const float pre = isInput ? std::clamp(disp[ch], 0.0f, 1.0f) : InvertMonotone(f, disp[ch]);
          e[ch] = LevelsStage(levels, adjAmt, pre);   // what reaches the channel's own levels
          o[ch] = f(pre);
       }
@@ -1095,10 +1141,8 @@ void Scene2DNode::PointFromPick(int adjType, float adjAmt, float levels[4], floa
             adjP[(size_t)ch] = 0.5f * (lo + hi);
          }
       }
-      return;
+      return true;
    }
-   if (adjType != kAdjCurves)
-      return;
    const bool lumaOnly = !adjP.empty() && adjP[0] > 0.5f;
    const float amt = std::clamp(adjAmt, 0.0f, 1.0f);
    float master[256];
@@ -1106,12 +1150,18 @@ void Scene2DNode::PointFromPick(int adjType, float adjAmt, float levels[4], floa
    const float lo = 0.05f, hi = 0.95f;   // a black / white / grey point's x stays this far inside the curve
    if (lumaOnly)
    {
-      const float pre = InvertMonotone([&](float v) { return v + (LutAt(master, v) - v) * amt; }, Luma709(disp));
+      const float pre = isInput ? std::clamp(Luma709(disp), 0.0f, 1.0f)
+                             : InvertMonotone([&](float v) { return v + (LutAt(master, v) - v) * amt; }, Luma709(disp));
+      if (point == 2)
+      {
+         std::fprintf(stderr, "PROBE point from pick refused: a grey point on a luma-only curve\n");
+         return false;   // a neutral grey means nothing on luma alone
+      }
       if (point == 1)
-         SetCurveEnd(curve, false, std::clamp(pre, 0.0f, hi), 0.0f);
-      else if (point == 3)
-         SetCurveEnd(curve, true, std::clamp(pre, lo, 1.0f), 1.0f);
-      return;   // a neutral grey means nothing on luma alone
+         PickCurveEnd(curve, false, pre, hi);
+      else
+         PickCurveEnd(curve, true, pre, lo);
+      return true;
    }
    float e[3], o[3];
    for (int ch = 0; ch < 3; ch++)
@@ -1119,7 +1169,7 @@ void Scene2DNode::PointFromPick(int adjType, float adjAmt, float levels[4], floa
       float chLut[256];
       CurveLut(curveCh[ch], chLut, 256);
       auto f = [&](float v) { return v + (LutAt(chLut, LutAt(master, v)) - v) * amt; };
-      const float pre = InvertMonotone(f, disp[ch]);
+      const float pre = isInput ? std::clamp(disp[ch], 0.0f, 1.0f) : InvertMonotone(f, disp[ch]);
       e[ch] = LutAt(master, pre);   // what reaches the channel's own curve
       o[ch] = f(pre);
    }
@@ -1127,10 +1177,11 @@ void Scene2DNode::PointFromPick(int adjType, float adjAmt, float levels[4], floa
    for (int ch = 0; ch < 3; ch++)
    {
       if (point == 1)
-         SetCurveEnd(curveCh[ch], false, std::clamp(e[ch], 0.0f, hi), 0.0f);
+         PickCurveEnd(curveCh[ch], false, e[ch], hi);
       else if (point == 3)
-         SetCurveEnd(curveCh[ch], true, std::clamp(e[ch], lo, 1.0f), 1.0f);
+         PickCurveEnd(curveCh[ch], true, e[ch], lo);
       else
          SetCurveMid(curveCh[ch], std::clamp(e[ch], lo, hi), target);
    }
+   return true;
 }

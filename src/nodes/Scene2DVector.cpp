@@ -50,6 +50,13 @@ namespace
          h = HF(h, g.t);
          for (float f : g.c) h = HF(h, f);
       }
+      h = H(h, (unsigned)s.strokeType);
+      h = HF(h, s.strokeAngle);
+      for (const Scene2DNode::GradStop& g : s.strokeStops)
+      {
+         h = HF(h, g.t);
+         for (float f : g.c) h = HF(h, f);
+      }
       h = HS(h, s.fillImage);
       h = H(h, (unsigned)s.imageMode);
       for (const auto& c : s.meshC) for (float f : c) h = HF(h, f);
@@ -90,7 +97,7 @@ namespace
          }
       // Corner radius (Photoshop's polygon/star Radius): each corner becomes a circular arc tangent to both
       // sides, the tangent run capped at half the shorter side so neighbouring arcs never cross.
-      if (s.radius <= 0.0f)
+      if (!(s.radius > 0.0f))   // NaN too (PhotoCraft hostile_radii_never_panic)
          return;
       const std::vector<float> v = xy;
       xy.clear();
@@ -677,8 +684,25 @@ namespace
             plutovg_canvas_set_dash(c, s.dashPhase, d, 2);
          }
       };
+      // The stroke's paint: its colour, or its gradient over the item's box (the fill's geometry, from a copy whose
+      // fill is the stroke's). A conical stroke paints through a surface freed after the stroke.
+      std::vector<plutovg_surface_t*> owned;
+      auto strokePaint = [&](plutovg_canvas_t* c) {
+         if (s.strokeType < 1 || s.strokeType > 4)
+         {
+            plutovg_canvas_set_rgba(c, s.strokeC[0], s.strokeC[1], s.strokeC[2], s.strokeC[3]);
+            return;
+         }
+         S g = s;
+         g.fillType = s.strokeType;
+         g.fillAngle = s.strokeAngle;
+         g.fillStops = s.strokeStops;
+         std::copy(s.strokeC, s.strokeC + 4, g.fillC);
+         if (plutovg_surface_t* own = SetFillPaint(c, g))
+            owned.push_back(own);
+      };
       plutovg_canvas_save(cv);
-      setColor(s.strokeC);
+      strokePaint(cv);
       const bool tapered = s.taperS > 0.0f || s.taperE > 0.0f;
       if (tapered)
          TaperStroke(cv, s, width);
@@ -700,7 +724,7 @@ namespace
          plutovg_canvas_t* t = plutovg_canvas_create(tmp);
          lineStyle(t);
          BuildPath(t, s);
-         plutovg_canvas_set_rgba(t, s.strokeC[0], s.strokeC[1], s.strokeC[2], s.strokeC[3]);
+         strokePaint(t);
          plutovg_canvas_set_line_width(t, width * 2.0f);
          plutovg_canvas_stroke(t);
          BuildPath(t, s);
@@ -724,10 +748,12 @@ namespace
       if (!closedShape && (s.arrowS > 0 || s.arrowE > 0))
       {
          plutovg_canvas_set_dash_array(cv, nullptr, 0);
-         setColor(s.strokeC);
+         strokePaint(cv);
          Arrowheads(cv, s, width);
       }
       plutovg_canvas_restore(cv);
+      for (plutovg_surface_t* own : owned)
+         plutovg_surface_destroy(own);
       if (s.behind)
          drawFill();
    }
@@ -777,6 +803,77 @@ namespace
       RasterShapesArgb(shapes.data(), shapes.size(), w, h, mask, argb.data(), strokeK);
       out.resize(argb.size());
       plutovg_convert_argb_to_rgba(out.data(), argb.data(), w, h, w * 4);
+   }
+
+   // A soft shape (PhotoCraft soft_shape_tests): the fills alone, their alpha feathered (Gaussian, sigma = feather) and
+   // shown at 1 - density beyond the path, then the strokes alone drawn crisp over them. Straight RGBA, top row first.
+   void RasterSoftShapes(const std::vector<Scene2DNode::Shape>& shapes, int w, int h, float feather, float density, std::vector<uint8_t>& out,
+                         float strokeK)
+   {
+      feather = std::isfinite(feather) ? std::clamp(feather, 0.0f, 128.0f) : 0.0f;
+      density = std::isfinite(density) ? std::clamp(density, 0.0f, 1.0f) : 1.0f;
+      std::vector<Scene2DNode::Shape> fills = shapes, strokes = shapes;
+      float base[3] = { 0.0f, 0.0f, 0.0f };   // beyond every fill: the first fill's colour
+      bool haveBase = false;
+      for (auto& f : fills)
+      {
+         f.strokeOn = false;
+         if (!haveBase && f.fillOn && f.op == Scene2DNode::Shape::kAdd)
+         {
+            std::copy(f.fillC, f.fillC + 3, base);
+            haveBase = true;
+         }
+      }
+      for (auto& k : strokes)
+         k.fillOn = false;
+      const size_t n = (size_t)w * h;
+      std::vector<uint8_t> fp;
+      RasterShapes(fills, w, h, false, fp, strokeK);
+      std::vector<float> a(n), pr(n), pg(n), pb(n);
+      for (size_t i = 0; i < n; i++)
+      {
+         const float al = fp[i * 4 + 3] / 255.0f;
+         a[i] = al;
+         pr[i] = fp[i * 4] / 255.0f * al;
+         pg[i] = fp[i * 4 + 1] / 255.0f * al;
+         pb[i] = fp[i * 4 + 2] / 255.0f * al;
+      }
+      if (feather > 0.25f)
+         for (std::vector<float>* c : { &a, &pr, &pg, &pb })
+            SelectMaths::GaussianBlur(*c, w, h, feather);
+      out.assign(n * 4, 0);
+      for (size_t i = 0; i < n; i++)
+      {
+         const float al = std::clamp(a[i], 0.0f, 1.0f);
+         const float shown = (1.0f - density) + density * al;
+         float rgb[3] = { base[0], base[1], base[2] };
+         if (al > 1e-4f)
+         {
+            rgb[0] = pr[i] / al, rgb[1] = pg[i] / al, rgb[2] = pb[i] / al;
+            // Beyond the path the base colour shows through what the feathered edge leaves.
+            const float k = (1.0f - density) * (1.0f - al) / std::max(1e-4f, shown);
+            for (int c = 0; c < 3; c++)
+               rgb[c] = rgb[c] * (1.0f - k) + base[c] * k;
+         }
+         for (int c = 0; c < 3; c++)
+            out[i * 4 + c] = (uint8_t)std::lround(std::clamp(rgb[c], 0.0f, 1.0f) * 255.0f);
+         out[i * 4 + 3] = (uint8_t)std::lround(std::clamp(shown, 0.0f, 1.0f) * 255.0f);
+      }
+      std::vector<uint8_t> sp;
+      RasterShapes(strokes, w, h, false, sp, strokeK);
+      for (size_t i = 0; i < n; i++)
+      {
+         const float sa = sp[i * 4 + 3] / 255.0f;
+         if (sa <= 0.0f)
+            continue;
+         const float da = out[i * 4 + 3] / 255.0f, oa = sa + da * (1.0f - sa);
+         for (int c = 0; c < 3; c++)
+         {
+            const float v = (sp[i * 4 + c] / 255.0f * sa + out[i * 4 + c] / 255.0f * da * (1.0f - sa)) / std::max(1e-6f, oa);
+            out[i * 4 + c] = (uint8_t)std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f);
+         }
+         out[i * 4 + 3] = (uint8_t)std::lround(oa * 255.0f);
+      }
    }
 
    void Upload(unsigned& tex, int& tw, int& th, int w, int h, const std::vector<uint8_t>& topFirst)
@@ -876,7 +973,16 @@ int Scene2DNode::AddTextLayer(const std::string& text, float x, float y, float b
    l.ay = 0.0f;
    l.x = x;
    l.y = y;
+   // A saved default type style (Type > Save Default Type Styles) starts every new type layer.
+   if (mDefaultTypeSet)
+   {
+      SetSummary(l, mDefaultType);
+      l.runs.assign(1, { l.text.size(), mDefaultType });
+      l.runSummary = mDefaultType;
+      l.runText = l.text;
+   }
    const int id = l.id;
+   NoteTypeWarnings(id);
    Commit();
    return id;
 }
@@ -1343,21 +1449,23 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
          key = HF(key, f);
    key = H(key, (unsigned)(l.typeMode | (l.pathFlip << 2) | (l.vertical << 3) | (l.warpVert << 4)));
    key = H(key, (unsigned)l.warpStyle);
-   for (float f : { l.pathOffset, l.warpBend, l.warpH, l.warpV })
+   for (float f : { l.pathOffset, l.pathEnd, l.warpBend, l.warpH, l.warpV })
       key = HF(key, f);
    for (const Shape& s : l.typePath)
       key = HashShape(key, s);
    // Styled runs, as they would be synced now (the layer's fields may have moved since the last save).
    const std::vector<TextRun> runs = CharRuns(l);
    float runMax = l.fontSize;
-   if (runs.size() > 1)
+   const bool styled = runs.size() > 1 || (runs.size() == 1 && !runs[0].st.Plain());
+   if (styled)
       for (const TextRun& r : runs)
       {
          key = H(key, (unsigned)r.len);
          key = HS(key, r.st.font);
-         for (float f : { r.st.size, r.st.tracking, r.st.c[0], r.st.c[1], r.st.c[2], r.st.c[3] })
+         key = HS(key, r.st.features);
+         for (float f : { r.st.size, r.st.tracking, r.st.c[0], r.st.c[1], r.st.c[2], r.st.c[3], r.st.kern })
             key = HF(key, f);
-         key = H(key, (unsigned)(r.st.bold | (r.st.italic << 1) | (r.st.underline << 2)));
+         key = H(key, (unsigned)(r.st.bold | (r.st.italic << 1) | (r.st.underline << 2) | (r.st.caps << 3) | (r.st.kernMode << 4)));
          runMax = std::max(runMax, r.st.size);
       }
    TextBox& tb = mTextBoxes[l.id];
@@ -1396,7 +1504,16 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
                                   pad * 2 + (int)(size * roomScale);
       int ch = (int)std::ceil((lines * size * roomScale * std::max(0.5f, l.leading) * 1.4f + lines * (l.spaceBefore + l.spaceAfter)) * tsy) + pad * 2;
       if (boxW > 0.0f)
-         ch = std::max(ch, (int)std::ceil(size * 1.5f * (1 + longest * size * 0.6f / std::max(1.0f, boxW)))) + pad * 2;
+      {
+         // Wrapped lines at the leading asked for: a loose leading must not clip the lower lines off the canvas.
+         size_t glyphs = 0;
+         for (char c : l.text)
+            glyphs += (c & 0xC0) != 0x80 && c != '\n' ? 1 : 0;
+         const float wrapped = (float)lines + (float)glyphs * size * 0.6f / std::max(1.0f, boxW);
+         const float pitch = size * roomScale * std::max(1.07f, std::max(0.5f, l.leading) * 1.4f) + l.spaceBefore + l.spaceAfter;
+         ch = std::max(ch, (int)std::ceil(size * 1.5f * (1 + longest * size * 0.6f / std::max(1.0f, boxW))) + pad * 2);
+         ch = std::max(ch, (int)std::ceil(wrapped * pitch * tsy) + pad * 2);
+      }
       cw = std::clamp(cw, 8, 8192);
       ch = std::clamp(ch, 8, 8192);
       std::vector<uint8_t> px((size_t)cw * ch * 4, 0);
@@ -1404,6 +1521,21 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
       {
          Platform::TextRasterRequest req;
          req.text = l.caps ? UpperText(l.text) : l.text;
+         // ALL CAPS on single runs, where it keeps the byte length (the spans index the bytes).
+         if (!l.caps && styled)
+         {
+            size_t at = 0;
+            for (const TextRun& r : runs)
+            {
+               if (r.st.caps && at + r.len <= l.text.size())
+               {
+                  const std::string up = UpperText(l.text.substr(at, r.len));
+                  if (up.size() == r.len)
+                     req.text.replace(at, r.len, up);
+               }
+               at += r.len;
+            }
+         }
          req.bold = l.bold;
          req.italic = l.italic;
          req.underline = l.underline;
@@ -1419,6 +1551,7 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
          req.wrapWidth = boxW > 0.0f ? std::clamp(boxW / (float)cw, 0.05f, 1.0f) : 1.0f;
          req.wrapHeight = 1.0f;
          req.lineSpacing = l.leading;
+         req.exactLeading = true;
          req.strike = l.strike;
          req.kerning = l.kerning;
          req.baseShift = shift;
@@ -1444,7 +1577,7 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
          req.scaleX = tsx;
          req.scaleY = tsy;
          // Styled runs; ALL CAPS that changes the byte length (e.g. a German sharp s) draws one style.
-         if (runs.size() > 1 && req.text.size() == l.text.size())
+         if (styled && req.text.size() == l.text.size())
          {
             const float alpha = std::max(1e-4f, std::clamp(l.textC[3], 0.0f, 1.0f));
             size_t at = 0;
@@ -1461,6 +1594,13 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
                sp.bold = r.st.bold;
                sp.italic = r.st.italic;
                sp.underline = r.st.underline;
+               sp.features = r.st.features;
+               // Tabular figures keep one advance: the font's pair kerning between them is off (Photoshop, PhotoCraft
+               // tabular numerals), unless the run turns kern on itself.
+               if ((" " + sp.features + " ").find(" tnum ") != std::string::npos && (" " + sp.features + " ").find("kern ") == std::string::npos)
+                  sp.features += " -kern";
+               sp.kernMode = r.st.kernMode;
+               sp.kern = r.st.kern;
                req.spans.push_back(sp);
                at += r.len;
             }
@@ -1571,6 +1711,10 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
    }
    if (mask)
       key = H(key, (unsigned)std::lround(l.vmaskFeather * 64.0f));
+   const bool soft = !mask && l.kind == Kind::Vector && l.SoftShape();
+   if (soft)
+      key = H(H(key, (unsigned)std::lround(std::clamp(l.shapeFeather, 0.0f, 128.0f) * 64.0f)),
+              (unsigned)std::lround(std::clamp(l.shapeDensity, 0.0f, 1.0f) * 4096.0f) + 11u);
    key = H(H(H(key, (unsigned)w), (unsigned)h), (unsigned)l.aaMode);
    Raster& r = in[l.id];
    if (r.key == key && r.tex != 0)
@@ -1613,7 +1757,7 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
       float lo[2], hi[2];
       // A shape being drawn or dragged is the top one (Illustrator redraws only what changed): the shapes under
       // it are drawn once, and each frame only the last shape's box is redrawn, converted and uploaded.
-      const bool local = !(mask && l.vmaskFeather > 0.25f) && last != nullptr && last->op == Shape::kAdd && last->type != Shape::kSvg &&
+      const bool local = !soft && !(mask && l.vmaskFeather > 0.25f) && last != nullptr && last->op == Shape::kAdd && last->type != Shape::kSvg &&
                          last->noise <= 0.0f && ShapeBounds(*last, lo, hi);
       const unsigned long long bk = H(H(H(H(prefix, (unsigned)w), (unsigned)h), (unsigned)l.aaMode), (unsigned)std::lround(strokeK * 4096.0f) + (mask ? 7u : 0u));
       if (!local)
@@ -1624,7 +1768,10 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
          r.work.shrink_to_fit();
          r.baseKey = 0;
          std::vector<uint8_t> px;
-         RasterShapes(all, w, h, mask, px, strokeK);
+         if (soft)
+            RasterSoftShapes(all, w, h, l.shapeFeather, l.shapeDensity, px, strokeK);
+         else
+            RasterShapes(all, w, h, mask, px, strokeK);
          hard(px);
          featherAlpha(px);
          Upload(r.tex, r.w, r.h, w, h, px);
@@ -2240,6 +2387,9 @@ void Scene2DNode::CopyShapeStyle(const Shape& from, Shape& to)
    to.noise = from.noise;
    to.strokeOn = from.strokeOn;
    std::copy(from.strokeC, from.strokeC + 4, to.strokeC);
+   to.strokeType = from.strokeType;
+   to.strokeAngle = from.strokeAngle;
+   to.strokeStops = from.strokeStops;
    to.width = from.width;
    to.cap = from.cap;
    to.join = from.join;
@@ -2304,36 +2454,13 @@ int Scene2DNode::CombineShapeLayers(const std::vector<int>& ids, int op)
       const float eps = 1e-5f;
       const bool axial = std::fabs(m[1]) < eps && std::fabs(m[3]) < eps;
       const bool same = axial && std::fabs(m[0] - 1.0f) < eps && std::fabs(m[4] - 1.0f) < eps;   // a pure move
-      const float k = std::sqrt(std::fabs(m[0] * m[4] - m[1] * m[3]));
-      auto map = [&](float& x, float& y) {
-         const float nx = m[0] * x + m[1] * y + m[2], ny = m[3] * x + m[4] * y + m[5];
-         x = nx;
-         y = ny;
-      };
       for (size_t j = 0; j < src.shapes.size(); j++)
       {
          Shape s = src.shapes[j];
-         if (!same)
-         {
-            if (s.type == Shape::kSvg)
-            {
-               // An SVG item keeps its box; only a move or a positive axis-aligned scale maps it exactly.
-               if (!axial || m[0] <= 0.0f || m[4] <= 0.0f)
-                  return 0;
-            }
-            else if (s.type != Shape::kPath && !ShapeToPath(s))
-               continue;   // an empty live shape draws nothing
-         }
-         if (s.type == Shape::kPath)
-            for (size_t p = 0; p + 1 < s.pts.size(); p += 2)
-               map(s.pts[p], s.pts[p + 1]);
-         else
-         {
-            map(s.x0, s.y0);
-            map(s.x1, s.y1);
-         }
-         if (s.scaleStroke)
-            s.width *= k;
+         if (s.type == Shape::kSvg && !same && (!axial || m[0] <= 0.0f || m[4] <= 0.0f))
+            return 0;   // an SVG item keeps its box; only a move or a positive axis-aligned scale maps it exactly
+         if (!TransformShape(s, m))
+            continue;   // an empty live shape draws nothing
          if (order[li] != keep)
             CopyShapeStyle(style, s);
          if (li > 0)
@@ -2358,6 +2485,92 @@ unsigned Scene2DNode::VectorMaskTexture(int id)
       return 0;
    Raster* r = SyncRaster(mVMasks, *l, true);
    return r != nullptr ? r->tex : 0;
+}
+
+// Ported from PhotoCraft engine/src/cmd/vector_cmds/shape.rs arrow_axis_scales (Apache 2.0), in Infinite's row-major
+// matrix (x' = m0 x + m1 y + m2, y' = m3 x + m4 y + m5).
+bool Scene2DNode::ArrowAxisScales(const float m[6], float x0, float y0, float x1, float y1, float& axial, float& perpendicular)
+{
+   const double dx = (double)x1 - x0, dy = (double)y1 - y0, len = std::hypot(dx, dy);
+   if (!std::isfinite(len) || len <= 1e-12)
+      return false;
+   const double ux = dx / len, uy = dy / len;
+   const double ax = m[0] * ux + m[1] * uy, ay = m[3] * ux + m[4] * uy;
+   const double px = -m[0] * uy + m[1] * ux, py = -m[3] * uy + m[4] * ux;
+   const double a = std::hypot(ax, ay), p = std::hypot(px, py);
+   if (!std::isfinite(a) || !std::isfinite(p) || a <= 1e-12 || p <= 1e-12)
+      return false;
+   if (std::fabs(ax * px + ay * py) > 1e-5 * a * p)
+      return false;
+   axial = (float)a;
+   perpendicular = (float)p;
+   return true;
+}
+
+bool Scene2DNode::TransformShape(Shape& s, const float m[6])
+{
+   for (int i = 0; i < 6; i++)
+      if (!std::isfinite(m[i]))
+         return false;
+   const float eps = 1e-5f;
+   const bool axial = std::fabs(m[1]) < eps && std::fabs(m[3]) < eps;
+   const bool positive = axial && m[0] > 0.0f && m[4] > 0.0f;
+   const bool uniform = positive && std::fabs(m[0] - m[4]) <= eps * std::max(1.0f, std::fabs(m[0]));
+   const float k = std::sqrt(std::fabs(m[0] * m[4] - m[1] * m[3]));
+   auto map = [&](float& x, float& y) {
+      const float nx = m[0] * x + m[1] * y + m[2], ny = m[3] * x + m[4] * y + m[5];
+      x = nx;
+      y = ny;
+   };
+   if (s.type == Shape::kLine || s.type == Shape::kSvg)
+   {
+      if (s.type == Shape::kSvg && !positive)
+         return false;   // an SVG item keeps its box; only a move or a positive axis scale maps it
+      const float len = std::hypot((s.x1 - s.x0) * m[0] + (s.y1 - s.y0) * m[1], (s.x1 - s.x0) * m[3] + (s.y1 - s.y0) * m[4]);
+      float axial = 0.0f, across = 0.0f;
+      const bool similar = ArrowAxisScales(m, s.x0, s.y0, s.x1, s.y1, axial, across) &&
+                           std::fabs(axial - across) <= 1e-4f * std::max(1.0f, axial);
+      if (s.type == Shape::kLine && (s.arrowS || s.arrowE) && (!similar || len < kLiveMinPx))
+      {
+         // Arrowheads are drawn from the stroke width: a squash, shear or sub-pixel line cannot keep them live.
+         if (!ShapeToPath(s))
+            return false;
+      }
+      else
+      {
+         map(s.x0, s.y0);
+         map(s.x1, s.y1);
+         if (s.scaleStroke)
+            s.width *= k;
+         return true;
+      }
+   }
+   else if (s.type != Shape::kPath)
+   {
+      const bool plain = (s.type == Shape::kRect && s.radius <= 0.0f && !CustomCorners(s)) || s.type == Shape::kEllipse;
+      const float bw = std::fabs((s.x1 - s.x0) * m[0]), bh = std::fabs((s.y1 - s.y0) * m[4]);
+      if ((uniform || (positive && plain)) && std::max(bw, bh) >= kLiveMinPx)
+      {
+         map(s.x0, s.y0);
+         map(s.x1, s.y1);
+         if (uniform)
+         {
+            s.radius *= k;
+            for (float& r : s.cornerR)
+               r *= k;
+         }
+         if (s.scaleStroke)
+            s.width *= k;
+         return true;
+      }
+      if (!ShapeToPath(s))
+         return false;
+   }
+   for (size_t p = 0; p + 1 < s.pts.size(); p += 2)
+      map(s.pts[p], s.pts[p + 1]);
+   if (s.scaleStroke)
+      s.width *= k;
+   return s.Anchors() >= 2;
 }
 
 bool Scene2DNode::ShapeToPath(Shape& s)
@@ -2589,4 +2802,74 @@ void Scene2DNode::DeformShape(Shape& s, int mode, float amount, float freq)
       p[0] = nax;
       p[1] = nay;
    }
+}
+
+// PhotoCraft trim_to_painted (Apache 2.0, ported): each edge is found with strips that double from it, so an empty
+// layer stops after the top edge and a small spot in a large box takes a handful of renders.
+bool Scene2DNode::TrimToPainted(const int rect[4], const std::function<void(const int strip[4], int painted[4])>& painted, int out[4])
+{
+   if (rect[2] <= rect[0] || rect[3] <= rect[1])
+      return false;
+   int box[4] = { rect[0], rect[1], rect[2], rect[3] };
+   // edge 0 top, 1 bottom, 2 left, 3 right: grow a strip from that edge until it holds paint; its painted box is exact
+   for (int e = 0; e < 4; e++)
+   {
+      const bool vert = e < 2;
+      const int len = vert ? box[3] - box[1] : box[2] - box[0];
+      bool found = false;
+      for (int k = 1;; k = std::min(len, k * 2))
+      {
+         int st[4] = { box[0], box[1], box[2], box[3] };
+         if (e == 0) st[3] = box[1] + k;
+         if (e == 1) st[1] = box[3] - k;
+         if (e == 2) st[2] = box[0] + k;
+         if (e == 3) st[0] = box[2] - k;
+         int p[4] = { 0, 0, 0, 0 };
+         painted(st, p);
+         if (p[2] > p[0] && p[3] > p[1])
+         {
+            if (e == 0) box[1] = std::max(box[1], p[1]);
+            if (e == 1) box[3] = std::min(box[3], p[3]);
+            if (e == 2) box[0] = std::max(box[0], p[0]);
+            if (e == 3) box[2] = std::min(box[2], p[2]);
+            found = true;
+            break;
+         }
+         if (k >= len)
+            break;
+      }
+      if (!found)
+         return false;
+   }
+   std::copy(box, box + 4, out);
+   return true;
+}
+
+bool Scene2DNode::SoftShapeFrame(int id, int out[4])
+{
+   const Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Vector || l->shapes.empty())
+      return false;
+   float bw = 1, bh = 1;
+   LayerBox(*l, bw, bh);
+   const int w = std::clamp((int)std::lround(bw), 1, GLUtil::kMaxTargetSide), h = std::clamp((int)std::lround(bh), 1, GLUtil::kMaxTargetSide);
+   std::vector<Shape> fills = l->shapes;
+   for (Shape& f : fills)
+      f.strokeOn = false;
+   std::vector<uint8_t> px;
+   RasterShapes(fills, w, h, false, px, 1.0f);
+   const int all[4] = { 0, 0, w, h };
+   int renders = 0;
+   const bool any = TrimToPainted(all, [&](const int st[4], int p[4]) {
+      renders++;
+      p[0] = st[2], p[1] = st[3], p[2] = st[0], p[3] = st[1];
+      for (int y = st[1]; y < st[3]; y++)
+         for (int x = st[0]; x < st[2]; x++)
+            if (px[((size_t)y * w + x) * 4 + 3] != 0)
+            {
+               p[0] = std::min(p[0], x), p[1] = std::min(p[1], y), p[2] = std::max(p[2], x + 1), p[3] = std::max(p[3], y + 1);
+            }
+   }, out);
+   std::fprintf(stderr, "PROBE soft shape frame %d: %d strips, any %d\n", id, renders, (int)any);
+   return any;
 }

@@ -7,6 +7,7 @@
 // change into every run, and a text change into the runs around it.
 #include "Scene2DNode.h"
 
+#include <cctype>
 #include <cstdio>
 #include <limits>
 #include <sstream>
@@ -252,8 +253,26 @@ bool Scene2DNode::ApplyCharAttrs(RunStyle& out, const StyleAttrs& a, std::string
    RunStyle s = out;
    for (const auto& [k, v] : a)
    {
-      if (k == "font")
+      if (k == "font" || k == "font_family")
          s.font = v;
+      else if (k == "font_style")
+      {
+         // The style picked under a family (PhotoCraft's Style Options): Regular, Bold, Italic or Bold Italic.
+         std::string w;
+         for (char ch : v)
+            if (ch != ' ' && ch != '-')
+               w += (char)std::tolower((unsigned char)ch);
+         if (w == "regular" || w == "roman" || w == "normal" || w == "book")
+            s.bold = false, s.italic = false;
+         else if (w == "bold")
+            s.bold = true, s.italic = false;
+         else if (w == "italic" || w == "oblique")
+            s.bold = false, s.italic = true;
+         else if (w == "bolditalic" || w == "boldoblique")
+            s.bold = true, s.italic = true;
+         else
+            return Fail(err, "font_style is Regular, Bold, Italic or Bold Italic");
+      }
       else if (k == "size")
       {
          if (!ReadFloat(v, s.size) || s.size < 1.0f || s.size > 2000.0f)
@@ -264,6 +283,46 @@ bool Scene2DNode::ApplyCharAttrs(RunStyle& out, const StyleAttrs& a, std::string
          if (!ReadFloat(v, s.tracking) || std::fabs(s.tracking) > 1000.0f)
             return Fail(err, "tracking must be -1000 to 1000");
       }
+      else if (k == "color" && !v.empty() && v[0] == '#')
+      {
+         // "#rrggbb" or "#rrggbbaa", the spelling PhotoCraft's and the web's colour fields use.
+         const std::string h = v.substr(1);
+         if ((h.size() != 6 && h.size() != 8) || h.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos)
+            return Fail(err, "color takes #rrggbb or four numbers 0 to 1");
+         for (int i = 0; i < 4; i++)
+            s.c[i] = i < (int)h.size() / 2 ? (float)std::stoi(h.substr(i * 2, 2), nullptr, 16) / 255.0f : 1.0f;
+      }
+      else if (k == "kerning")
+      {
+         std::string w = v;
+         for (char& ch : w)
+            ch = (char)std::tolower((unsigned char)ch);
+         float f = 0.0f;
+         if (w == "metrics" || w == "auto")
+            s.kernMode = 0, s.kern = 0.0f;
+         else if (w == "optical")
+            s.kernMode = 1, s.kern = 0.0f;
+         else if (w == "off" || w == "none")
+            s.kernMode = 2, s.kern = 0.0f;
+         else if (ReadFloat(v, f) && std::fabs(f) <= 10000.0f)
+            s.kernMode = 2, s.kern = f;
+         else
+            return Fail(err, "kerning is metrics, optical, off or a number");
+      }
+      else if (k == "caps")
+      {
+         std::string w = v;
+         for (char& ch : w)
+            ch = (char)std::tolower((unsigned char)ch);
+         if (w == "all" || w == "allcaps" || w == "1")
+            s.caps = true;
+         else if (w == "none" || w == "normal" || w == "0")
+            s.caps = false;
+         else
+            return Fail(err, "caps is all or none");
+      }
+      else if (k == "features")
+         s.features = v;
       else if (k == "color")
       {
          std::istringstream in(v);
@@ -296,10 +355,22 @@ bool Scene2DNode::ApplyParaAttrs(ParaStyle& out, const StyleAttrs& a, std::strin
    {
       if (k == "align")
       {
+         std::string w = v;
+         for (char& ch : w)
+            ch = (char)std::tolower((unsigned char)ch);
          float f = 0.0f;
-         if (!ReadFloat(v, f) || f != std::floor(f) || f < 0.0f || f > 3.0f)
-            return Fail(err, "align must be 0 to 3");
-         s.align = (int)f;
+         if (w == "left")
+            s.align = 0;
+         else if (w == "center" || w == "centre")
+            s.align = 1;
+         else if (w == "right")
+            s.align = 2;
+         else if (w == "justify" || w == "justified")
+            s.align = 3;
+         else if (!ReadFloat(v, f) || f != std::floor(f) || f < 0.0f || f > 3.0f)
+            return Fail(err, "align must be 0 to 3, or left, center, right or justify");
+         else
+            s.align = (int)f;
       }
       else if (k == "leading")
       {
@@ -330,6 +401,9 @@ Scene2DNode::StyleAttrs Scene2DNode::CharAttrsOf(const RunStyle& s)
    a["bold"] = s.bold ? "1" : "0";
    a["italic"] = s.italic ? "1" : "0";
    a["underline"] = s.underline ? "1" : "0";
+   a["kerning"] = s.kernMode == 0 ? "metrics" : s.kernMode == 1 ? "optical" : s.kern == 0.0f ? "off" : Num(s.kern);
+   a["caps"] = s.caps ? "all" : "none";
+   a["features"] = s.features;
    return a;
 }
 Scene2DNode::StyleAttrs Scene2DNode::ParaAttrsOf(const ParaStyle& s)
@@ -430,6 +504,13 @@ Scene2DNode::RunStyle Scene2DNode::SummaryOf(const Layer& l)
    s.italic = l.italic;
    s.underline = l.underline;
    s.charStyle = l.runs.empty() ? 0 : l.runs[0].st.charStyle;
+   if (!l.runs.empty())
+   {
+      s.features = l.runs[0].st.features;
+      s.kernMode = l.runs[0].st.kernMode;
+      s.kern = l.runs[0].st.kern;
+      s.caps = l.runs[0].st.caps;
+   }
    return s;
 }
 void Scene2DNode::SetSummary(Layer& l, const RunStyle& s)
@@ -662,10 +743,22 @@ bool Scene2DNode::StyleTextRange(int id, size_t a, size_t b, const StyleAttrs& s
    Layer* l = FindLayer(id);
    if (l == nullptr || l->kind != Kind::Text)
       return Fail(err, "not a text layer");
+   // Paragraph names (align, leading, indents, spacing) are shared with the paragraph panel: they set the layer's
+   // paragraph, the rest the characters in range.
+   StyleAttrs chars, para;
+   for (const auto& [k, v] : set)
+      (k == "align" || k == "leading" || k == "indentL" || k == "indentR" || k == "indentFirst" || k == "spaceBefore" || k == "spaceAfter"
+          ? para
+          : chars)[k] = v;
    RunStyle probe;
-   if (!ApplyCharAttrs(probe, set, err))
+   ParaStyle pp = ParaOf(*l);
+   if (!ApplyCharAttrs(probe, chars, err) || !ApplyParaAttrs(pp, para, err))
       return false;
-   StyleRange(*l, a, b, [&](RunStyle& s) { ApplyCharAttrs(s, set); });
+   if (!chars.empty())
+      StyleRange(*l, a, b, [&](RunStyle& s) { ApplyCharAttrs(s, chars); });
+   if (!para.empty())
+      SetPara(*l, pp);
+   NoteTypeWarnings(id);
    Commit();
    return true;
 }
@@ -914,7 +1007,17 @@ bool Scene2DNode::SetStyleAttrs(bool para, uint32_t id, const StyleAttrs* paraAt
       if (charAttrs && !ApplyCharAttrs(cp, *charAttrs, err))
          return false;
       if (charAttrs)
+      {
          d->attrs = *charAttrs;
+         // A family sent with its style is kept as the pair (font_family + font_style), as the font menu picked it.
+         auto f = d->attrs.find("font");
+         if (f != d->attrs.end() && d->attrs.count("font_style") != 0)
+         {
+            d->attrs["font_family"] = f->second;
+            d->attrs.erase(f);
+         }
+         std::fprintf(stderr, "PROBE char style %u attrs %zu\n", id, d->attrs.size());
+      }
    }
    if (nw == mDoc.textStyles)
       return true;

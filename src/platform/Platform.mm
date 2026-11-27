@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <mutex>
+#include <sstream>
 
 #import <objc/runtime.h>
 #import <Cocoa/Cocoa.h>
@@ -1748,6 +1749,75 @@ namespace Platform
       }
    }
 
+   float PairKerning(const std::string& font, float size, const std::string& a, const std::string& b)
+   {
+      @autoreleasepool
+      {
+         CFStringRef nameRef = CFStringCreateWithCString(kCFAllocatorDefault, font.c_str(), kCFStringEncodingUTF8);
+         CTFontRef f = CTFontCreateWithName(nameRef, std::max(1.0f, size), nullptr);
+         if (nameRef != nullptr)
+            CFRelease(nameRef);
+         if (f == nullptr)
+            return 0.0f;
+         auto width = [&](const std::string& t) -> double
+         {
+            CFStringRef str = CFStringCreateWithCString(kCFAllocatorDefault, t.c_str(), kCFStringEncodingUTF8);
+            if (str == nullptr)
+               return 0.0;
+            const void* k[1] = { kCTFontAttributeName };
+            const void* v[1] = { f };
+            CFDictionaryRef at = CFDictionaryCreate(kCFAllocatorDefault, k, v, 1, &kCFTypeDictionaryKeyCallBacks,
+                                                    &kCFTypeDictionaryValueCallBacks);
+            CFAttributedStringRef as = CFAttributedStringCreate(kCFAllocatorDefault, str, at);
+            CTLineRef line = CTLineCreateWithAttributedString(as);
+            const double w = CTLineGetTypographicBounds(line, nullptr, nullptr, nullptr);
+            CFRelease(line);
+            CFRelease(as);
+            CFRelease(at);
+            CFRelease(str);
+            return w;
+         };
+         const double k = width(a + b) - width(a) - width(b);
+         CFRelease(f);
+         return (float)k;
+      }
+   }
+
+   bool CheckWord(const std::string& word, const std::string& language)
+   {
+      @autoreleasepool
+      {
+         NSString* w = [NSString stringWithUTF8String:word.c_str()];
+         if (w == nil || w.length == 0)
+            return true;
+         NSSpellChecker* sc = [NSSpellChecker sharedSpellChecker];
+         NSString* lang = language.empty() ? [sc language] : [NSString stringWithUTF8String:language.c_str()];
+         const NSRange r = [sc checkSpellingOfString:w startingAt:0 language:lang wrap:NO inSpellDocumentWithTag:0 wordCount:nullptr];
+         return r.location == NSNotFound;
+      }
+   }
+
+   std::vector<std::string> SpellSuggestions(const std::string& word, int max, const std::string& language)
+   {
+      std::vector<std::string> out;
+      @autoreleasepool
+      {
+         NSString* w = [NSString stringWithUTF8String:word.c_str()];
+         if (w == nil || w.length == 0 || max <= 0)
+            return out;
+         NSSpellChecker* sc = [NSSpellChecker sharedSpellChecker];
+         NSString* lang = language.empty() ? [sc language] : [NSString stringWithUTF8String:language.c_str()];
+         NSArray<NSString*>* g = [sc guessesForWordRange:NSMakeRange(0, w.length) inString:w language:lang inSpellDocumentWithTag:0];
+         for (NSString* s in g)
+         {
+            if ((int)out.size() >= max)
+               break;
+            out.push_back([s UTF8String]);
+         }
+      }
+      return out;
+   }
+
    std::string FontFileForFamily(const std::string& family)
    {
       std::string out;
@@ -1775,6 +1845,37 @@ namespace Platform
          }
       }
       return out;
+   }
+
+   bool FontFaceInstalled(const std::string& postscriptName)
+   {
+      bool found = false;
+      @autoreleasepool
+      {
+         NSString* name = postscriptName.empty() ? nil : [NSString stringWithUTF8String:postscriptName.c_str()];
+         if (name == nil)
+            return false;
+         NSDictionary* attrs = @{ (__bridge NSString*)kCTFontNameAttribute : name };
+         CTFontDescriptorRef desc = CTFontDescriptorCreateWithAttributes((__bridge CFDictionaryRef)attrs);
+         if (desc == nullptr)
+            return false;
+         const void* keys[1] = { kCTFontNameAttribute };
+         CFSetRef mandatory = CFSetCreate(nullptr, keys, 1, &kCFTypeSetCallBacks);
+         CTFontDescriptorRef match = CTFontDescriptorCreateMatchingFontDescriptor(desc, mandatory);
+         CFRelease(mandatory);
+         CFRelease(desc);
+         if (match == nullptr)
+            return false;
+         // CoreText can still hand back a near face; only the exact name counts.
+         CFStringRef got = (CFStringRef)CTFontDescriptorCopyAttribute(match, kCTFontNameAttribute);
+         CFRelease(match);
+         if (got != nullptr)
+         {
+            found = [(__bridge NSString*)got isEqualToString:name];
+            CFRelease(got);
+         }
+      }
+      return found;
    }
 
    const std::vector<std::string>& AvailableFontFamilies()
@@ -2023,7 +2124,10 @@ namespace Platform
             else if (req.align == 2) ctAlign = kCTTextAlignmentRight;
             else if (req.align == 3) ctAlign = kCTTextAlignmentJustified;
 
-            CGFloat lineSpacingMultiple = std::max(0.1f, req.lineSpacing);
+            CGFloat lineSpacingMultiple = req.exactLeading ? 1.0 : std::max(0.1f, req.lineSpacing);
+            // Exact leading: every line box is the pitch tall, so baselines sit that far apart.
+            CGFloat linePitch = req.exactLeading ? std::max(1.0f, req.fontSize * std::max(0.1f, req.lineSpacing)) : 0.0;
+            CGFloat linePitchMax = req.exactLeading ? linePitch : 0.0;
             // Paragraph indents and spacing, px. A tail indent below 0 counts from the trailing edge.
             CGFloat headIndent = req.indentL, firstIndent = req.indentL + req.indentFirst, tailIndent = -req.indentR;
             CGFloat spaceBefore = std::max(0.0f, req.spaceBefore), spaceAfter = std::max(0.0f, req.spaceAfter);
@@ -2036,9 +2140,11 @@ namespace Platform
                { kCTParagraphStyleSpecifierTailIndent, sizeof(tailIndent), &tailIndent },
                { kCTParagraphStyleSpecifierParagraphSpacingBefore, sizeof(spaceBefore), &spaceBefore },
                { kCTParagraphStyleSpecifierParagraphSpacing, sizeof(spaceAfter), &spaceAfter },
+               { kCTParagraphStyleSpecifierMinimumLineHeight, sizeof(linePitch), &linePitch },
+               { kCTParagraphStyleSpecifierMaximumLineHeight, sizeof(linePitchMax), &linePitchMax },
             };
             CTParagraphStyleRef paragraphStyle =
-               CTParagraphStyleCreate(paragraphSettings, 7);
+               CTParagraphStyleCreate(paragraphSettings, 9);
 
             CFStringRef cfText = CFStringCreateWithCString(kCFAllocatorDefault, req.text.c_str(), kCFStringEncodingUTF8);
             CFNumberRef kern =
@@ -2168,9 +2274,71 @@ namespace Platform
                      const bool fake = fb && req.outlineWidth <= 0.0f;
                      float sw = fake ? -3.0f : strokeSetting;
                      CFNumberRef swNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &sw);
+                     // OpenType features of the run: tags on, "-liga" standard ligatures off.
+                     bool ligaOff = false, kernOff = false;
+                     if (!sp.features.empty())
+                     {
+                        CFMutableArrayRef feats = CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
+                        std::istringstream fin(sp.features);
+                        std::string tag;
+                        while (fin >> tag)
+                        {
+                           const bool off = tag[0] == '-';
+                           const std::string t = off ? tag.substr(1) : tag;
+                           if (t.size() != 4)
+                              continue;
+                           if (t == "liga" && off)
+                              ligaOff = true;
+                           if (t == "kern" && off)
+                              kernOff = true;   // CoreText's pair kerning goes with a fixed kern, below
+                           int v = off ? 0 : 1;
+                           CFStringRef tRef = CFStringCreateWithCString(kCFAllocatorDefault, t.c_str(), kCFStringEncodingUTF8);
+                           CFNumberRef vRef = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &v);
+                           const void* fk[2] = { kCTFontOpenTypeFeatureTag, kCTFontOpenTypeFeatureValue };
+                           const void* fv[2] = { tRef, vRef };
+                           CFDictionaryRef d = CFDictionaryCreate(kCFAllocatorDefault, fk, fv, 2, &kCFTypeDictionaryKeyCallBacks,
+                                                                  &kCFTypeDictionaryValueCallBacks);
+                           CFArrayAppendValue(feats, d);
+                           CFRelease(d);
+                           CFRelease(tRef);
+                           CFRelease(vRef);
+                        }
+                        if (CFArrayGetCount(feats) > 0)
+                        {
+                           const void* dk[1] = { kCTFontFeatureSettingsAttribute };
+                           const void* dv[1] = { feats };
+                           CFDictionaryRef da = CFDictionaryCreate(kCFAllocatorDefault, dk, dv, 1, &kCFTypeDictionaryKeyCallBacks,
+                                                                   &kCFTypeDictionaryValueCallBacks);
+                           CTFontDescriptorRef desc = CTFontDescriptorCreateWithAttributes(da);
+                           if (CTFontRef ff = CTFontCreateCopyWithAttributes(f, 0.0, nullptr, desc))
+                           {
+                              CFRelease(f);
+                              f = ff;
+                           }
+                           CFRelease(desc);
+                           CFRelease(da);
+                        }
+                        CFRelease(feats);
+                     }
                      CFAttributedStringSetAttribute(m, r, kCTFontAttributeName, f);
                      CFAttributedStringSetAttribute(m, r, kCTForegroundColorAttributeName, col);
-                     CFAttributedStringSetAttribute(m, r, req.kerning ? kCTTrackingAttributeName : kCTKernAttributeName, trNum);
+                     if (ligaOff)
+                     {
+                        int lg = 0;
+                        CFNumberRef lgNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &lg);
+                        CFAttributedStringSetAttribute(m, r, kCTLigatureAttributeName, lgNum);
+                        CFRelease(lgNum);
+                     }
+                     // Kerning off with a fixed kern (1/1000 em) replaces the font's pairs; else tracking adds to them.
+                     if (sp.kernMode == 2 || !req.kerning || kernOff)
+                     {
+                        float kv = tr + (kernOff && sp.kernMode != 2 ? 0.0f : sp.kern) * 0.001f * std::max(1.0f, sp.size * scale);
+                        CFNumberRef kvNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &kv);
+                        CFAttributedStringSetAttribute(m, r, kCTKernAttributeName, kvNum);
+                        CFRelease(kvNum);
+                     }
+                     else
+                        CFAttributedStringSetAttribute(m, r, kCTTrackingAttributeName, trNum);
                      CFAttributedStringSetAttribute(m, r, kCTUnderlineStyleAttributeName, sulNum);
                      CFAttributedStringSetAttribute(m, r, kCTStrokeWidthAttributeName, swNum);
                      CFAttributedStringSetAttribute(m, r, kCTStrokeColorAttributeName, fake ? col : strokeColor);

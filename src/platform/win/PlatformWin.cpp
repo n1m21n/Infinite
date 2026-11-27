@@ -679,6 +679,12 @@ namespace Platform
       return out;
    }
 
+   // GDI enumerates families only; a PostScript face name is not looked up here, so it reads as a family as before.
+   bool FontFaceInstalled(const std::string&)
+   {
+      return false;
+   }
+
    const std::vector<std::string>& AvailableFontFamilies()
    {
       static std::vector<std::string> sFonts;
@@ -703,6 +709,9 @@ namespace Platform
       return sFonts;
    }
 
+   float PairKerning(const std::string&, float, const std::string&, const std::string&) { return 0.0f; }
+   bool CheckWord(const std::string&, const std::string&) { return true; }
+   std::vector<std::string> SpellSuggestions(const std::string&, int, const std::string&) { return {}; }
    bool AddFontFile(const std::string& path, std::string& family)
    {
       family.clear();

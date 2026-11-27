@@ -866,6 +866,7 @@ set(COMMON_SOURCES
     src/nodes/Scene2DVector.cpp
     src/nodes/Scene2DVectorTools.cpp
     src/nodes/Scene2DType.cpp
+    src/nodes/Scene2DTypeCmds.cpp
     src/nodes/Scene2DSvgEdit.cpp
     src/nodes/Scene2DAgent.cpp
     src/nodes/Scene2D3D.cpp

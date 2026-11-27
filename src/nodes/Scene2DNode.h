@@ -51,8 +51,10 @@ public:
    // From a picked pixel (display sRGB, with the adjustment already on it): the White Balance temperature / tint that
    // make it neutral, and Levels' or Curves' black (1), grey (2) or white (3) point set from it.
    static void WhiteBalanceFromPick(const float disp[3], float amt, float& temp, float& tint);
-   static void PointFromPick(int adjType, float adjAmt, float levels[4], float levelsCh[3][4], std::vector<float>& adjP,
-                             std::vector<float>& curve, std::vector<float> curveCh[3], const float disp[3], int point);
+   // False (nothing changed) for a type other than Levels / Curves, a point other than 1..3, a sample that is not a
+   // finite colour, or a grey point on a luma-only curve.
+   static bool PointFromPick(int adjType, float adjAmt, float levels[4], float levelsCh[3][4], std::vector<float>& adjP,
+                             std::vector<float>& curve, std::vector<float> curveCh[3], const float disp[3], int point, bool isInput = false);
    static int AdjParamCount(int type);
    static std::vector<float> AdjParamDefault(int type);
    // Hue/Saturation's six Photoshop ranges live at adjP[kHueRangeBase + range * kHueRangeStride]: hue (deg),
@@ -129,6 +131,11 @@ public:
       float CornerR(int i) const { return cornerR[i] >= 0.0f ? cornerR[i] : radius; }
       bool strokeOn = false;
       float strokeC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      // Gradient strokes, as the fill's: 0 solid (strokeC), 1 linear, 2 radial, 3 reflected, 4 conical, over the
+      // item's box; strokeStops empty = strokeC to white.
+      int strokeType = 0;
+      float strokeAngle = 90.0f;
+      std::vector<GradStop> strokeStops;
       float width = 4.0f;
       int cap = 0, join = 0;                  // butt/round/square, miter/round/bevel
       int align = 0;                          // centre, inside, outside
@@ -211,11 +218,19 @@ public:
       float c[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       bool bold = false, italic = false, underline = false;
       uint32_t charStyle = 0;   // character style id, 0 = None
+      // OpenType features: sorted space-separated tags turned on ("frac ss01 tnum"); "-liga" = standard ligatures off.
+      std::string features;
+      // Kerning: 0 metrics (the font's pairs), 1 optical, 2 off with a fixed kern of `kern` (1/1000 em) after the character.
+      int kernMode = 0;
+      float kern = 0.0f;
+      bool caps = false;   // ALL CAPS on this run (on top of the layer's)
       bool operator==(const RunStyle& o) const
       {
          return font == o.font && size == o.size && tracking == o.tracking && std::equal(c, c + 4, o.c) && bold == o.bold &&
-                italic == o.italic && underline == o.underline && charStyle == o.charStyle;
+                italic == o.italic && underline == o.underline && charStyle == o.charStyle && features == o.features &&
+                kernMode == o.kernMode && kern == o.kern && caps == o.caps;
       }
+      bool Plain() const { return charStyle == 0 && features.empty() && kernMode == 0 && kern == 0.0f && !caps; }
       bool operator!=(const RunStyle& o) const { return !(*this == o); }
    };
    struct TextRun
@@ -336,6 +351,7 @@ public:
       float adjAmt = 16.0f, adjTo = 16.0f;
       int adjDrive = 0;
       bool adjMap = false;
+      bool adjDither = false;   // gradient map: half a level of noise breaks up banding (PhotoCraft dither)
       // Levels (amount = gamma): input black, input white, output black, output white, 0..1.
       float levels[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
       // Curves (amount = strength): x, y pairs in 0..1, sorted by x, ends included.
@@ -387,6 +403,11 @@ public:
       bool hasVMask = false, vmaskOn = true, vmaskInvert = false;
       float vmaskFeather = 0.0f;              // Gaussian sigma, px (Photoshop's mask Feather)
       float vmaskDensity = 1.0f;              // 0..1: beyond the path the layer shows at 1 - density (Photoshop's Density)
+      // Vector layers, a soft shape (PhotoCraft soft_shape_tests): the items' own path is the fill's vector mask, so
+      // Feather (Gaussian sigma, px) and Density (beyond the path the fill shows at 1 - density) soften the fill only;
+      // strokes stay crisp on top.
+      float shapeFeather = 0.0f, shapeDensity = 1.0f;
+      bool SoftShape() const { return shapeFeather > 0.25f || shapeDensity < 1.0f; }
       std::vector<Shape> vmask;
       // Text layers. boxW 0 = point text (no wrap); else wraps at boxW px.
       std::string text, font;
@@ -423,6 +444,8 @@ public:
       std::vector<Shape> typePath;
       float pathOffset = 0.0f;
       bool pathFlip = false, vertical = false;
+      // Where type on an open path stops, a fraction of the path; < 0 = the path's end (files without it load so).
+      float pathEnd = -1.0f;
       // Warp Text (and a paint layer's Warp style): 0 none, see WarpStyleName; bend and distortions -100 .. 100.
       int warpStyle = 0;
       float warpBend = 50.0f, warpH = 0.0f, warpV = 0.0f;
@@ -476,6 +499,7 @@ public:
    struct Document
    {
       int w = 1920, h = 1080;
+      float dpi = 72.0f;            // resolution: pixels per inch (print size = pixels / dpi)
       int background = 0;           // 0 white, 1 black, 2 colour, 3 transparent
       float bgColor[3] = { 1.0f, 1.0f, 1.0f };
       bool ratioLock = false;
@@ -550,8 +574,23 @@ public:
    // target's parent; into = put it inside the group `target` at the top.
    void MoveLayer(int id, int target, bool below, bool into = false, bool settleClips = true);
    int GroupLayers(const std::vector<int>& ids);   // returns the new group's id
+   // Group nesting cap (PhotoCraft MAX_GROUP_DEPTH): no layer sits inside more than kMaxGroupDepth groups. Grouping that
+   // would pass it is refused (0, no edit), a move that would is ignored, and a new or pasted group goes beside the
+   // enclosing group instead. The tree walks above stop at 64 hops, so the cap stays well under them.
+   static constexpr int kMaxGroupDepth = 32;
+   int GroupHeight(int id);                    // nested group levels from id down: a leaf 0, a group 1 + its deepest child
+   int MaxGroupDepth();                        // the document's deepest chain of groups
+   bool CanGroup(const std::vector<int>& ids); // GroupLayers(ids) stays within the cap
+   // Group from Layers with the dialog's options (PhotoCraft group_options): name (empty keeps "Group N"), colour label
+   // (0 = No Color, which leaves the layers' own colours), blend (BlendModes index or kPassThrough) and opacity 0..1.
+   // labelLayers: the colour also labels every layer in it (Ctrl+G with a colour). The group starts collapsed.
+   struct GroupOptions { std::string name; int label = 0; int blend = kPassThrough; float opacity = 1.0f; bool labelLayers = false; };
+   int GroupLayersWith(const std::vector<int>& ids, const GroupOptions& o);
    void Ungroup(int group);
    int Duplicate(int id);
+   // Photoshop's Layers panel option Add "copy" to Copied Layers and Groups: off, a duplicate keeps its name.
+   // An app preference (every document), not saved in a file.
+   static inline bool sCopySuffix = true;
    // Link Layers (PhotoCraft layer.linkLayers): want 1 puts `ids` in one fresh group, 0 unlinks them, -1 toggles
    // (unlinks when they already share one group, or when there is only one). A group left with one member is dropped.
    // Returns whether `ids` end up linked; *changed says whether anything moved (a repeat is no edit at all).
@@ -642,10 +681,47 @@ public:
    // Document edits that keep every layer's picture where it is.
    void CanvasSize(int w, int h, int anchor);   // anchor 0..8, row major from top left
    void ImageSize(int w, int h);                // scales every layer with the document
-   void CropTo(float x0, float y0, float x1, float y1);   // document pixels
+   // deletePixels: paint layers lose what falls outside the new canvas (Delete Cropped Pixels); type and node
+   // (smart) layers stay whole either way.
+   void CropTo(float x0, float y0, float x1, float y1, bool deletePixels = false);   // document pixels
    // A turned crop (Photoshop's crop at an angle, Straighten): the picture turns by -deg (degrees, the box's turn
    // clockwise on screen) about the box centre (cx, cy), then the document is cropped to the w x h box. One step.
-   void CropRotated(float cx, float cy, float w, float h, float deg);
+   void CropRotated(float cx, float cy, float w, float h, float deg, bool deletePixels = false);
+   // Image Size with a resolution (PhotoCraft image.imageSize): dpi > 0 sets it. keepPrintSize resamples so the print
+   // size stays (a side given still wins, the other keeping the proportions); without it the pixels stay and only the
+   // resolution changes unless w / h are given. Type keeps its pixel size, so it scales with the pixels only.
+   // nearest: paint layers sample nearest neighbour from then on, so a reduction keeps source values (Resample: Nearest).
+   void ImageSizeDpi(int w, int h, float dpi, bool keepPrintSize, bool nearest = false);
+   // The Crop tool's target W x H x Resolution: crop to the box (turned by deg when not 0), then resample the result to
+   // tw x th (0 = as cropped) and set dpi (0 = keep). One edit.
+   void CropToTarget(float x0, float y0, float x1, float y1, float deg, int tw, int th, float dpi);
+   // The Crop tool's Fill: Content-Aware (PhotoCraft crop_fill). After the crop (turned by deg when not 0), the area the
+   // old canvas does not cover (corners a turn uncovers, strips an extension adds) is rebuilt from layer id's pixels
+   // around it, each 8-connected piece on its own, into a new paint layer above id. Returns the new layer's id, or 0
+   // when nothing was uncovered (the crop still happens).
+   int CropContentAware(int id, float x0, float y0, float x1, float y1, float deg, bool deletePixels = false);
+   // Clone from another document (PhotoCraft cloneSource.set with a document): the Clone Stamp reads these pixels
+   // (top-down straight RGBA, w x h, in that document's own px) instead of this document's; the offset is as for a
+   // source here. With Wrap the source repeats at its own edges. Empty clears it.
+   void SetCloneExternal(const std::vector<uint8_t>& rgba, int w, int h);
+   bool HasCloneExternal() const { return !mCloneExt.empty(); }
+   // Its parts. map takes a cropped-canvas point (u, v) to the old document: x = a u + b v + e, y = c u + d v + f.
+   // A pixel is covered when its centre lands inside the old ow x oh canvas by the margin (half the pixel's projected
+   // size, one more px for a turn's blended edge). Labels: 0 covered, kUnlabelled uncovered, then 1-based pieces;
+   // the pieces' bounds (x0, y0, x1, y1 exclusive) come back in label order.
+   static constexpr uint32_t kUnlabelled = 0xffffffffu;
+   static double CropMargin(const double map[6], bool rotated);
+   static bool CropCovered(const double map[6], double ow, double oh, int u, int v, double margin);
+   static std::vector<std::array<int, 4>> LabelComponents(std::vector<uint32_t>& labels, int w, int h);
+   // Crop and Straighten Photos (PhotoCraft scancrop): the photos on a flatbed scan (top-down straight RGBA, w x h),
+   // each a centre, its sides along its own axes and the turn (degrees, -45..45) of its x axis, in reading order.
+   struct FoundPhoto
+   {
+      double cx = 0, cy = 0, w = 0, h = 0, angle = 0, area = 0;
+   };
+   static std::vector<FoundPhoto> FindPhotos(int w, int h, const std::vector<uint8_t>& rgba);
+   // Each photo found on layer id becomes its own upright paint layer at the photo's centre, above id. The count made.
+   int StraightenPhotos(int id);
    // Perspective Crop: the quad q (TL TR BR BL, document px) becomes the whole w x h document, every layer
    // carried by the same projective map (a corner warp, so it stays editable). The size a side gets when it is
    // 0: both 0 is the rectangle the quad shows in perspective (PhotoCraft's free size), one 0 keeps the quad's
@@ -763,8 +839,11 @@ public:
    // Gradient from a to b (document px), colour A to B; radial when `radial`.
    // kind: 1 linear, 2 radial, 3 angle, 4 reflected, 5 diamond.
    // extend: past the ends 0 holds the end colour, 1 repeats, 2 reflects; dither breaks up 8-bit banding.
+   // method: 0 the straight ramp; 1 Smooth, Photoshop's measured Classic Smooth curves (colour every tenth, opacity every
+   // quarter) at 100 % smoothness; 2 Classic, 3 Perceptual, 4 Linear and Smooth below 100 % keep the straight ramp
+   // (not measured; PhotoCraft gradient_alpha_method_tests).
    bool Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], int kind, float opacity = 1.0f,
-                 int extend = 0, bool dither = false);
+                 int extend = 0, bool dither = false, int method = 0, float smoothness = 1.0f);
    // The picture's colour (display values) at a document point.
    // size: 1, 3 or 5 px square, averaged. layer: read that paint layer alone (0 = the whole picture).
    // size is the N of an N by N average (1 = point). zoom > 0 and <= 1 sizes the box as Photoshop does:
@@ -957,6 +1036,24 @@ public:
    // One call for the agent and tests: Begin, preview, End(true).
    bool SelectColorRange(const std::vector<SelectMaths::Sample>& s, const SelectMaths::RangeParams& p, bool invert, int op,
                          bool sampleAll, int layerId);
+   // Image > Adjustments > Replace Color (PhotoCraft adjust_cmds): the paint layer's colours in the range Color Range
+   // finds for the same clicks (samples document px, top row first) shift by hue (degrees), saturation and lightness
+   // (-100..100), each pixel in proportion to its share; a selection limits where. Paint layers that fill the
+   // document only; false + err otherwise or for a sample outside the document.
+   // fromRgb: the From colour (display 0..1); clicks with no add among them start from it (PhotoCraft: subtracting
+   // from a single colour). A colour that is not three finite 0..1 values is refused before anything changes.
+   bool ReplaceColor(int layerId, const std::vector<SelectMaths::Sample>& s, const SelectMaths::RangeParams& p, float hue,
+                     float sat, float light, std::string* err = nullptr, const float* fromRgb = nullptr);
+   // Image > Adjustments run destructively (PhotoCraft image.adjustments.*): `adj`'s settings (an adjustment layer's
+   // type and values) baked into a paint layer's own pixels; a selection limits where, by its share. Paint layers that
+   // fill the document, unmoved and unlocked; Lens Blur (it waits for a depth model) is refused. False + err otherwise.
+   bool ApplyAdjustment(int layerId, const Layer& adj, std::string* err = nullptr);
+   // Image > Adjustments > Match Color (PhotoCraft algo/tone.rs match_color): the paint layer's CIELab mean and spread
+   // moved to the source picture's (straight RGBA8, display values; null = the layer itself). luminance / intensity
+   // scale L and a, b (100 = as is), fade (0..100) mixes back toward the original, neutralize sends the mean colour to
+   // grey. Inside the selection when there is one; transparent pixels are skipped.
+   bool MatchColor(int layerId, const uint8_t* srcRgba, size_t srcPixels, float luminance = 100.0f, float intensity = 100.0f,
+                   float fade = 0.0f, bool neutralize = false, std::string* err = nullptr);
    // Mesh warp grid: lines at rest fractions us (columns) and vs (rows) of the grid's box, both 0 .. 1 with the
    // ends included; pts the points' document positions, row by row from the top left (us.size() per row).
    // The Default grid is 4 x 4 at the thirds (Photoshop's one patch with its thirds); `deflt` stays true until a
@@ -994,6 +1091,12 @@ public:
    enum StylePart { kStStroke = 1, kStFill = 2, kStOpacity = 4, kStEffects = 8, kStCharacter = 16, kStParagraph = 32, kStObject = 64,
                     kStAll = 127 };
    bool CopyLayerStyle(int from, int to, int parts = kStOpacity | kStEffects);
+   // Transfer effects (PhotoCraft layer.layerStyle.transferEffects): drag the fx onto another layer. effect -1 takes the
+   // whole style (it replaces the target's), 0..kFxCount-1 one fx kind, kFxCount + j the j-th extra (fxMore); copy keeps
+   // the source's, else the source loses it. A kind the target already has goes in as an extra. False and no change for
+   // the same layer, a missing or locked layer, or an effect the source does not have on.
+   bool TransferEffects(int from, int to, int effect, bool copy);
+   bool CanTransferEffects(int from, int to, int effect, bool copy);
    bool wandAntialias = true;   // the wand's and bucket's soft edge (panel only, not saved)
 
    // ---- 3D surface paint ---------------------------------------------------
@@ -1069,6 +1172,64 @@ public:
    // Through the node (saved text, undo):
    bool ReplaceText(int id, size_t a, size_t b, const std::string& ins);
    bool StyleTextRange(int id, size_t a, size_t b, const StyleAttrs& set, std::string* err = nullptr);
+   // ---- Type commands (Photoshop's Type menu; ranges are UTF-8 byte offsets, a == b == npos = the whole text) ----
+   // OpenType toggles: tag is liga (standard ligatures, on by default), dlig, frac, swsh, salt, ordn, titl, sups, sinf,
+   // calt or ss01 .. ss20. on -1 toggles: the direction comes from the first character of the range. Every layer must
+   // be an unlocked Text layer. outOn: the state set.
+   static bool FeatureOn(const RunStyle& s, const std::string& tag);
+   static void SetFeature(RunStyle& s, const std::string& tag, bool on);
+   bool SetTypeFeature(const std::vector<int>& layers, const std::string& tag, int on, size_t a, size_t b, bool* outOn = nullptr,
+                       std::string* err = nullptr);
+   // Numerals (Type > OpenType > Numerals): replaces the figure tags (lnum onum pnum tnum) and keeps the others.
+   enum class Numerals { Default, Lining, Oldstyle, Proportional, Tabular, ProportionalLining, TabularLining,
+                         ProportionalOldstyle, TabularOldstyle, Count };
+   static const char* NumeralsLabel(Numerals n);
+   static Numerals NumeralsOf(const RunStyle& s);
+   bool SetNumerals(const std::vector<int>& layers, Numerals n, size_t a, size_t b, std::string* err = nullptr);
+   // Kerning of a range: mode 0 metrics, 1 optical, 2 off with `value` (1/1000 em).
+   bool SetRangeKerning(int layer, size_t a, size_t b, int mode, float value, std::string* err = nullptr);
+   // Alt+arrow between two letters: the pair before byte `at` becomes a fixed kern of what shows now plus `by`.
+   bool KernPair(int layer, size_t at, float by, std::string* err = nullptr);
+   // Cmd+Shift+. / Cmd+Shift+,: every run in the range steps by `by` px of shown size (the layer's scale counts),
+   // never below 1 px or above 2000 px.
+   bool StepTypeSize(int layer, size_t a, size_t b, float by, std::string* err = nullptr);
+   // Relative steps: tracking of each run in the range, and the layer's leading (px) and baseline shift, clamped.
+   bool StepTypeStyle(int layer, size_t a, size_t b, float trackingBy, float leadingBy, float shiftBy, std::string* err = nullptr);
+   // Insert text (a glyph) over [a, b) of a Text layer; CRLF becomes LF. outCaret: the byte after it.
+   bool InsertTypeText(int layer, size_t a, size_t b, const std::string& t, size_t* outCaret = nullptr, std::string* err = nullptr);
+   static const char* LoremIpsum();
+   // Paste Lorem Ipsum: into Text layer `layer` at byte `at` (npos = the end); layer 0 = a new box layer. Returns the
+   // layer, -1 when `layer` is not an unlocked Text layer.
+   int PasteLoremIpsum(int layer, size_t at, size_t* outCaret = nullptr, std::string* err = nullptr);
+   // Fonts not installed, sorted, over every Text layer and run; replace them by `map`, or all by `fallback`.
+   std::vector<std::string> MissingFonts();
+   int ReplaceMissingFonts(const std::map<std::string, std::string>& map, const std::string& fallback = "");
+   // Warnings a font name gives ("font 'X' is not installed; text may render using a fallback face"), empty when it is.
+   static std::string FontWarning(const std::string& family);
+   // A type layer's font warnings, one per missing family (create, set style and edit each refresh the last ones).
+   std::vector<std::string> TypeWarnings(int layer);
+   const std::vector<std::string>& LastTypeWarnings() const { return mTypeWarnings; }
+   void NoteTypeWarnings(int layer);
+   // Default type style: saved from a layer's first run, given to new type layers and by Load.
+   bool SaveDefaultTypeStyle(int layer);
+   bool LoadDefaultTypeStyle(int layer);
+   bool HasDefaultTypeStyle() const { return mDefaultTypeSet; }
+   const RunStyle& DefaultTypeStyle() const { return mDefaultType; }
+   int UpdateAllTextLayers();
+   // Check Spelling: the misspelled words of the listed Text layers (none = every one), in layer then text order.
+   struct Misspelling { int layer = 0; size_t start = 0, end = 0; std::string word; std::vector<std::string> suggestions; };
+   std::vector<Misspelling> CheckSpelling(const std::vector<int>& layers, const std::set<std::string>& ignore, int suggestions = 4);
+   // Change one occurrence (the word must still be at [start, end)) or every whole-word occurrence; returns the count.
+   bool SpellChange(int layer, size_t start, size_t end, const std::string& word, const std::string& replace, std::string* err = nullptr);
+   int SpellChangeAll(const std::vector<int>& layers, const std::string& word, const std::string& replace);
+   // A user dictionary (lower case, kept with the app's settings): words in it are spelled right.
+   static std::vector<std::string>& UserDictionary();
+   static void AddToDictionary(const std::string& w);
+   static void RemoveFromDictionary(const std::string& w);
+   bool HasTextLayer();
+   int TextLayerByName(const std::string& name);   // 0 = none
+   // Character offsets of UTF-8 byte offsets (one count per offset, in order).
+   static std::vector<size_t> CharOffsets(const std::string& text, const std::vector<size_t>& bytes);
    const TextStyles& TypeStyles()
    {
       Layers();
@@ -1114,6 +1275,12 @@ public:
    // An item's outline as polylines in box px (anchors for paths), for the editor.
    static void Outline(const Shape& s, std::vector<std::vector<float>>& out);
    static bool ShapeBounds(const Shape& s, float lo[2], float hi[2]);
+   // A soft shape's frame: the hard fill's painted pixels in the layer's own px (a subtracted margin left out), found by
+   // TrimToPainted. False when nothing is painted.
+   bool SoftShapeFrame(int id, int out[4]);
+   // The painted box inside `rect` (x0 y0 x1 y1, ends exclusive), asking `painted` for the painted box of a strip
+   // (empty: x1 <= x0). Strips double from each edge, so an edge takes about log2 of the side renders, not one per row.
+   static bool TrimToPainted(const int rect[4], const std::function<void(const int strip[4], int painted[4])>& painted, int out[4]);
    // True when (x, y) is on the item itself: inside its fill, or within `pad` of its outline or stroke.
    static bool ShapeHit(const Shape& s, float x, float y, float pad);
    // The layer's vector or text picture (and vector mask) as a texture; 0 = none.
@@ -1121,6 +1288,16 @@ public:
    unsigned VectorMaskTexture(int id);
    // Convert a live shape to an editable cubic Bezier path, split a segment, subdivide, or deform points.
    static bool ShapeToPath(Shape& s);
+   // An item under the affine m (x' = m0 x + m1 y + m2, y' = m3 x + m4 y + m5). A move or a positive uniform scale keeps
+   // a live shape live (box mapped, radius and corner radii scaled); a positive axis scale keeps a plain rectangle or
+   // ellipse live; anything else (flip, rotate, shear, or a live box under kLiveMinPx a side, where the live parameters
+   // cannot be kept) becomes the transformed path. A line maps its two ends. False when the item draws nothing.
+   static constexpr float kLiveMinPx = 2.0f;
+   static bool TransformShape(Shape& s, const float m[6]);
+   // How a transform stretches a line along itself (axial) and across it (perpendicular); false when the two do not
+   // stay at right angles (a shear, or a squash on a diagonal line) or the line has no length. PhotoCraft
+   // arrow_axis_scales (Apache 2.0). A headed line stays live only when both are equal: its heads are sized from width.
+   static bool ArrowAxisScales(const float m[6], float x0, float y0, float x1, float y1, float& axial, float& perpendicular);
    static int SplitSegment(Shape& s, int seg, float t);
    static void SubdividePath(Shape& s);
    static void DeformShape(Shape& s, int mode, float amount, float freq);
@@ -1188,6 +1365,9 @@ public:
    bool StrokePath(const std::string& name, int id, const BrushEngine::Brush& b, bool simulatePressure);
    // Convert to Shape: a new vector layer above `above` holding the path, filled; 0 without that path.
    int PathToShapeLayer(const std::string& name, int above, const float rgba[4]);
+   // An inline path (a Pen path still being drawn) as a shape layer; the Work Path stays unless consumeWorkPath.
+   // 0 when the path is empty or a subpath has under two anchors.
+   int ShapesToShapeLayer(const std::vector<Shape>& subs, int above, const float rgba[4], bool consumeWorkPath);
    static void PathPolylines(const DocPath& p, std::vector<std::vector<float>>& lines, std::vector<int>& ops);
    static void PolygonMask(const std::vector<float>& xy, int w, int h, std::vector<uint8_t>& out, bool aa);
    static void FeatherMask(std::vector<uint8_t>& a, int w, int h, float radius);
@@ -1236,10 +1416,26 @@ public:
    static bool UsesGlyphType(const Layer& l) { return l.typeMode != 0 || l.vertical; }
    // A new text layer on (inside = false) or in a document path; 0 with err set when the path will not do.
    int AddTypeOnPath(const std::string& path, const std::string& text, bool inside, int above, int* err = nullptr);
+   // Area type inside a vector layer's outline, holes kept (PhotoCraft type.fillPath with a shape); the Work Path stays.
+   int AddTypeInShape(int shapeLayer, const std::string& text, int above, int* err = nullptr);
    int AttachTextToPath(int id, const std::string& path, bool inside);   // TypePathError
    int SetTypePath(int id, std::vector<Shape> subs);                    // TypePathError; the path in the text's px
    bool ReleaseTypePath(int id);   // on a path -> point text, in a path -> box text over the path's bounds
    bool SetVerticalType(int id, bool vertical);
+   // The type path's length (px, the text's px); 0 without one.
+   double TypePathLength(const Layer& l);
+   // Type on a path: start and end along it (px; end < 0 = the path's end) and the direction. A value up to the length
+   // as a float rounds to the canonical length (never past the path); beyond it, or start past end, is refused.
+   bool SetPathPlacement(int id, float start, float end, bool flip, std::string* err = nullptr);
+   // Move one anchor (and its handles) of the vector mask (typePath false) or the type path, in the path's own px.
+   bool MovePathAnchor(int id, bool typePath, int sub, int anchor, float dx, float dy);
+   // Box text: top left x y and size w h; a value that is not finite counts as 0, sizes clamp to 1 .. FLT_MAX.
+   bool ApplyTextBox(int id, const double box[4], float* outW = nullptr, float* outH = nullptr);
+   // Convert to Paragraph Text (a box that fits the lines, no new wraps) / Convert to Point Text, the ink kept in place.
+   bool ConvertTextKind(int id, bool paragraph);
+   int LastHardenedWraps() const { return mLastHardened; }   // soft wraps the last Convert to Point Text made line breaks
+   // The history name for a new type layer from the Type tool.
+   static const char* NewTypeLayerName(bool mask, bool vertical);
    bool SetWarpText(int id, int style, float bend, float hd, float vd, bool vert);
    // A paint layer pulled through a warp style: one 12 x 12 mesh warp, one undo step.
    bool WarpLayerStyle(int id, int style, float bend, float hd, float vd, bool vert);
@@ -1255,6 +1451,10 @@ public:
    enum SelOp { kSelNew = 0, kSelAdd, kSelSub, kSelIntersect };
    void SelectRect(float x0, float y0, float x1, float y1, int op, float feather, bool ellipse, bool aa = false);
    void SelectPolygon(const std::vector<float>& xy, int op, float feather, bool aa = false);
+   // Type Mask (Photoshop's Horizontal / Vertical Type Mask): text layer `textLayer`'s glyphs become the selection, combined
+   // by `op`, and the layer goes. The glyphs are not cut at the canvas: what lies past an edge is kept (SelApron). Text with
+   // no glyphs selects nothing (Add / Subtract keep the earlier selection, New / Intersect clear it).
+   bool TypeMaskSelect(int textLayer, int op, std::string* err = nullptr);
    void SelectEllipse(float x0, float y0, float x1, float y1, int op, float feather, bool aa);   // Photoshop's measured edge   // aa: 1 px coverage edge (Photoshop's Anti-alias)
    void SelectWand(float x, float y, int tolerance, bool contiguous, int op, bool sampleAll, int layerId);
    void SelectAll();
@@ -1364,7 +1564,18 @@ public:
 
    // A pixel layer from top-down RGBA at (x, y), under `parent` or above layer `above`; its id.
    int AddFileLayer(int parent, const std::string& name, int x, int y, int w, int h, const std::vector<uint8_t>& rgba, int above = 0);
+   // Export one layer (PhotoCraft layer.exportAs): the layer alone trimmed to its pixels, scaled by scalePct (1..1000) with
+   // resample "nearest", "bilinear" or "bicubic" (exact spelling), written as a PNG. Never edits the document. False with
+   // *err naming the bad part ("resample", "scale", "layer", "empty", "write").
+   bool ExportLayerPng(int id, const std::string& path, int scalePct, const std::string& resample, std::string* err = nullptr,
+                       int* outW = nullptr, int* outH = nullptr);
+   // rgba (top row first, straight alpha) resized to nw x nh: method 0 nearest, 1 bilinear, 2 bicubic (premultiplied).
+   static std::vector<uint8_t> ResampleRgba(const std::vector<uint8_t>& rgba, int w, int h, int nw, int nh, int method);
 private:
+   RunStyle mDefaultType;
+   bool mDefaultTypeSet = false;
+   std::vector<std::string> mTypeWarnings;
+   int mLastHardened = 0;
    void Parse();
    void Serialize();
    const Layer* FindConst(int id) const;
@@ -1475,6 +1686,7 @@ private:
    bool mFirstSnapDone = false;
    void SourceFromText(const std::string& text);
    GLUtil::Fbo mPattern;
+   std::vector<uint8_t> mPatternCpu;   // the same tile, rows as the surface holds them (Impressionist samples it per dab)
    uint64_t mPatternKey = 0;
    unsigned mWarpProgram = 0;
    // CPU-rastered layers (vector, text) and vector masks, re-rastered when their key changes.
@@ -1519,6 +1731,12 @@ private:
    void EndArt();
    int mPaintId = 0, mPaintTarget = 0;
    BrushEngine::Brush mPaintBrushIn;   // the brush BeginPaint was given (before its own scaling)
+   // Background erase with Contiguous: the surface before the stroke and the stroke's path in surface pixels.
+   std::vector<uint8_t> mCloneExt;   // clone source from another document (top-down)
+   int mCloneExtW = 0, mCloneExtH = 0;
+   std::vector<uint8_t> mBgSnap;
+   std::vector<float> mBgPts;
+   void BgContiguousRestore(GLUtil::Fbo& fbo, int dirty[4]);
    struct SkinStroke
    {
       bool on = false;
@@ -1579,6 +1797,8 @@ private:
    bool ApronMatches() const;
    SelApron ApronOrCanvas() const;           // the apron, or the on-canvas selection as one
    void SetSelectionFromApron(SelApron ap);  // trims it, crops mSel from it, drops it when it fits the canvas
+   bool TextCoverage(int id, SelApron& out);
+   void ClearPaintOffCanvas();   // paint layers: clear surface pixels that fall wholly outside the canvas   // a text layer's glyph alpha in document px (top row first), uncut
    void StoreSelection();
    // The document changed size: the selection moves by (dx, dy) into a w x h frame (Canvas Size, Crop), or goes.
    void ReframeSelection(int w, int h, int dx, int dy);
@@ -1615,6 +1835,7 @@ private:
    unsigned mFillProgram = 0, mAntsProgram = 0, mResampleProgram = 0;
    int mGradExtend = 0;          // the next ApplyFill's gradient extend and dither (Gradient sets, then clears)
    bool mGradDither = false;
+   int mGradMethod = 0;          // the next ApplyFill's gradient method (1 Smooth's measured curves, else straight)
    bool mPaintTried = false;
    unsigned long long mPaintEdits = 0;   // bumps when a surface changes outside a stroke
 

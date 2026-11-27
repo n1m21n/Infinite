@@ -61,7 +61,16 @@ namespace BrushEngine
          "float Tip(int tip, vec2 p, vec2 fc, float rad, float hard) {\n"
          "   float r = length(p) / rad;\n"
          "   float aa = min(1.0, 1.0 / rad);\n"
-         "   if (uPencil == 1) return (tip == 3) ? step(max(abs(p.x), abs(p.y)), rad) : step(length(p), rad);\n"
+         // Hard edge on a soft round or square tip: fully on wherever the soft tip would show at all, so it keeps the
+         // soft tip's reach (PhotoCraft replace_anti_alias_tests); a hard tip is the plain aliased disc or square.
+         "   if (uPencil == 1) {\n"
+         "      if ((tip == 0 || tip == 1 || tip == 3) && hard < 1.0 - aa) {\n"
+         "         float m = tip == 3 ? max(abs(p.x), abs(p.y)) / rad : r;\n"
+         // "Would show": at least half an 8-bit level (1/510), the smallest change a soft dab leaves in the picture.
+         "         return step(0.002, 1.0 - smoothstep(hard, 1.0, m));\n"
+         "      }\n"
+         "      return (tip == 3) ? step(max(abs(p.x), abs(p.y)), rad) : step(length(p), rad);\n"
+         "   }\n"
          "   if (tip == 0 || tip == 1) return 1.0 - smoothstep(min(hard, 1.0 - aa), 1.0, r);\n"
          "   if (tip == 2) return 1.0 - smoothstep(min(0.94, 1.0 - aa), 1.0, r);\n"
          "   if (tip == 3) { float m = max(abs(p.x), abs(p.y)) / rad; return 1.0 - smoothstep(min(hard, 1.0 - aa), 1.0, m); }\n"
@@ -178,7 +187,7 @@ namespace BrushEngine
          "      base = mix(uCol, uColB, 1.0 - abs(2.0 * t - 1.0));\n"
          "   } else if (uColAlong == 2) base = mix(uCol, uColB, across * 0.5 + 0.5);\n"
          "   if (uHasColTex == 1) base = texture(uColTex, fc / max(uSurfSize, vec2(1.0))).rgb;\n"
-         "   if (uWet == 1) base = texture(uCarry, vec2(0.5)).rgb;\n"
+         "   if (uWet == 1) { vec4 cw = texture(uCarry, vec2(0.5)); if (cw.a < 0.5) discard; base = cw.rgb; }\n"
          "   if (uMat >= 0) {\n"
          "      // Height across the stroke and its slope (per unit of across).\n"
          "      float x = across, sl = 0.0;\n"
@@ -251,6 +260,22 @@ namespace BrushEngine
          "uniform int uLock;\n"
          "uniform sampler2D uComp;\n"   // Sample All Layers: the picture as it stood, under the layer's own paint
          "uniform int uHasComp;\n"
+         "uniform int uSmudgeMode;\n"   // 0 normal, 1 darken, 2 lighten, 3 hue, 4 saturation, 5 color, 6 luminosity
+         "float lumOf(vec3 c) { return dot(c, vec3(0.3, 0.59, 0.11)); }\n"
+         "vec3 clipC(vec3 c) { float l = lumOf(c); float n = min(c.r, min(c.g, c.b)); float x = max(c.r, max(c.g, c.b));\n"
+         "   if (n < 0.0) c = l + (c - l) * l / max(l - n, 1e-5); if (x > 1.0) c = l + (c - l) * (1.0 - l) / max(x - l, 1e-5); return c; }\n"
+         "vec3 setLum(vec3 c, float l) { return clipC(c + (l - lumOf(c))); }\n"
+         "float satOf(vec3 c) { return max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b)); }\n"
+         "vec3 setSat(vec3 c, float s) { float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b));\n"
+         "   return mx > mn ? (c - mn) * s / (mx - mn) : vec3(0.0); }\n"
+         "vec3 smBlend(vec3 b, vec3 s) {\n"   // b the pixel as it was, s the smudged colour (the separable / non-separable modes)
+         "   if (uSmudgeMode == 1) return min(b, s);\n"
+         "   if (uSmudgeMode == 2) return max(b, s);\n"
+         "   if (uSmudgeMode == 3) return setLum(setSat(s, satOf(b)), lumOf(b));\n"
+         "   if (uSmudgeMode == 4) return setLum(setSat(b, satOf(s)), lumOf(b));\n"
+         "   if (uSmudgeMode == 5) return setLum(s, lumOf(b));\n"
+         "   if (uSmudgeMode == 6) return setLum(b, lumOf(s));\n"
+         "   return s; }\n"
          "void main() {\n"
          "   vec2 uv = gl_FragCoord.xy * uTexel;\n"
          "   vec4 d = texture(uSrc, uv);\n"
@@ -263,7 +288,9 @@ namespace BrushEngine
          "   float a = mix(d.a, s.a, m);\n"
          "   vec3 rgb = mix(d.rgb * d.a, s.rgb * s.a, m) / max(a, 1e-4);\n"
          "   if (a <= 1e-4) rgb = d.rgb;\n"
-         "   fragColor = uLock == 1 ? vec4(mix(d.rgb, s.rgb, m * s.a), d.a) : vec4(rgb, a);\n"
+         "   vec3 n = uLock == 1 ? mix(d.rgb, s.rgb, m * s.a) : rgb;\n"
+         "   if (uSmudgeMode > 0 && d.a > 0.0) n = mix(n, smBlend(d.rgb, n), d.a);\n"
+         "   fragColor = uLock == 1 ? vec4(n, d.a) : vec4(n, a);\n"
          "}\n";
 
       // The surface with the stroke's coverage applied, straight alpha.
@@ -349,6 +376,17 @@ namespace BrushEngine
          "   }\n"
          "   return s / w;\n"
          "}\n"
+         // Protect Detail (PhotoCraft local_sharpen, Apache 2.0): a sigma 2.5 Gaussian and a soft limit on the
+         // difference, so an edge gets a low, wide halo and a lone pixel a gentle lift.
+         "vec3 gaussPD(sampler2D t, vec2 uv) {\n"
+         "   vec3 s = vec3(0.0); float w = 0.0;\n"
+         "   for (int i = -8; i <= 8; i++) for (int j = -8; j <= 8; j++) {\n"
+         "      float k = exp(-float(i * i + j * j) / 12.5);\n"
+         "      s += texture(t, uv + vec2(float(i), float(j)) * uTexel).rgb * k; w += k;\n"
+         "   }\n"
+         "   return s / w;\n"
+         "}\n"
+         "vec3 protectPD(vec3 v, vec3 bl) { vec3 d = v - bl; return v + d * (6.0 / 255.0) / (6.0 / 255.0 + abs(d)); }\n"
          "float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }\n"
          // Keep d's hue and saturation, take r's lightness.
          "vec3 keepHue(vec3 d, vec3 r) { float ld = lum(d), lr = lum(r);\n"
@@ -387,6 +425,9 @@ namespace BrushEngine
          "         fragColor = mix(d, s, a); return; }\n"
          "      if (uMode == 29) { vec2 ts = vec2(textureSize(uSrcTex, 0)); ivec2 q = ivec2(mod(floor((px + uPatPhase) / uPatScale), ts));\n"
          "         vec4 s = uHasSrc == 1 ? texelFetch(uSrcTex, q, 0) : vec4(uColor, 1.0);\n"   // pattern stamp: the tile, repeated
+         "         if (uSrcBlend == 7) { if (uLock == 1) { fragColor = d; return; } float k = a * (1.0 - d.a); float oa = d.a + k;\n"   // Behind
+         "            fragColor = oa > 0.0 ? vec4((d.rgb * d.a + s.rgb * k) / oa, oa) : d; return; }\n"
+         "         if (uSrcBlend > 0) s.rgb = mix(s.rgb, cloneBlend(d.rgb, s.rgb), d.a);\n"   // the other modes paint over the pixels
          "         fragColor = uLock == 1 ? vec4(mix(d.rgb, s.rgb, a), d.a) : mix(d, s, a); return; }\n"
          "      if (uMode == 24) { vec4 s = srcAt(vUv); if (uSrcBlend > 0) s.rgb = mix(s.rgb, cloneBlend(d.rgb, s.rgb), d.a);\n"
          "         fragColor = uLock == 1 ? vec4(mix(d.rgb, s.rgb, a), d.a) : mix(d, s, a); return; }\n"   // undo brush: the earlier state
@@ -397,7 +438,8 @@ namespace BrushEngine
          "      if (uMode == 28) { fragColor = uFinal == 1 ? d : vec4(mix(d.rgb, vec3(1.0, 0.25, 0.3), a * 0.55), max(d.a, a * 0.55)); return; }\n"
          "      if ((uMode == 6 || uMode == 7) && uHasSrc == 1) {\n"   // Sample All Layers: the picture's blur / sharpen lands here
          "         vec4 b = srcAt(vUv); vec3 bl = softSrc(vUv), o = bl;\n"
-         "         if (uMode == 7) { if (uSharpMode == 0) { float l = lum(b.rgb); o = b.rgb + (b.rgb - bl) * 2.0 * (1.0 - abs(2.0 * l - 1.0)); }\n"
+         "         if (uMode == 7) { if (uSharpMode == 3) o = protectPD(b.rgb, gaussPD(uSrcTex, vUv));\n"
+         "            else if (uSharpMode == 0) { float l = lum(b.rgb); o = b.rgb + (b.rgb - bl) * 2.0 * (1.0 - abs(2.0 * l - 1.0)); }\n"
          "            else o = b.rgb + (b.rgb - bl) * (uSharpMode == 2 ? 3.5 : 1.5); o = clamp(o, 0.0, 1.0); }\n"
          "         vec4 s = vec4(o, b.a);\n"
          "         fragColor = uLock == 1 ? vec4(mix(d.rgb, s.rgb, a), d.a) : mix(d, s, a); return; }\n"
@@ -419,7 +461,8 @@ namespace BrushEngine
          "         r = mix(d.rgb, vec3(g * 0.8, d.g * 0.9, d.b * 0.9), k); }\n"
          "      if (uMode == 7) {\n"   // clarity: local contrast, midtones only; unsharp mask; harsh: strong and wide
          "         vec3 bl = soft(vUv);\n"
-         "         if (uSharpMode == 0) { float l = lum(d.rgb); r = d.rgb + (d.rgb - bl) * 2.0 * (1.0 - abs(2.0 * l - 1.0)); }\n"
+         "         if (uSharpMode == 3) r = protectPD(d.rgb, gaussPD(uSurf, vUv));\n"
+         "         else if (uSharpMode == 0) { float l = lum(d.rgb); r = d.rgb + (d.rgb - bl) * 2.0 * (1.0 - abs(2.0 * l - 1.0)); }\n"
          "         else r = d.rgb + (d.rgb - bl) * (uSharpMode == 2 ? 3.5 : 1.5);\n"
          "         r = clamp(r, 0.0, 1.0);\n"
          "      }\n"
@@ -543,14 +586,14 @@ namespace BrushEngine
          "uniform float uRefill;\n"
          "uniform vec3 uCol;\n"
          "void main() {\n"
-         "   vec3 c = texture(uPrev, vec2(0.5)).rgb;\n"
+         "   vec4 p = texture(uPrev, vec2(0.5)); vec3 c = p.rgb;\n"
          "   vec3 rgb = vec3(0.0); float al = 0.0;\n"
          "   for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) {\n"
          "      vec4 t = texture(uSurf, uUv + vec2(float(i), float(j)) * uSpan);\n"
          "      rgb += t.rgb * t.a; al += t.a;\n"
          "   }\n"
          "   vec3 under = al > 1e-4 ? rgb / al : c;\n"
-         "   vec3 o = mix(c, under, uPick * al / 9.0);\n"
+         "   vec3 o = mix(c, under, p.a < 0.5 ? 1.0 : uPick * al / 9.0);\n"
          "   fragColor = vec4(mix(o, uCol, uRefill), 1.0);\n"
          "}\n";
 
@@ -958,12 +1001,21 @@ namespace BrushEngine
       {
          if (!GLUtil::EnsureFbo(mWetCarry[0], 1, 1, GL_RGBA16F, "BrushCarry") || !GLUtil::EnsureFbo(mWetCarry[1], 1, 1, GL_RGBA16F, "BrushCarry"))
             mBrush.wet = 0.0f;
-         else if (b.autoClean || !mCarryReady)
+         else
          {
-            const float c[4] = { b.color[0], b.color[1], b.color[2], 1.0f };
-            GLUtil::ClearFbo(mWetCarry[0], c);
-            mCarryIdx = 0;
+            // A new colour loads the reservoir; a fresh load (no pickup) or a first stroke starts from it, a pickup
+            // kept by Clean off carries on, and a clean, unloaded brush starts empty.
+            const bool fresh = !mMixer.hasColor || !MixerState::Same(mMixer.color, b.color);
+            mMixer.BeginStroke(b.color);
+            mEmpty = !mMixer.hasRes && !mMixer.hasPick;
+            if (mEmpty || fresh || !mMixer.hasPick || !mCarryReady)
+            {
+               const float c[4] = { mMixer.res[0], mMixer.res[1], mMixer.res[2], mEmpty ? 0.0f : 1.0f };
+               GLUtil::ClearFbo(mWetCarry[0], c);
+               mCarryIdx = 0;
+            }
             mCarryReady = true;
+            mMixer.hasPick = true;   // the stroke picks paint up as it goes
          }
       }
       mSelection = selection;
@@ -987,7 +1039,11 @@ namespace BrushEngine
       }
       mQueue.clear();
       sStrokeSeed = sStrokeSeed * 1664525u + 1013904223u;
-      mRng = sStrokeSeed | 1u;
+      mRng = (b.seed != 0 ? b.seed : sStrokeSeed) | 1u;
+      {
+         float tx = 0, ty = 0, r = 0;
+         ApplyPose(b, pressure, tx, ty, r);
+      }
       const float p = ApplyPressureCurve(pressure);
       mLastX = mPenX = x;
       mLastY = mPenY = y;
@@ -998,6 +1054,7 @@ namespace BrushEngine
       mEuroP = { p, 0.0f, true };
       mEuroLastTime = mPenTime;
       mAirAccum = 0.0f;
+      mDabN = 0;
       mCarry = 0.0f;
       mDabX = x;
       mDabY = y;
@@ -1037,8 +1094,10 @@ namespace BrushEngine
          x += (Rand(mRng) - 0.5f) * mBrush.jitter * mBrush.size;
          y += (Rand(mRng) - 0.5f) * sy * mBrush.size;
       }
-      const float tiltMag = std::min(1.0f, std::hypot(mTiltX, mTiltY));
-      const float tiltAz = std::atan2(mTiltY, mTiltX);
+      float tX = mTiltX, tY = mTiltY, penRot = mPenRot;
+      ApplyPose(mBrush, pressure, tX, tY, penRot);
+      const float tiltMag = std::min(1.0f, std::hypot(tX, tY));
+      const float tiltAz = std::atan2(tY, tX);
       const float p = ApplyPressureCurve(pressure);
       mDist += std::hypot(x - mPrevX, y - mPrevY);
       const float fx = mPrevX, fy = mPrevY;
@@ -1058,10 +1117,16 @@ namespace BrushEngine
       mRot = b.angleJitter > 0.0f ? (Rand(mRng) - 0.5f) * 6.2831853f * std::clamp(b.angleJitter, 0.0f, 1.0f) : 0.0f;
       if (b.tiltAngle && tiltMag > 0.05f)
          mRot += tiltAz;
-      mRot += mPenRot * (3.14159265f / 180.0f);
+      mRot += penRot * (3.14159265f / 180.0f);
       mRound = b.roundJitter > 0.0f ? 1.0f - Rand(mRng) * std::clamp(b.roundJitter, 0.0f, 0.95f) : 1.0f;
       if (b.tiltRound)
          mRound = std::max(0.05f, mRound * (1.0f - 0.75f * tiltMag));
+      if (b.projection && tiltMag > 1e-4f)
+      {
+         // A tip leaning tiltMag of the way to flat (90 degrees) shows cos of that lean across the lean's direction.
+         mRound = std::max(0.05f, mRound * std::cos(tiltMag * 1.5707963f));
+         mRot += tiltAz + 1.5707963f;   // the tip squashes along its own y: turn that onto the lean
+      }
       if (b.hueJitter > 0.0f || b.satJitter > 0.0f || b.valJitter > 0.0f)
       {
          const float dh = (Rand(mRng) - 0.5f) * b.hueJitter, ds = (Rand(mRng) - 0.5f) * 2.0f * b.satJitter, dv = (Rand(mRng) - 0.5f) * 2.0f * b.valJitter;
@@ -1069,7 +1134,19 @@ namespace BrushEngine
       }
       else
          std::copy(b.color, b.color + 3, mRgb);
+      if (b.impressionist && b.patternRgba != nullptr && b.patternW > 0 && b.patternH > 0)
+      {
+         // Impressionist: the tile under the dab's centre, its phase jittered by up to one tile per dab.
+         const float jx = (Rand(mRng) - 0.5f) * 2.0f * (float)b.patternW, jy = (Rand(mRng) - 0.5f) * 2.0f * (float)b.patternH;
+         const float k = std::max(0.05f, b.patternScale);
+         auto wrapI = [](float v, int n) { const int i = (int)std::floor(v); return ((i % n) + n) % n; };
+         const int qx = wrapI((x + b.patternPhase[0] + jx) / k, b.patternW), qy = wrapI((y + b.patternPhase[1] + jy) / k, b.patternH);
+         const uint8_t* t = b.patternRgba + ((size_t)qy * b.patternW + qx) * 4;
+         for (int c = 0; c < 3; c++)
+            mRgb[c] = t[c] / 255.0f;
+      }
       Queue(x, y, p, seed, mDir, fx, fy);
+      struct NextDab { int& n; ~NextDab() { n++; } } nextDab{ mDabN };   // mirrored copies share the index
       for (const auto& m : mMirrors)
          Queue(m[0] * x + m[1] * y + m[2], m[3] * x + m[4] * y + m[5], p, seed, std::atan2(m[3] * std::cos(mDir) + m[4] * std::sin(mDir), m[0] * std::cos(mDir) + m[1] * std::sin(mDir)),
                m[0] * fx + m[1] * fy + m[2], m[3] * fx + m[4] * fy + m[5]);
@@ -1079,6 +1156,7 @@ namespace BrushEngine
    {
       Pending q{ x, y, p, seed, dir, mDist, mSize, mFlow, mHard, mRot, mRound, { mRgb[0], mRgb[1], mRgb[2] }, fx, fy,
                  DabShare(mBrush.wet, mBrush.wetJitter, seed), DabShare(mBrush.refill, mBrush.refillJitter, seed + 17.0f) };
+      q.index = mDabN;
       mQueue.push_back(q);
       // A drop pushes paint out to five radii; a comb's tines drag a little past its width.
       const float sz = mBrush.size * std::max(1.0f, mSize);
@@ -1130,7 +1208,7 @@ namespace BrushEngine
          mLastP = pressure;
          return;
       }
-      const float scale = mBrush.pressureSize ? std::max(0.05f, std::max(mLastP, pressure)) : 1.0f;
+      const float scale = mBrush.pressureSize ? std::max(0.05f, ResponseAt(mBrush.sizeCurveMid, std::max(mLastP, pressure))) : 1.0f;
       const float step = std::max(mBrush.pencil ? 1.0f : 0.5f, mBrush.size * scale * std::max(0.01f, mBrush.spacing));
       float t = step - mCarry;
       int guard = 0;
@@ -1300,16 +1378,21 @@ namespace BrushEngine
    void Stroke::DrawDab(const Pending& q, float taper)
    {
       const Brush& b = mBrush;
-      const float scale = (b.pressureSize ? std::max(0.05f, q.pressure) : 1.0f) * q.size * taper;
+      const float fadeS = FadeAt(b.fadeSize, q.index), fadeO = FadeAt(b.fadeOpacity, q.index);
+      if (fadeS <= 0.0f || fadeO <= 0.0f)
+         return;   // faded out
+      const float scale = (b.pressureSize ? std::max(0.05f, ResponseAt(b.sizeCurveMid, q.pressure)) : 1.0f) * q.size * taper * fadeS;
       float r = 0.5f * b.size * scale;
       float cx = q.x, cy = q.y;
-      if (b.pencil)
+      // A hard aliased tip sits on the pixel grid; a soft one with anti-alias off keeps the soft tip's centre, so both
+      // reach the same pixels (PhotoCraft replace_anti_alias_tests).
+      if (b.pencil && b.hardness >= 0.999f)
       {
          r = std::max(0.5f, std::round(r * 2.0f) * 0.5f);
          cx = std::floor(cx) + 0.5f;
          cy = std::floor(cy) + 0.5f;
       }
-      const float flow = b.flow * q.flow * (b.pressureOpacity ? q.pressure : 1.0f);
+      const float flow = b.flow * q.flow * (b.pressureOpacity ? ResponseAt(b.opacityCurveMid, q.pressure) : 1.0f) * fadeO;
       if (b.mode == kSmudge)
       {
          SmudgeDab(q, r, std::clamp(flow * b.opacity, 0.0f, 1.0f));
@@ -1431,7 +1514,7 @@ namespace BrushEngine
       // Pick-up and refill are shares per brush width travelled, so the spacing does not change the look.
       const float per = std::clamp(b.spacing, 0.01f, 2.0f);
       const float pick = 1.0f - std::pow(1.0f - std::clamp(q.wet, 0.0f, 0.999f), per);
-      const float refill = 1.0f - std::pow(1.0f - std::clamp(q.refill, 0.0f, 0.999f), per);
+      const float refill = mEmpty ? 0.0f : 1.0f - std::pow(1.0f - std::clamp(q.refill, 0.0f, 0.999f), per);
       GLUtil::DrawPass(mWetCarry[to], sCarry, [&]()
       {
          glActiveTexture(GL_TEXTURE0);
@@ -1490,6 +1573,7 @@ namespace BrushEngine
          glUniform1f(GLUtil::UniformLoc(sSmudge, "uHard"), std::clamp(mBrush.hardness, 0.0f, 0.98f));
          glUniform1f(GLUtil::UniformLoc(sSmudge, "uStrength"), strength);
          glUniform1i(GLUtil::UniformLoc(sSmudge, "uLock"), mBrush.lockAlpha ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(sSmudge, "uSmudgeMode"), std::clamp(mBrush.smudgeMode, 0, 6));
          glActiveTexture(GL_TEXTURE2);
          glBindTexture(GL_TEXTURE_2D, mBrush.sourceTex);
          glUniform1i(GLUtil::UniformLoc(sSmudge, "uComp"), 2);
@@ -1684,6 +1768,8 @@ namespace BrushEngine
       dirty[0] = dirty[1] = dirty[2] = dirty[3] = 0;
       if (!mActive)
          return;
+      if (mBrush.wet > 0.0f && !DirectMode(mBrush.mode))
+         mMixer.EndStroke(mBrush.color, mBrush.autoClean, mBrush.autoLoad);
       // A smoothed stroke catches up to where the pen let go when catchUp is on: the stabiliser by feeding
       // the last pen point until every sample in the window is it, smoothing/string by walking straight there.
       if (mBrush.catchUp)

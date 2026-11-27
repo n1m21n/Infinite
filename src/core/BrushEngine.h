@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <array>
@@ -60,8 +61,14 @@ namespace BrushEngine
       float smoothing = 0.0f;      // 0..1, lazy-mouse string
       int stabiliser = 0;          // 0 off, else the brush follows a weighted average of this many pen samples
       bool pencil = false;         // hard pixels, no anti-aliasing
+      bool autoErase = false;      // pencil: a stroke that starts on the foreground colour paints the background colour
       bool pressureSize = false;   // off unless asked, as Photoshop; presets that want it say so (Make)
       bool pressureOpacity = false;
+      // Each dynamic's own response (Photoshop's per-control curves): the value at half pressure of a curve through
+      // (0, 0), (0.5, mid) and (1, 1); 0.5 is linear.
+      float sizeCurveMid = 0.5f, opacityCurveMid = 0.5f;
+      // Fade (Photoshop's Fade control): over this many dabs the size / opacity ramps from full to nothing; 0 off.
+      int fadeSize = 0, fadeOpacity = 0;
       int mode = kNormal;
       bool lockAlpha = false;
       bool follow = false;         // the tip turns with the stroke's direction
@@ -117,20 +124,29 @@ namespace BrushEngine
       float patternScale = 1.0f;
       bool patternAligned = true;
       float patternPhase[2] = { 0.0f, 0.0f };
+      // Pattern Stamp Impressionist: each dab takes the tile colour at its centre, offset by a seeded jitter of up to one
+      // tile. The surface owner fills the tile (rows as the surface holds them) and turns the stroke into Normal dabs.
+      bool impressionist = false;
+      const uint8_t* patternRgba = nullptr;
+      int patternW = 0, patternH = 0;
+      uint32_t seed = 0;   // non-zero: the stroke's random draws replay exactly (Impressionist, jitters)
       bool sourceFlipX = false, sourceFlipY = false;
       // Wrap around: the surface tiles, so a dab past one edge comes back on the opposite one and the clone / heal source
       // reads across the seam (periodic clone). Smudge and warp never wrap: they stop at the edge.
       bool wrap = false;
       float sourceAnchor[2] = { 0.0f, 0.0f };
-      int sourceBlend = 0;         // clone: 0 normal, 1 multiply, 2 screen, 3 overlay, 4 darken, 5 lighten, 6 difference
+      int sourceBlend = 0;         // clone / pattern stamp: 0 normal, 1 multiply, 2 screen, 3 overlay, 4 darken, 5 lighten, 6 difference, 7 behind (pattern)
       bool protectHue = false;     // dodge / burn / sponge: the hue stays put
-      int sharpMode = 1;           // sharpen: 0 clarity, 1 unsharp mask, 2 harsh
+      int sharpMode = 1;           // sharpen: 0 clarity, 1 unsharp mask, 2 harsh, 3 protect detail
+      int smudgeMode = 0;          // smudge: 0 normal, 1 darken, 2 lighten, 3 hue, 4 saturation, 5 color, 6 luminosity
       int spongeMode = 0;          // sponge: 0 saturate, 1 desaturate, 2 vibrance (dull colours gain most)
       float key[3] = { 0.0f, 0.0f, 0.0f };   // colour replace / background erase: the colour sampled where the stroke began
       float keyTolerance = 0.25f;  // 0..1 of the RGB distance
       bool protectFg = false;      // background erase: the tolerance narrows to the foreground colour, which is kept (Photoshop)
+      bool bgContiguous = false;   // background erase: only pixels joined to the stroke through erasable colour go (Limits: Contiguous)
       bool wetEdges = false;       // the stroke's edge holds more paint than its middle
-      bool autoClean = true;       // wet mix: each stroke starts with clean paint (off: keeps what the last one picked up)
+      bool autoClean = true;       // wet mix: after a stroke the brush is emptied (off: keeps what it picked up)
+      bool autoLoad = true;        // wet mix: after a stroke the reservoir fills with the colour again
       float accumulation = 1.0f;   // 0..1, how much overlapping dabs build up inside one stroke
       float accumJitter = 0.0f;    // 0..1, per dab
       float hardJitter = 0.0f;     // 0..1, per dab
@@ -143,10 +159,77 @@ namespace BrushEngine
       bool tiltSize = false;       // stylus tilt widens stroke
       bool tiltAngle = false;      // stylus tilt azimuth turns tip
       bool tiltRound = false;      // stylus tilt flattens tip roundness
+      bool projection = false;     // brush projection: the tip foreshortens along the tilt (cos of the lean) and turns to face it
+      // Pose: fixed stylus values that stand in for the pen's, each axis only when its own switch is on (PhotoCraft).
+      bool pose = false;
+      bool posePressureOn = false, poseTiltXOn = false, poseTiltYOn = false, poseRotOn = false;
+      float posePressure = 1.0f, poseTiltX = 0.0f, poseTiltY = 0.0f, poseRot = 0.0f;   // tilt -1..1, rotation degrees
       float airbrushRate = 0.0f;   // 0..1 continuous dab build-up while pointer stays still (4 + 36 x rate dabs a second)
       bool spacingOff = false;     // one dab per pointer sample: a fast pointer spaces the dabs wider, a slow one closer
+      bool protectTexture = false; // Protect Texture: picking another preset keeps this brush's grain pattern
    };
+   // Picking preset `next` while `cur` is held: with Protect Texture on, the grain pattern stays (its mode, scale and
+   // depth come from the new preset), as Photoshop and PhotoCraft's with_protected_texture do.
+   // The mixer brush's load (PhotoCraft paint/src/mixer.rs MixerState, Apache 2.0): the reservoir of loaded paint and
+   // the pickup well. A new colour loads the reservoir before a stroke; after it the automatic Clean empties the
+   // brush and the automatic Load fills the reservoir again.
+   struct MixerState
+   {
+      bool hasRes = false, hasPick = false, hasColor = false;
+      float res[3] = {}, color[3] = {};
+      float amount = 0.0f;
+      static bool Same(const float* a, const float* b) { return a[0] == b[0] && a[1] == b[1] && a[2] == b[2]; }
+      void Load(const float* c) { hasRes = true; std::copy(c, c + 3, res); amount = 1.0f; }
+      void Clean() { hasRes = hasPick = false; amount = 0.0f; }
+      // The reservoir the next stroke in this colour starts with; false = a clean brush.
+      bool NextLoad(const float* c, float out[3]) const
+      {
+         const float* r = (!hasColor || !Same(color, c)) ? c : (hasRes ? res : nullptr);
+         if (r != nullptr)
+            std::copy(r, r + 3, out);
+         return r != nullptr;
+      }
+      void BeginStroke(const float* c)
+      {
+         if (!hasColor || !Same(color, c))
+         {
+            Load(c);
+            hasColor = true;
+            std::copy(c, c + 3, color);
+         }
+      }
+      void EndStroke(const float* c, bool clean, bool load)
+      {
+         if (clean)
+            Clean();
+         if (load)
+            Load(c);
+         hasColor = true;
+         std::copy(c, c + 3, color);
+      }
+   };
+
+   inline Brush WithProtectedTexture(Brush next, const Brush& cur)
+   {
+      if (!cur.protectTexture)
+         return next;
+      next.grain = cur.grain;
+      next.grainTex = cur.grainTex;
+      next.grainTexW = cur.grainTexW;
+      next.grainTexH = cur.grainTexH;
+      next.protectTexture = true;
+      return next;
+   }
    // The airbrush rate that lays `dabsPerSecond` dabs a second while the pointer stays still.
+   // A dynamic's response curve through (0, 0), (0.5, mid) and (1, 1), piecewise linear.
+   inline float ResponseAt(float mid, float p)
+   {
+      p = p < 0.0f ? 0.0f : (p > 1.0f ? 1.0f : p);
+      mid = mid < 0.0f ? 0.0f : (mid > 1.0f ? 1.0f : mid);
+      return p <= 0.5f ? 2.0f * p * mid : mid + (p - 0.5f) * 2.0f * (1.0f - mid);
+   }
+   // Fade over `steps` dabs: dab 0 is full, dab `steps` and after nothing.
+   inline float FadeAt(int steps, int index) { return steps <= 0 ? 1.0f : (index >= steps ? 0.0f : 1.0f - (float)index / (float)steps); }
    inline float AirbrushRateFor(float dabsPerSecond) { return (dabsPerSecond - 4.0f) / 36.0f; }
    // One dab's share of `base` with `jitter`: a dab's own seed picks how far below `base` it falls, so replays match.
    float DabShare(float base, float jitter, float seed);
@@ -183,6 +266,22 @@ namespace BrushEngine
       // Where the pen will be `aheadMs` after sample b, carried on from sample a ({x, y, ms} each), at most
       // maxPx past b. False when the two samples give no direction or speed.
       static bool Predict(const float a[3], const float b[3], float aheadMs, float maxPx, float out[2]);
+      // The pen's values with the brush's pose laid over them: only the axes the pose switches on change.
+      static void ApplyPose(const Brush& b, float& pressure, float& tiltX, float& tiltY, float& rotDeg)
+      {
+         if (!b.pose)
+            return;
+         if (b.posePressureOn)
+            pressure = b.posePressure;
+         if (b.poseTiltXOn)
+            tiltX = b.poseTiltX;
+         if (b.poseTiltYOn)
+            tiltY = b.poseTiltY;
+         if (b.poseRotOn)
+            rotDeg = b.poseRot;
+      }
+      // The last dab's tip: size factor, rotation (radians) and roundness factor (tests).
+      void LastTip(float& size, float& rot, float& round) const { size = mSize; rot = mRot; round = mRound; }
       // A dab exactly here, no spacing walk (recorded replays).
       void Dab(float x, float y, float pressure, float seed);
       // Symmetry: every dab is also placed through each of these surface-pixel
@@ -192,9 +291,12 @@ namespace BrushEngine
       void Flush();
       // The surface with the stroke on it, for showing while the stroke lasts.
       unsigned DisplayTexture(const GLUtil::Fbo& surface);
+      // The same picture as a framebuffer (to read pixels back): the merged display, or the surface itself.
+      const GLUtil::Fbo& DisplayFbo(const GLUtil::Fbo& surface) { return DisplayTexture(surface) == mDisplay.tex && mDisplay.fbo != 0 ? mDisplay : surface; }
       // Merges the stroke into `surface` for good (its handle stays). Returns
       // the touched rectangle (x0, y0, x1, y1, surface px), empty when nothing landed.
       void End(GLUtil::Fbo& surface, int dirty[4]);
+      const MixerState& Mixer() const { return mMixer; }
       void Cancel();
       // The last stroke's coverage (alpha = how much of the stroke landed), kept until the next Begin.
       const GLUtil::Fbo& Coverage() const { return mCoverage; }
@@ -233,6 +335,7 @@ namespace BrushEngine
          float rgb[3];         // the dab's colour (colour jitter)
          float fromX, fromY;   // smudge: where the previous dab sat
          float wet = 0, refill = 0;   // wet mix: the dab's pick-up and refill (wet / refill jitter)
+         int index = 0;        // the dab's place in the stroke (Fade); mirrored copies share it
       };
       void DrawDab(const Pending& q, float taper);
       void SmudgeDab(const Pending& q, float r, float strength);
@@ -251,6 +354,7 @@ namespace BrushEngine
       float mDabX = 0, mDabY = 0, mDir = 0;       // the last dab's place and the stroke's heading (radians)
       float mDist = 0;                            // stroke length walked so far, px
       float mPrevX = 0, mPrevY = 0;               // the last placed dab (smudge pick-up)
+      int mDabN = 0;   // dabs placed this stroke (Fade)
       float mSize = 1, mFlow = 1, mRgb[3] = { 0, 0, 0 };   // the dab being placed: jitter and taper
       float mHard = 1, mRot = 0, mRound = 1;
       bool mEnding = false;                       // the pen lifted: taper-out dabs land now
@@ -271,6 +375,8 @@ namespace BrushEngine
       GLUtil::Fbo mWetCarry[2];                      // wet mix: the colour the brush carries (1x1, ping-pong)
       int mCarryIdx = 0;
       bool mCarryReady = false;    // the carry holds a stroke's paint (auto clean off keeps it)
+      MixerState mMixer;           // what the wet brush is loaded with between strokes
+      bool mEmpty = false;         // a clean, unloaded brush: it lays down only what it picks up
       void UpdateCarry(const Pending& q, float r);
       bool mDisplayStale = true;
       bool mFinal = false;                        // the merge that lands (End), not the live display

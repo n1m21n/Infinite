@@ -2937,6 +2937,13 @@ namespace params
       constexpr float stab_hi = 32.0f;
       constexpr float stab_lo = 0.0f;
       constexpr float pressure_curve_lo = 0.25f;
+      // Brush pose: fixed pen values (pressure 0..1, tilt -1..1, barrel rotation in degrees).
+      constexpr float pose_pressure_lo = 0.0f;
+      constexpr float pose_pressure_hi = 1.0f;
+      constexpr float pose_tilt_lo = -1.0f;
+      constexpr float pose_tilt_hi = 1.0f;
+      constexpr float pose_rot_lo = -180.0f;
+      constexpr float pose_rot_hi = 180.0f;
       constexpr float pressure_curve_hi = 3.0f;
       constexpr float smooth_hi = 100.0f;
       constexpr float smooth_lo = 0.0f;
@@ -2946,6 +2953,17 @@ namespace params
       constexpr float scatter_y_lo = 0.0f;
       constexpr float taper_in_hi = 1000.0f;
       constexpr float taper_in_lo = 0.0f;
+      constexpr float curve_mid_lo = 0.0f, curve_mid_hi = 1.0f;   // a dynamic's response at half pressure
+      constexpr float fade_lo = 0.0f, fade_hi = 200.0f;           // Fade: dabs to nothing
+      constexpr float dpi_lo = 1.0f, dpi_hi = 10000.0f;          // Image size resolution, pixels per inch
+      constexpr int one_field = 1;
+      constexpr int crop_target_fields = 3;                      // W, H, resolution
+      constexpr int rgba_bytes = 4;                              // a picture read back: R G B A per pixel
+      constexpr int sample_half = 2;                             // eyedropper sample size: half on each side
+      constexpr int capture_fields = 3;                          // brush preset captures: size, tool, colour
+      constexpr int colour_fields = 3;                           // r g b
+      constexpr const char* stylistic_set_tag = "ss%02d";        // OpenType ss01..ss20
+      constexpr int min_stroke_stops = 2;                        // a gradient stroke needs two stops
       constexpr float taper_out_hi = 1000.0f;
       constexpr float taper_out_lo = 0.0f;
       constexpr float accumulation_hi = 100.0f;
@@ -3128,6 +3146,12 @@ namespace params
       constexpr float local_range_lo = 0.0f;
       constexpr float tonal_fuzz_hi = 100.0f;
       constexpr float tonal_fuzz_lo = 0.0f;
+      constexpr float type_size_step = 2.0f;           // Cmd+Shift+. / , (Photoshop's 2 pt)
+      constexpr float type_size_more = 5.0f;          // with Alt: 5 steps (10 pt)
+      constexpr size_t spell_menu_max = 12;          // misspelled words listed in Type > Check Spelling
+      constexpr const char* fallback_font = "Helvetica";   // Replace All Missing Fonts
+      constexpr float replace_hue_lo = -180.0f;
+      constexpr float replace_hue_hi = 180.0f;
       constexpr float depth_sel_lo = 0.0f;
       constexpr float depth_sel_hi = 100.0f;
       constexpr float lens_focus_lo = 0.0f;

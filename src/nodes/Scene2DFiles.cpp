@@ -16,6 +16,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <functional>
 #include <sstream>
@@ -1591,4 +1592,111 @@ unsigned Scene2DNode::FillTexture(const std::string& path, int& w, int& h)
    w = it->second.w;
    h = it->second.h;
    return it->second.tex;
+}
+
+std::vector<uint8_t> Scene2DNode::ResampleRgba(const std::vector<uint8_t>& rgba, int w, int h, int nw, int nh, int method)
+{
+   std::vector<uint8_t> out((size_t)std::max(0, nw) * std::max(0, nh) * 4, 0);
+   if (w <= 0 || h <= 0 || nw <= 0 || nh <= 0 || rgba.size() < (size_t)w * h * 4)
+      return out;
+   const double fx = (double)w / nw, fy = (double)h / nh;
+   auto px = [&](int x, int y, int c) {
+      x = std::clamp(x, 0, w - 1);
+      y = std::clamp(y, 0, h - 1);
+      const uint8_t* p = &rgba[((size_t)y * w + x) * 4];
+      return c == 3 ? p[3] / 255.0 : (p[c] / 255.0) * (p[3] / 255.0);   // premultiplied
+   };
+   auto cubic = [](double t) {   // Keys cubic, a = -0.75: Photoshop's Bicubic (PhotoCraft bicubic_upscale_matches_photoshop)
+      constexpr double a = -0.75;
+      t = std::fabs(t);
+      return t < 1 ? (a + 2) * t * t * t - (a + 3) * t * t + 1 : t < 2 ? a * t * t * t - 5 * a * t * t + 8 * a * t - 4 * a : 0.0;
+   };
+   for (int y = 0; y < nh; y++)
+      for (int x = 0; x < nw; x++)
+      {
+         double v[4] = { 0, 0, 0, 0 };
+         const double sx = (x + 0.5) * fx - 0.5, sy = (y + 0.5) * fy - 0.5;
+         if (method == 0)
+         {
+            const int ix = std::min(w - 1, (int)std::floor((x + 0.5) * fx)), iy = std::min(h - 1, (int)std::floor((y + 0.5) * fy));
+            std::memcpy(&out[((size_t)y * nw + x) * 4], &rgba[((size_t)iy * w + ix) * 4], 4);
+            continue;
+         }
+         const int x0 = (int)std::floor(sx), y0 = (int)std::floor(sy);
+         const int r = method == 1 ? 1 : 2;
+         double sum = 0;
+         for (int j = y0 - r + 1; j <= y0 + r; j++)
+            for (int i = x0 - r + 1; i <= x0 + r; i++)
+            {
+               const double wgt = method == 1 ? std::max(0.0, 1 - std::fabs(sx - i)) * std::max(0.0, 1 - std::fabs(sy - j))
+                                              : cubic(sx - i) * cubic(sy - j);
+               if (wgt == 0)
+                  continue;
+               sum += wgt;
+               for (int c = 0; c < 4; c++)
+                  v[c] += wgt * px(i, j, c);
+            }
+         if (sum != 0)
+            for (double& c : v)
+               c /= sum;
+         const double a = std::clamp(v[3], 0.0, 1.0);
+         uint8_t* o = &out[((size_t)y * nw + x) * 4];
+         for (int c = 0; c < 3; c++)
+            o[c] = (uint8_t)std::lround(a > 0 ? std::clamp(v[c] / a, 0.0, 1.0) * 255.0 : 0.0);
+         o[3] = (uint8_t)std::lround(a * 255.0);
+      }
+   return out;
+}
+
+bool Scene2DNode::ExportLayerPng(int id, const std::string& path, int scalePct, const std::string& resample, std::string* err,
+                                 int* outW, int* outH)
+{
+   auto fail = [&](const char* why) {
+      if (err != nullptr)
+         *err = why;
+      std::fprintf(stderr, "PROBE export layer %d: refused (%s)\n", id, why);
+      return false;
+   };
+   const int method = resample == "nearest" ? 0 : resample == "bilinear" ? 1 : resample == "bicubic" ? 2 : -1;
+   if (method < 0)
+      return fail("resample");
+   if (scalePct < 1 || scalePct > 1000)
+      return fail("scale");
+   if (FindConst(id) == nullptr)
+      return fail("layer");
+   std::vector<uint8_t> rgba;
+   static int sExportFrame = 1 << 24;
+   int W = mDoc.w, H = mDoc.h;
+   if (!RenderSet({ id }, ++sExportFrame, rgba) || rgba.size() < (size_t)W * H * 4)
+      return fail("layer");
+   // The file holds the layer's pixels trimmed to their bounds, not the canvas around them (PhotoCraft
+   // export_layer_trims_to_its_pixels).
+   {
+      int x0 = W, y0 = H, x1 = -1, y1 = -1;
+      for (int y = 0; y < H; y++)
+         for (int x = 0; x < W; x++)
+            if (rgba[((size_t)y * W + x) * 4 + 3] != 0)
+               x0 = std::min(x0, x), y0 = std::min(y0, y), x1 = std::max(x1, x), y1 = std::max(y1, y);
+      if (x1 < 0)
+         return fail("empty");
+      if (x0 > 0 || y0 > 0 || x1 < W - 1 || y1 < H - 1)
+      {
+         const int tw = x1 - x0 + 1, th = y1 - y0 + 1;
+         std::vector<uint8_t> t((size_t)tw * th * 4);
+         for (int y = 0; y < th; y++)
+            std::memcpy(&t[(size_t)y * tw * 4], &rgba[((size_t)(y0 + y) * W + x0) * 4], (size_t)tw * 4);
+         rgba.swap(t);
+         W = tw, H = th;
+      }
+   }
+   const int nw = std::max(1, (int)std::lround((double)W * scalePct / 100.0)), nh = std::max(1, (int)std::lround((double)H * scalePct / 100.0));
+   const std::vector<uint8_t> scaled = (nw == W && nh == H) ? rgba : ResampleRgba(rgba, W, H, nw, nh, method);
+   if (stbi_write_png(path.c_str(), nw, nh, 4, scaled.data(), nw * 4) == 0)
+      return fail("write");
+   if (outW != nullptr)
+      *outW = nw;
+   if (outH != nullptr)
+      *outH = nh;
+   std::fprintf(stderr, "PROBE export layer %d: %dx%d %s\n", id, nw, nh, resample.c_str());
+   return true;
 }

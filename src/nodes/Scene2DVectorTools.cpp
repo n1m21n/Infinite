@@ -11,6 +11,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <deque>
 #include <numeric>
@@ -1518,11 +1519,28 @@ int Scene2DNode::PathToShapeLayer(const std::string& name, int above, const floa
    if (found == nullptr)
       return 0;
    const DocPath p = *found;
+   const int vid = ShapesToShapeLayer(p.subs, above, rgba, false);
+   if (Layer* dst = FindLayer(vid))
+      dst->name = p.name == kWorkPath ? std::string("Shape") : p.name;
+   return vid;
+}
+
+int Scene2DNode::ShapesToShapeLayer(const std::vector<Shape>& subs, int above, const float rgba[4], bool consumeWorkPath)
+{
+   Layers();
+   if (subs.empty())
+      return 0;
+   for (const Shape& s : subs)
+      if (s.Anchors() < 2)
+      {
+         fprintf(stderr, "PROBE [2d] path to shape refused: a subpath has %d anchors\n", s.Anchors());
+         return 0;
+      }
    const int vid = AddVectorLayer(above);
    Layer* dst = FindLayer(vid);
    if (dst == nullptr)
       return 0;
-   for (Shape s : p.subs)
+   for (Shape s : subs)
    {
       for (size_t i = 0; i + 1 < s.pts.size(); i += 2)
       {
@@ -1535,7 +1553,10 @@ int Scene2DNode::PathToShapeLayer(const std::string& name, int above, const floa
       s.strokeOn = false;
       dst->shapes.push_back(std::move(s));
    }
-   dst->name = p.name == kWorkPath ? std::string("Shape") : p.name;
+   dst->name = "Shape";
+   if (consumeWorkPath)
+      DeletePath(kWorkPath);
+   fprintf(stderr, "PROBE [2d] path to shape: layer %d from %zu subpaths, consume %d\n", vid, subs.size(), consumeWorkPath ? 1 : 0);
    Commit();
    return vid;
 }
