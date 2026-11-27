@@ -13143,6 +13143,18 @@ namespace
                if (doc->UpscaleLayer2x(l->id) > 0)
                   Touch();
             }
+            if (l->kind != Kind::Group && !adj && MenuParts::Item(T("Photo to Line Art"), nullptr))
+            {
+               PushUndoCheckpoint("Photo to Line Art");
+               if (doc->LineArtLayer(l->id) > 0)
+                  Touch();
+            }
+            if (l->kind != Kind::Group && !adj && MenuParts::Item(T("Colorize"), nullptr))
+            {
+               PushUndoCheckpoint("Colorize");
+               if (doc->ColorizeLayer(l->id) > 0)
+                  Touch();
+            }
             if (!adj && MenuParts::Item(T("Layer as Output"), nullptr, l->output)) sPending.what = Pending::LayerOutput;
             if (!adj && doc->CanTakeBelow(*l) && MenuParts::Item(T("Effect on Below"), nullptr, l->below)) sPending.what = Pending::LayerBelow;
             if (l->warpOn && MenuParts::Item(T("Reset Distort"), nullptr))

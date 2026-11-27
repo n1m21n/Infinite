@@ -161,6 +161,14 @@ namespace Ml
                "5dafe91d3466726d03a2c07c5c8020fc77d66e806428eaa88941ceb6e9fef509", 1618174, "Apache-2.0",
                "Clean-room SPAN 2x (Apache-2.0), trained on PD12M CC0 + Infinite headless renders + LPIPS (BSD-2).",
                { 1, 3, 256, 256 }, EpPref::CpuOnly, "span" });
+         add({ "lineart_clean", "Clean Photo-to-Lineart", "1.0.0", "art", "models/lineart_clean.onnx",
+               "3dbdb68c06b7e0d7cbd9a1b00cd940efedffc942d576d0fcfdd7f83060a51b56", 4752420, "MIT",
+               "Clean-room Photo-to-Lineart (MIT), trained on Infinite G-buffer normal/depth edges + PD12M CC0.",
+               { 1, 3, 512, 512 }, EpPref::CpuOnly, "lineart" });
+         add({ "colorize_clean", "Clean Auto-Colorize", "1.0.0", "art", "models/colorize_clean.onnx",
+               "f12c6018da46d00571e80f25bb837ab118dcee7d57247af5fa36754e5915ef96", 6432884, "Apache-2.0",
+               "Clean-room Auto-Colorize (Apache-2.0 MobileNetV4-Small), self-supervised BT.601 YCbCr on PD12M CC0.",
+               { 1, 1, 256, 256 }, EpPref::CpuOnly, "colorize" });
       }
 
       void CloseAllSessionsLocked(RegistryState& s)

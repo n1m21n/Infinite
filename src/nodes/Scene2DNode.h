@@ -735,6 +735,8 @@ public:
    bool SelectAllObjectsAi(int op, bool sampleAll, int layerId, std::string* outHint = nullptr);
    bool PreviewSubjectMatte(int op, bool sampleAll, int layerId);
    int UpscaleLayer2x(int layerId, std::string* outHint = nullptr);
+   int LineArtLayer(int layerId, std::string* outHint = nullptr);
+   int ColorizeLayer(int layerId, std::string* outHint = nullptr);
    // Once a frame: applies a waiting prompt when its picture is ready. True when the selection changed.
    bool AiSelectPoll();
    bool AiSelectWaiting() const { return mAiWait.on || mSubjectJob.valid(); }

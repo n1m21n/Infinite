@@ -16,6 +16,8 @@
 #include "core/ml/TextOcr.h"
 #include "core/ml/ObjectDetect.h"
 #include "core/ml/Upscale.h"
+#include "core/ml/LineArt.h"
+#include "core/ml/Colorize.h"
 #include "platform/Platform.h"
 #include <chrono>
 
@@ -5278,4 +5280,84 @@ int Scene2DNode::UpscaleLayer2x(int layerId, std::string* outHint)
    if (uw < 2 || uh < 2 || upTop.size() != (size_t)uw * uh * 4)
       return 0;
    return AddFileLayer(parent, baseName + " 2x", 0, 0, uw, uh, upTop, layerId);
+}
+
+int Scene2DNode::LineArtLayer(int layerId, std::string* outHint)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> px;
+   const Layer* l = FindConst(layerId);
+   const std::string baseName = l ? l->name : "Layer";
+   const int parent = l ? l->parent : 0;
+   auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
+   if (it != mSurfaces.end() && l->pw == W && l->ph == H)
+      ReadRect(it->second.fbo, 0, 0, W, H, px);
+   else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
+      ReadRect(mOut, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return 0;
+
+   std::vector<uint8_t> topDown(px.size());
+   for (int y = 0; y < H; y++)
+      std::memcpy(&topDown[(size_t)y * W * 4], &px[(size_t)(H - 1 - y) * W * 4], (size_t)W * 4);
+
+   std::vector<uint8_t> outTop;
+   if (Ml::LineArt::Available())
+   {
+      std::string err;
+      if (!Ml::LineArt::RunNow(topDown, W, H, outTop, err))
+      {
+         if (outHint) *outHint = err;
+         Ml::LineArt::Fallback(topDown, W, H, outTop);
+      }
+   }
+   else
+   {
+      if (outHint) *outHint = Ml::LineArt::Missing();
+      Ml::LineArt::Fallback(topDown, W, H, outTop);
+   }
+   if (outTop.size() != (size_t)W * H * 4)
+      return 0;
+   return AddFileLayer(parent, baseName + " Line Art", 0, 0, W, H, outTop, layerId);
+}
+
+int Scene2DNode::ColorizeLayer(int layerId, std::string* outHint)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> px;
+   const Layer* l = FindConst(layerId);
+   const std::string baseName = l ? l->name : "Layer";
+   const int parent = l ? l->parent : 0;
+   auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
+   if (it != mSurfaces.end() && l->pw == W && l->ph == H)
+      ReadRect(it->second.fbo, 0, 0, W, H, px);
+   else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
+      ReadRect(mOut, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return 0;
+
+   std::vector<uint8_t> topDown(px.size());
+   for (int y = 0; y < H; y++)
+      std::memcpy(&topDown[(size_t)y * W * 4], &px[(size_t)(H - 1 - y) * W * 4], (size_t)W * 4);
+
+   std::vector<uint8_t> outTop;
+   if (Ml::Colorize::Available())
+   {
+      std::string err;
+      if (!Ml::Colorize::RunNow(topDown, W, H, outTop, err))
+      {
+         if (outHint) *outHint = err;
+         Ml::Colorize::Fallback(topDown, W, H, outTop);
+      }
+   }
+   else
+   {
+      if (outHint) *outHint = Ml::Colorize::Missing();
+      Ml::Colorize::Fallback(topDown, W, H, outTop);
+   }
+   if (outTop.size() != (size_t)W * H * 4)
+      return 0;
+   return AddFileLayer(parent, baseName + " Colorized", 0, 0, W, H, outTop, layerId);
 }

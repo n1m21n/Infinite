@@ -15,6 +15,8 @@
 #include "core/ml/TextOcr.h"
 #include "core/ml/ObjectDetect.h"
 #include "core/ml/Upscale.h"
+#include "core/ml/LineArt.h"
+#include "core/ml/Colorize.h"
 #include "stb_image.h"
 #include "gl3.h"
 #include "stb_image_write.h"
@@ -3891,6 +3893,49 @@ void RunView2DTest()
                const bool okU = Ml::Upscale::Run2xNow(small, 64, 64, up, uw, uh, err);
                printf("  ML-SPAN: ok=%d out=%dx%d active=%s err=%s\n", okU, uw, uh, Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
                Check("ML-SPAN: upscales 2x cleanly via ModelRegistry", okU && uw == 128 && uh == 128 && Ml::ModelRegistry::ActiveFamily() == "span");
+            }
+         }
+         // 3e. Clean-room Photo-to-Lineart & Auto-Colorize + offline fallbacks
+         {
+            int iw = 0, ih = 0; std::vector<uint8_t> rgba;
+            if (!loadRgbaFile(evalRoot + "/S1/000000001503.jpg", rgba, iw, ih))
+            {
+               std::error_code ec;
+               for (const auto& de : std::filesystem::directory_iterator(evalRoot + "/S1", ec))
+                  if (de.path().extension() == ".jpg" && loadRgbaFile(de.path().string(), rgba, iw, ih)) break;
+            }
+            if (!rgba.empty())
+            {
+               std::vector<uint8_t> fbLa, fbCol;
+               Ml::LineArt::Fallback(rgba, iw, ih, fbLa);
+               Ml::Colorize::Fallback(rgba, iw, ih, fbCol);
+               Check("ML-LINEART: offline Sobel fallback matches size", fbLa.size() == rgba.size());
+               Check("ML-COLORIZE: offline sepia fallback matches size", fbCol.size() == rgba.size());
+               if (!Ml::LineArt::Available())
+                  printf("  [skip] ML-LINEART: %s\n", Ml::LineArt::Missing().c_str());
+               else
+               {
+                  std::vector<uint8_t> ink; std::string err;
+                  const bool okL = Ml::LineArt::RunNow(rgba, iw, ih, ink, err);
+                  size_t dark = 0;
+                  for (size_t i = 0; i < ink.size(); i += 4) dark += (ink[i] < 180);
+                  const float frac = ink.empty() ? 0.0f : (float)dark / (float)(ink.size() / 4);
+                  printf("  ML-LINEART: ok=%d dark=%.3f active=%s err=%s\n", okL, frac, Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
+                  Check("ML-LINEART: produces non-trivial ink sketch", okL && frac > 0.01f && frac < 0.80f);
+               }
+               if (!Ml::Colorize::Available())
+                  printf("  [skip] ML-COLORIZE: %s\n", Ml::Colorize::Missing().c_str());
+               else
+               {
+                  std::vector<uint8_t> col; std::string err;
+                  const bool okC = Ml::Colorize::RunNow(rgba, iw, ih, col, err);
+                  size_t chroma = 0;
+                  for (size_t i = 0; i < col.size(); i += 4)
+                     chroma += (std::abs((int)col[i] - (int)col[i + 1]) + std::abs((int)col[i + 1] - (int)col[i + 2])) > 8;
+                  const float cfrac = col.empty() ? 0.0f : (float)chroma / (float)(col.size() / 4);
+                  printf("  ML-COLORIZE: ok=%d chroma=%.3f active=%s err=%s\n", okC, cfrac, Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
+                  Check("ML-COLORIZE: produces colour channels on photo", okC && cfrac > 0.05f);
+               }
             }
          }
          Ml::ModelRegistry::Unload();
