@@ -149,9 +149,9 @@ namespace Ml
                "48fc40f24f6d2a207a2b1091d3437eb3cc3eb6b676dc3ef9c37384005483683b", 10860000, "Apache-2.0",
                "PaddleOCR PP-OCRv4 Mobile / RapidOCR (Apache-2.0 code & weights). https://github.com/PaddlePaddle/PaddleOCR",
                { 1, 3, 48, 320 }, EpPref::CpuOnly, "ppocr" });
-         add({ "dfine_s", "D-FINE-S Object Detector (COCO)", "1.0.0", "select", "models/dfine_s_coco.onnx",
-               "cd8a49a945feda6d28c6304ae8ae85c2759ba1d78a5a83a22c5ce8db82ef7238", 41540000, "Apache-2.0",
-               "D-FINE-S COCO-only checkpoint (Peterande, Apache-2.0, MS COCO CC-BY-4.0). https://github.com/Peterande/D-FINE",
+         add({ "dfine_s", "D-FINE-S Object Detector (COCO)", "1.0.1", "select", "models/dfine_s_coco.onnx",
+               "900316a5c18fd176ff5bd08048768c892d051156d9b0fe0bf692e753331e8ed1", 31630000, "Apache-2.0",
+               "D-FINE-S COCO-only mixed FP16/FP32 checkpoint (Peterande, Apache-2.0, MS COCO CC-BY-4.0). https://github.com/Peterande/D-FINE",
                { 1, 3, 640, 640 }, EpPref::CpuOnly, "dfine" });
          add({ "p3m_net", "P3M-Net Hair Matte", "1.0.0", "matte", "models/p3m_net.onnx",
                "", 0, "MIT",
