@@ -583,6 +583,7 @@ set(COMMON_SOURCES
     src/app/selftest/MidiOutTests.cpp
     src/app/selftest/View3DNavTests.cpp
     src/app/selftest/View2DTests.cpp
+    src/app/selftest/View2DParityTests.cpp
     src/app/selftest/MixerPanelTests.cpp
     src/app/selftest/PageMenuTests.cpp
     src/app/selftest/MenuAliveTests.cpp

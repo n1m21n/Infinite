@@ -112,6 +112,7 @@ namespace
    void PhotoMenus(Scene2DNode* doc);   // Edit / Image / Layer / Filter / View in the canvas menu
    void AskDialog(Scene2DNode* doc);
    void ExportSubMenu(Scene2DNode* doc);
+   std::string DocLabel(const GraphNode* gn);
    void PlaceEmbedded(Scene2DNode* doc);
    void QuickExportPng();
    void RecordTransform(int kind, float deg, bool vertical);
@@ -378,6 +379,10 @@ namespace
    ImVec2 sCropQuad[4];               // TL TR BR BL, document px; with Perspective on, sOp.cropHandle 0..3 is a corner
    const float* CropQuadF() { return &sCropQuad[0].x; }
    std::vector<Scene2DNode::Layer> sClip;   // Copy / Cut: the layers waiting to be pasted
+   uint64_t sClipDoc = 0;                    // the document they came from, and its type styles then
+   Scene2DNode::TextStyles sClipStyles;
+   void ClipLayers(Scene2DNode* doc, const std::vector<int>& ids);
+   std::vector<Scene2DNode::Layer> ClipFor(Scene2DNode* doc);
    int sPasteCount = 0;                     // each paste of the same copy steps further from the original
    float sZoomVel = 0.0f;                   // smoothed wheel zoom: log-zoom still to apply
    ImVec2 sZoomAt(0, 0);
@@ -429,10 +434,10 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, MaskFromAlpha, HideSel, MaskObjects, RemoveMask, ApplyMask, InvertMask, AddFxMask, RemoveFxMask, BlurFxMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown, LinkLayers, SelectLinked, NewFromClip };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, MaskFromAlpha, HideSel, MaskObjects, RemoveMask, ApplyMask, InvertMask, AddFxMask, RemoveFxMask, BlurFxMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown, LinkLayers, SelectLinked, NewFromClip, DupToDoc, RefineDoc };
       What what = None;
       int arg = 0;         // AddAdjust: the type
-      uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
+      uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node; DupToDoc: the destination document (0 = new)
    } sPending;
 
    // Click-a-node-on-the-canvas mode, as the 3D View has: 0 off, 1 add the picked node as a layer, 2 replace the active layer's source.
@@ -1360,6 +1365,8 @@ namespace
       // A marquee masks the new fill to it, as it does a new adjustment (Photoshop).
       if (doc->HasSelection() && !doc->quickMask && doc->MaskFromSelection(id))
          doc->Deselect();   // the selection went into the mask: it is dropped (Photoshop, PhotoCraft #1250)
+      else if (Scene2DNode::sDefaultFillMasks)
+         doc->AddPixelMask(id);   // Use Default Masks on Fill Layers: an all-shown mask to paint into
       SelectOnly(id);
    }
 
@@ -3914,12 +3921,17 @@ namespace
          }
          if (sUserPresets.empty())
             continue;
-         if (field == "tip")
+         // "tip <side> <base64>" is Define Brush Preset's picture; "tip <n>" (one number) is the brush's tip shape,
+         // read with the other fields below. Both lines share the name, so only the two-token form is the picture.
+         std::string rest;
+         std::getline(ls, rest);
+         std::istringstream ps(rest);
+         int side = 0;
+         std::string b64;
+         if (field == "tip" && ps >> side >> b64)
          {
-            int side = 0;
-            std::string b64;
             std::vector<uint8_t> mask;
-            if (ls >> side >> b64 && side > 0 && Base64::Decode(b64, mask) && mask.size() == (size_t)side * side)
+            if (side > 0 && Base64::Decode(b64, mask) && mask.size() == (size_t)side * side)
             {
                // Back to a picture AddSampledTip reads: black, the mask as alpha.
                std::vector<uint8_t> rgba((size_t)side * side * 4, 0);
@@ -3930,7 +3942,8 @@ namespace
             continue;
          }
          std::vector<float> vals;
-         for (float v; ls >> v;)
+         std::istringstream vs(rest);
+         for (float v; vs >> v;)
             vals.push_back(v);
          if (field == "captures" && vals.size() >= (size_t)params::view2d::capture_fields)
          {
@@ -3991,6 +4004,83 @@ namespace
       sUserPresets.push_back(u);
       SaveUserPresets();
       return (int)sUserPresets.size() - 1;
+   }
+   // Rename a saved preset (PhotoCraft brush.presets.rename): no name another preset has, built-in or saved, ignoring case;
+   // a case-only rename of itself is fine. False leaves it as it was.
+   bool RenameUserPreset(int i, std::string name)
+   {
+      LoadUserPresets();
+      const auto ws = [](char c) { return c == ' ' || c == '\t'; };
+      while (!name.empty() && ws(name.back()))
+         name.pop_back();
+      while (!name.empty() && ws(name.front()))
+         name.erase(name.begin());
+      if (i < 0 || i >= (int)sUserPresets.size() || name.empty())
+         return false;
+      const auto same = [&](const std::string& a) {
+         return a.size() == name.size() && std::equal(a.begin(), a.end(), name.begin(), [](char x, char y) {
+            return std::tolower((unsigned char)x) == std::tolower((unsigned char)y); });
+      };
+      for (const BrushEngine::Preset& bp : BrushEngine::Presets())
+         if (same(bp.name))
+            return false;
+      for (int j = 0; j < (int)sUserPresets.size(); j++)
+         if (j != i && same(sUserPresets[(size_t)j].name))
+            return false;
+      sUserPresets[(size_t)i].name = name;
+      SaveUserPresets();
+      return true;
+   }
+   // Rename Preset: a built-in preset renamed becomes a saved one under the new name (PhotoCraft: it is the user's then).
+   struct PresetRenameAsk { bool open = false; int user = -1; BrushEngine::Brush brush; bool erase = false; std::string name; };
+   PresetRenameAsk sPresetRename;
+   int RenamePreset(int user, const BrushEngine::Brush& b, bool erase, const std::string& name)
+   {
+      const bool copy = user < 0;
+      if (copy)
+         user = SaveUserPreset(b, erase);
+      if (RenameUserPreset(user, name))
+         return user;
+      if (copy)
+      {
+         sUserPresets.erase(sUserPresets.begin() + user);
+         SaveUserPresets();
+      }
+      return -1;
+   }
+   void PresetRenameDialog()
+   {
+      if (sPresetRename.open)
+      {
+         ImGui::OpenPopup("##v2dpresetrename");
+         sPresetRename.open = false;
+      }
+      if (!MenuParts::BeginPopup("##v2dpresetrename"))
+         return;
+      static char sBuf[sizeof sRenameBuf] = {};
+      static bool sTaken = false;
+      if (ImGui::IsWindowAppearing())
+      {
+         std::snprintf(sBuf, sizeof sBuf, "%s", sPresetRename.name.c_str());
+         sTaken = false;
+         UiInteract::FocusHere();
+      }
+      ImGui::TextUnformatted(T("Rename Preset"));
+      const bool enter = FieldWell::InputText("##v2dpresetname", sBuf, sizeof sBuf, ImGuiInputTextFlags_EnterReturnsTrue);
+      if (sTaken)
+         ImGui::TextDisabled("%s", T("Another preset has that name"));
+      const bool ok = ActionButton::Draw(T("OK"), ImVec2(0.0f, 0.0f), ActionButton::Kind::Plain);
+      if (ok || enter)
+      {
+         const int got = RenamePreset(sPresetRename.user, sPresetRename.brush, sPresetRename.erase, sBuf);
+         sTaken = got < 0;
+         if (got >= 0)
+         {
+            (sPresetRename.erase ? sUserPickErase : sUserPick) = got;
+            ImGui::CloseCurrentPopup();
+         }
+      }
+      MenuParts::EndPopup();
    }
    // A saved preset onto the tool: what it did not capture stays the tool's own; a captured colour becomes the foreground.
    void PickUserPreset(int i, BrushEngine::Brush& b)
@@ -8979,7 +9069,27 @@ namespace
             if (any && MenuParts::Item(T("Copy Merged"), Sc("Shift+Ctrl+C"))) sPending.what = Pending::CopyMerged;
             if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"))) sPending.what = Pending::Paste;
             if (any && MenuParts::Item(T("Duplicate"), Sc("Ctrl+J"))) sPending.what = Pending::Duplicate;
+            if (any && MenuParts::SubMenu(T("Duplicate To")))
+            {
+               // Photoshop's Duplicate Layer > Destination: another open document, or a new one.
+               const GraphNode* self = DocGraphNode();
+               for (GraphNode& gn : gNodes)
+                  if (&gn != self && dynamic_cast<Scene2DNode*>(gn.node.get()) != nullptr)
+                     if (MenuParts::Item((DocLabel(&gn) + "##v2ddupto" + std::to_string(gn.uid)).c_str()))
+                     {
+                        sPending.what = Pending::DupToDoc;
+                        sPending.uid = gn.uid;
+                     }
+               MenuParts::Separator();
+               if (MenuParts::Item(T("New Document")))
+               {
+                  sPending.what = Pending::DupToDoc;
+                  sPending.uid = 0;
+               }
+               ImGui::EndMenu();
+            }
             MenuParts::Check(T("Add \"copy\" to Copies"), &Scene2DNode::sCopySuffix);
+            MenuParts::Check(T("Default Masks on Fill Layers"), &Scene2DNode::sDefaultFillMasks);
             if (SelectionActsOnPixels(doc))
                if (MenuParts::Item(T("Layer via Cut"), Sc("Shift+Ctrl+J")))
                {
@@ -9163,6 +9273,7 @@ namespace
          }
       }
       SnapshotNameDialog(doc);   // outside the menu, which has closed by the time it shows
+      PresetRenameDialog();
       AskDialog(doc);
       GroupOptionsDialog(doc);
       const ImVec2 mp = ImGui::GetIO().MousePos;
@@ -10699,6 +10810,16 @@ namespace
          Touch();
          return;
       }
+      if (keep && which == 1 && sRefineOut >= 3)
+         if (Layer* al = Active(doc))
+         {
+            // To a new document: made once the dialog is gone (spawning a document node mid-draw is not safe).
+            sPending.what = Pending::RefineDoc;
+            sPending.arg = al->id;
+            sPending.uid = sRefineOut == 4 ? 1 : 0;
+            Touch();
+            return;
+         }
       if (keep && which == 1 && sRefineOut != 0)
          if (Layer* al = Active(doc))
             if (const int id = doc->RefineOutput(sRefineOut, al->id, sRefineDecon ? sRefineDeconAmt : 0.0f); id != 0)
@@ -10806,13 +10927,14 @@ namespace
       MoreSlider(T("Contrast"), &sRefine.contrast, params::view2d::contrast_lo, params::view2d::contrast_hi, "%.0f%%");
       MoreSlider(T("Shift Edge"), &sRefine.shift, params::view2d::shift_lo, params::view2d::shift_hi, "%.0f%%");
       MoreHeader(T("Output"));
-      static const char* kOut[3] = { "Selection", "Layer Mask", "New Layer with Mask" };
-      MoreCombo(T("Output To"), &sRefineOut, kOut, 3);
+      static const char* kOut[5] = { "Selection", "Layer Mask", "New Layer with Mask", "New Document",
+                                     "New Document with Layer Mask" };
+      MoreCombo(T("Output To"), &sRefineOut, kOut, 5);
       MoreCheck(T("Decontaminate"), &sRefineDecon);
       if (sRefineDecon)
       {
-         if (sRefineOut != 2)
-            sRefineOut = 2;   // Photoshop: decontaminated colours go to a new layer
+         if (sRefineOut < 2)
+            sRefineOut = 2;   // Photoshop: decontaminated colours go to a new layer (or document)
          MorePct(T("Amount"), &sRefineDeconAmt, params::view2d::refine_decon_amt_lo, params::view2d::refine_decon_amt_hi);
       }
       if (was.radius != sRefine.radius || was.smart != sRefine.smart || was.smooth != sRefine.smooth ||
@@ -11450,6 +11572,14 @@ namespace
             {
                sUserPresets[(size_t)user].brush = b;
                SaveUserPresets();
+            }
+            if (MenuParts::Item(T("Rename Preset"), nullptr, false, user >= 0 || preset >= 0))
+            {
+               sPresetRename.open = true;
+               sPresetRename.user = user;
+               sPresetRename.brush = b;
+               sPresetRename.erase = erasing;
+               sPresetRename.name = user >= 0 ? sUserPresets[(size_t)user].name : std::string(presets[(size_t)preset].name);
             }
             if (MenuParts::Item(T("Delete Preset"), nullptr, false, user >= 0))
             {
@@ -14883,6 +15013,13 @@ namespace
             ModNext(*l, Scene2DNode::kLfFillAngle);
             SliderRow(T("Angle"), &l->fillAngle, params::view2d::fill_angle_lo, params::view2d::fill_angle_hi, "%.0f°");
          }
+         if (type >= 1 && type <= 5)
+         {
+            // Gradient Fill's Scale and Offset (Photoshop): the span along the angle, and the centre's move.
+            SliderRow(T("Scale"), &l->fillScale, params::view2d::fill_scale_lo, params::view2d::fill_scale_hi, "%.2f");
+            SliderRow(T("Offset X"), &l->fillOff[0], params::view2d::fill_offset_lo, params::view2d::fill_offset_hi, "%.2f");
+            SliderRow(T("Offset Y"), &l->fillOff[1], params::view2d::fill_offset_lo, params::view2d::fill_offset_hi, "%.2f");
+         }
       }
       if (l->kind == Kind::Adjust)
       {
@@ -17376,6 +17513,31 @@ namespace
       }
    }
 
+   // A document's label in the picker and the Duplicate To menu: its own name, else "Document N".
+   std::string DocLabel(const GraphNode* gn)
+   {
+      auto* d = gn != nullptr ? dynamic_cast<Scene2DNode*>(gn->node.get()) : nullptr;
+      if (d != nullptr && !d->Doc().name.empty())
+         return d->Doc().name;
+      return std::string(T("Document")) + " " + std::to_string(gn != nullptr ? gn->index : 0);
+   }
+
+   void ClipLayers(Scene2DNode* doc, const std::vector<int>& ids)
+   {
+      sClip = doc->CopyLayers(ids);
+      sClipDoc = sDocUid;
+      sClipStyles = doc->Doc().textStyles;
+   }
+
+   // The clip as this document should paste it: from another document, with fresh link groups and styles by name.
+   std::vector<Scene2DNode::Layer> ClipFor(Scene2DNode* doc)
+   {
+      std::vector<Scene2DNode::Layer> clip = sClip;
+      if (sClipDoc != 0 && sClipDoc != sDocUid)
+         doc->AdoptLayers(clip, sClipStyles);
+      return clip;
+   }
+
    void DrawDocPicker(Scene2DNode* doc, float w)
    {
       std::vector<GraphNode*> docs;
@@ -17383,7 +17545,7 @@ namespace
          if (dynamic_cast<Scene2DNode*>(gn.node.get()) != nullptr)
             docs.push_back(&gn);
       GraphNode* self = DocGraphNode();
-      auto nameOf = [](const GraphNode* gn) { return std::string("Document ") + std::to_string(gn->index); };
+      auto nameOf = [](const GraphNode* gn) { return DocLabel(gn); };
       ImGui::SetNextItemWidth(w - kIconW - tok::space_1);
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (PanelKit::Chip() - ImGui::GetFontSize()) * 0.5f));
       const bool docsOpen = MenuParts::BeginCombo("##v2ddocs", self != nullptr ? nameOf(self).c_str() : "");
@@ -17406,6 +17568,17 @@ namespace
       {
          if (MenuParts::Item(T("New Document"))) sPending.what = Pending::NewDoc;
          if (MenuParts::Item(T("Duplicate Document"))) sPending.what = Pending::DuplicateDoc;
+         if (doc != nullptr)
+         {
+            // The document's own name (saved with it; empty shows "Document N").
+            char nameBuf[128];
+            std::snprintf(nameBuf, sizeof nameBuf, "%s", doc->Doc().name.c_str());
+            if (FieldWell::InputText("##v2ddocname", nameBuf, sizeof nameBuf, 0))
+            {
+               doc->Doc().name = nameBuf;
+               gPatchDirty = true;
+            }
+         }
          if (MenuParts::Item(T("Open PSD or ORA..."))) sPending.what = Pending::OpenFile;
          if (MenuParts::Item(T("New from Clipboard"))) sPending.what = Pending::NewFromClip;
          if (MenuParts::Item(T("Place Embedded..."), nullptr, false, doc != nullptr)) PlaceEmbedded(doc);
@@ -17710,6 +17883,70 @@ namespace
          }
          break;
       }
+      case Pending::DupToDoc:
+      {
+         // Duplicate To: the selected layers (a layer inside a selected group goes with it) into another document,
+         // above its active layer, or into a new document of this one's size. One undo step; the destination shows.
+         std::vector<int> tops;
+         for (int id : sSel)
+         {
+            bool inner = false;
+            for (int o : sSel)
+               inner = inner || (o != id && doc->IsInside(id, o));
+            if (!inner && doc->FindLayer(id) != nullptr)
+               tops.push_back(id);
+         }
+         if (tops.empty())
+            break;
+         Scene2DNode* dst = nullptr;
+         uint64_t dstUid = 0;
+         for (GraphNode& gn : gNodes)
+            if (todo.uid != 0 && gn.uid == todo.uid)
+            {
+               dst = dynamic_cast<Scene2DNode*>(gn.node.get());
+               dstUid = gn.uid;
+            }
+         if (todo.uid != 0 && (dst == nullptr || dst == doc))
+            break;
+         const size_t undo0 = gUndoStack.size();
+         PushUndoCheckpoint("Duplicate layers to document");
+         std::vector<int> made;
+         std::string err;
+         if (dst == nullptr)
+         {
+            if ((dst = MakeDoc(at.x, at.y + tok::view2d_run_pending_span, "")) != nullptr)
+               made = dst->TakeLayersAsNewDocument(*doc, tops, "", "");
+         }
+         else
+         {
+            // The panel keeps no selection for a document it is not showing, so the copies go on top there.
+            made = dst->CopyLayersFrom(*doc, tops, 0, &err);
+            if (!made.empty())
+            {
+               sDocUid = dstUid;
+               sNeedFit = true;
+            }
+         }
+         if (made.empty())
+         {
+            RollbackUndoTo(undo0);
+            if (!err.empty())
+               Notices::Post(Notices::Level::Warning, "view2d.dupto", T("Can't duplicate layers"), err);
+            break;
+         }
+         sSel = made;
+         Touch();
+         break;
+      }
+      case Pending::RefineDoc:
+      {
+         PushUndoCheckpoint("Refine to new document");
+         if (Scene2DNode* nd = MakeDoc(at.x, at.y + tok::view2d_run_pending_span, ""))
+            if (const int id = nd->RefineIntoNewDocument(*doc, todo.arg, todo.uid != 0))
+               sSel = { id };
+         Touch();
+         break;
+      }
       case Pending::NewDoc:
          PushUndoCheckpoint("New document");
          MakeDoc(at.x, at.y + tok::view2d_run_pending_span, "");
@@ -17890,7 +18127,7 @@ namespace
             if (const int nid = doc->FilterMaskToLayer(src, src))
             {
                ClipToOs(doc, { nid });
-               sClip = doc->CopyLayers({ nid });
+               ClipLayers(doc, { nid });
                sPasteCount = -1;
                doc->RemoveLayer(nid);
                SelectOnly(src);
@@ -17911,7 +18148,7 @@ namespace
             if (const int nid = SelectionToLayer(doc, cut))
             {
                ClipToOs(doc, { nid });
-               sClip = doc->CopyLayers({ nid });
+               ClipLayers(doc, { nid });
                sPasteCount = -1;   // pixels paste in place first, like Affinity and Photoshop
                doc->RemoveLayer(nid);
                SelectOnly(src);
@@ -17919,7 +18156,7 @@ namespace
          }
          else if (!sSel.empty())
          {
-            sClip = doc->CopyLayers(sSel);
+            ClipLayers(doc, sSel);
             sPasteCount = 0;
             if (todo.what == Pending::Cut)
                DeleteSelected(doc);
@@ -17930,7 +18167,7 @@ namespace
          if (const int nid = MergedLayer(doc, VisibleTop(doc), true, 0))
          {
             ClipToOs(doc, { nid });
-            sClip = doc->CopyLayers({ nid });
+            ClipLayers(doc, { nid });
             sPasteCount = -1;
             doc->RemoveLayer(nid);
             doc->Commit();
@@ -17959,7 +18196,7 @@ namespace
             Layer* a = Active(doc);
             sPasteCount++;
             const float nudge = tok::view2d_nudge_ratio * std::max(0, sPasteCount);
-            sSel = doc->PasteLayers(sClip, a != nullptr ? a->id : 0, nudge, nudge);
+            sSel = doc->PasteLayers(ClipFor(doc), a != nullptr ? a->id : 0, nudge, nudge);
          }
          break;
       case Pending::Delete: DeleteSelected(doc); break;
@@ -18585,7 +18822,7 @@ namespace
             return;
          PushUndoCheckpoint("Paste layer");
          Layer* a = Active(doc);
-         sSel = doc->PasteLayers(sClip, a != nullptr ? a->id : 0, 0.0f, 0.0f);
+         sSel = doc->PasteLayers(ClipFor(doc), a != nullptr ? a->id : 0, 0.0f, 0.0f);
       }
       if (sSel == before || sSel.empty())
          return;
@@ -20722,6 +20959,140 @@ static bool Is3DNode(INode* n)
 }
 
 // INFINITE_VIEW2DTEST: the panel's own actions on a real document (the Effects menu, the 3D gizmo). Returns failures.
+// PhotoCraft ledger parity checks that need the panel's own state (View2DParityTests.cpp runs them); "" = all.
+int View2DPanelParityTests(Scene2DNode* doc, const char* only)
+{
+   int fails = 0;
+   const auto want = [&](const char* tag) { return only[0] == '\0' || std::strncmp(tag, only, std::strlen(only)) == 0; };
+   auto expect = [&](const char* what, bool pass) {
+      printf("  [%s] panel: %s\n", pass ? "pass" : "FAIL", what);
+      fails += pass ? 0 : 1;
+   };
+   const size_t keep = sUserPresets.size();
+   if (want("parity.preset"))
+   {
+      // brush_preset_cmds tests rename_checks_names.
+      BrushEngine::Brush b;
+      const int a = SaveUserPreset(b, false), c = SaveUserPreset(b, false);
+      const bool renamed = RenameUserPreset(a, "  Alpha One ") && sUserPresets[(size_t)a].name == "Alpha One";
+      const bool clash = !RenameUserPreset(c, "alpha one");
+      const bool caseOnly = RenameUserPreset(a, "ALPHA ONE") && sUserPresets[(size_t)a].name == "ALPHA ONE";
+      const bool builtinName = !RenameUserPreset(c, BrushEngine::Presets()[0].name) && !RenameUserPreset(c, "   ");
+      const size_t n = sUserPresets.size();
+      const int copy = RenamePreset(-1, BrushEngine::Presets()[0].brush, false, "My Round");
+      expect("parity: Rename Preset refuses another preset's name (any case), takes a case-only rename of itself",
+             renamed && clash && caseOnly && builtinName);
+      expect("parity: renaming a built-in preset makes a saved one under the new name",
+             copy >= 0 && sUserPresets.size() == n + 1 && sUserPresets[(size_t)copy].name == "My Round");
+      expect("parity: a refused rename of a built-in preset leaves no copy behind",
+             RenamePreset(-1, BrushEngine::Presets()[0].brush, false, "my round") < 0 && sUserPresets.size() == n + 1);
+      // brush_preset_size: a preset saved at size 40 with a dual tip of 10 comes back as (40, 10) on a 200 px brush.
+      BrushEngine::Brush d;
+      d.size = 40.0f;
+      d.dualTip = 1;
+      d.dualScale = 0.25f;
+      sSaveCapSize = true;
+      const int dp = SaveUserPreset(d, false);
+      BrushEngine::Brush big = d;
+      big.size = 200.0f;
+      PickUserPreset(dp, big);
+      expect("parity: a brush preset's size and dual tip size are not scaled twice",
+             std::fabs(big.size - 40.0f) < 1e-4f && std::fabs(big.size * big.dualScale - 10.0f) < 1e-4f);
+   }
+   if (want("parity.pencil") && doc != nullptr)
+   {
+      // pencil_auto_erase_exact_tests.rs: the start pixel must be the foreground exactly (alpha aside); a level off is not.
+      const int S = 8;
+      std::vector<uint8_t> px((size_t)S * S * 4);
+      for (size_t i = 0; i < px.size(); i += 4)
+         px[i] = 220, px[i + 1] = 30, px[i + 2] = 30, px[i + 3] = 128;
+      const int id = doc->AddFileLayer(0, "auto erase", 0, 0, S, S, px);
+      doc->Commit();
+      float k[3] = { 0, 0, 0 };
+      const bool got = doc->Pick(S * 0.5f, S * 0.5f, k, 1, id);
+      const float red[3] = { 220 / 255.0f, 30 / 255.0f, 30 / 255.0f }, off[3] = { 221 / 255.0f, 30 / 255.0f, 30 / 255.0f };
+      expect("parity: Pencil Auto Erase matches the exact foreground on a half-transparent pixel",
+             got && PencilOnForeground(k, red));
+      expect("parity: Pencil Auto Erase paints the foreground when it is one level off", got && !PencilOnForeground(k, off));
+      doc->RemoveLayer(id);
+      doc->Commit();
+   }
+   if (want("parity.replace") && doc != nullptr)
+   {
+      // replace_color_range.rs selected_work_bounds_...: a selection with a hole still edits everywhere but the hole,
+      // a selection hanging off the canvas edits only its part on the layer, none edits the whole layer.
+      using SN = Scene2DNode;
+      // Replace Color works on a layer that fills the document, unmoved.
+      const int W = std::max(doc->Doc().w, 40), H = std::max(doc->Doc().h, 40);
+      std::vector<uint8_t> px((size_t)W * H * 4);
+      for (size_t i = 0; i < px.size(); i += 4)
+         px[i] = 217, px[i + 1] = 26, px[i + 2] = 26, px[i + 3] = 255;
+      const int id = doc->AddFileLayer(0, "replace colour", 0, 0, W, H, px);
+      doc->Commit();
+      auto reset = [&]() {
+         const float red[3] = { 217 / 255.0f, 26 / 255.0f, 26 / 255.0f };
+         doc->Deselect();
+         doc->FillPixels(id, red, 1.0f);
+         doc->Commit();
+      };
+      auto changed = [&](float x, float y) {
+         float c[3] = {};
+         doc->Pick(x, y, c, 1, id);
+         return c[0] < 0.5f;   // red turned towards cyan
+      };
+      auto run = [&]() {
+         SelectMaths::Sample k;
+         k.rgb[0] = 217 / 255.0f, k.rgb[1] = k.rgb[2] = 26 / 255.0f;
+         k.x = k.y = 5.0f;
+         SelectMaths::RangeParams cp;
+         cp.fuzziness = 40.0f;
+         return doc->ReplaceColor(id, { k }, cp, 180.0f, 0.0f, 0.0f);
+      };
+      reset();
+      doc->SelectRect(0, 0, (float)doc->Doc().w, (float)doc->Doc().h, SN::kSelNew, 0.0f, false);
+      doc->SelectRect(12, 12, 15, 15, SN::kSelSub, 0.0f, false);
+      const bool hole = run() && changed(5, 5) && changed(35, 35) && !changed(13.5f, 13.5f);
+      reset();
+      doc->SelectRect(-20, -20, 10, 10, SN::kSelNew, 0.0f, false);
+      const bool edge = run() && changed(5, 5) && !changed(20, 20) && !changed(35, 5);
+      reset();
+      const bool none = run() && changed(5, 5) && changed(35, 35);
+      printf("  parity replace colour: hole %d edge %d none %d\n", (int)hole, (int)edge, (int)none);
+      expect("parity: Replace Color edits the selected pixels around a hole, a selection past the edge, or the whole layer",
+             hole && edge && none);
+      doc->Deselect();
+      doc->RemoveLayer(id);
+      doc->Commit();
+   }
+   if (want("parity.fillmask") && doc != nullptr)
+   {
+      // pattern_fill_cmds.rs create_preview_and_commit_honor_default_masks_option: the option decides whether a new
+      // fill layer has a mask, made in the same undo step as the layer.
+      const bool was = Scene2DNode::sDefaultFillMasks;
+      doc->Deselect();
+      bool ok = true;
+      for (int on = 0; on < 2; on++)
+      {
+         Scene2DNode::sDefaultFillMasks = on != 0;
+         const size_t undo0 = gUndoStack.size();
+         AddFill(doc);
+         const Layer* l = Active(doc);
+         const bool masked = l != nullptr && l->kind == Kind::Fill && l->HasPixelMask();
+         const int id = l != nullptr ? l->id : 0;
+         const bool oneStep = gUndoStack.size() == undo0 + 1;   // the layer and its mask are one undo step
+         doc->RemoveLayer(id);
+         doc->Commit();
+         RollbackUndoTo(undo0);
+         printf("  parity fill mask: option %d -> mask %d, one undo step %d\n", on, (int)masked, (int)oneStep);
+         ok = ok && masked == (on != 0) && id != 0 && oneStep;
+      }
+      Scene2DNode::sDefaultFillMasks = was;
+      expect("parity: Default Masks on Fill Layers decides whether a new fill layer has a mask; undo removes it", ok);
+   }
+   sUserPresets.resize(keep);
+   return fails;
+}
+
 int View2DPanelSelfCheck(Scene2DNode* doc)
 {
    int fails = 0;
@@ -26035,7 +26406,7 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             {
                int pr[8], nr[8];
                dabs(fg, true, 0.5f, pr);
-               dabs(fg, false, 20.0f * fg / 255.0f / 1.7320508f, nr);   // the shader scales the tolerance by sqrt 3
+               dabs(fg, false, 20.0f * fg / 255.0f, nr);   // the key-to-foreground distance: only red rises, 20 levels a block
                for (int i = 0; i < 8; i++)
                {
                   const bool good = i < fg ? std::abs(pr[i] - nr[i]) <= 1 && pr[i] >= 0 : pr[i] == 255;
@@ -26495,12 +26866,15 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
                      continue;
                   }
                   bad += !isRed(off, x, y) && !isFull(off, x, y);
-                  // The reach: the soft tip's outermost pixels may round to nothing (a weight under one 8-bit level in
-                  // the outer tenth of a hardness-0 tip), so there Hard edge may replace what anti alias leaves red;
-                  // past the tip, or the other way round, nothing is let off.
+                  // The reach: the measured soft tip reaches past its radius, and its outermost pixels round to nothing
+                  // (a weight under about one 8-bit level of the change), so there Hard edge may replace what anti alias
+                  // leaves red, out to where the tip still shows (0.002); past that, or the other way round, nothing is let off.
                   const float r = std::sqrt((x + 0.5f - cx) * (x + 0.5f - cx) + (y + 0.5f - cy) * (y + 0.5f - cy));
-                  const bool rimRounds = isRed(on, x, y) && r > 36.0f && r < 41.5f;
-                  if (isRed(on, x, y) != isRed(off, x, y) && !rimRounds && std::fabs(r - 40.0f) > 1.5f)
+                  const float wIn = BrushEngine::RoundTipWeight(std::max(r - 1.5f, 0.0f), 40.0f, hardness);
+                  const float wOut = BrushEngine::RoundTipWeight(r + 1.5f, 40.0f, hardness);
+                  // Measured: anti alias still rounds a weight of about 0.016 (four 8-bit levels) to nothing on this colour change.
+                  const bool rimRounds = isRed(on, x, y) && isFull(off, x, y) && wIn < 6.0f / 255.0f && wOut <= 0.004f + 3.0f / 255.0f;
+                  if (isRed(on, x, y) != isRed(off, x, y) && !rimRounds)
                      reach++;
                   partialOn += !isRed(on, x, y) && !isFull(on, x, y);
                }
@@ -27662,7 +28036,10 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
                           { { "op", "select" }, { "shape", "grow" }, { "tolerance", 40 }, { "layer", gl }, { "allLayers", false } } }));
       expect("B3: grow reaches past the box", out.value("ok", false) && doc->SelectionAt((int)(W * 0.5f), (int)(cy + 40)) > 0.5f);
       // depth: answers now, later ("analysing"), or a typed error when there is no model.
-      apply(json::array({ { { "op", "select" }, { "shape", "depth" }, { "near", { 0.5, 1.0 } } } }));
+      // The gradient layer is sampled: this document is never drawn here, so there is no composite to read.
+      apply(json::array({ { { "op", "select" }, { "shape", "depth" }, { "near", { 0.5, 1.0 } }, { "layer", gl }, { "allLayers", false } } }));
+      if (!(out.value("ok", false) || firstCode() == "E_MISSING"))
+         fprintf(stderr, "PROBE B3 depth: %.300s\n", out.dump().c_str());
       expect("B3: depth select answers or says what is missing", out.value("ok", false) || firstCode() == "E_MISSING");
       // mask: from a selection, then inverted.
       apply(json::array({ { { "op", "select" }, { "shape", "rect" }, { "rect", { 0, 0, W * 0.5f, (float)H } } },
@@ -29832,8 +30209,16 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          lin.sizeCurveMid = 0.5f;
          const bool c2 = dabAt(lin, 0.5f, wLin, aLin);
          fprintf(stderr, "PROBE curves: curve width %d alpha %.2f linear width %d alpha %.2f\n", wCurve, aCurve, wLin, aLin);
+         // The width that shows (alpha over half a level) of a hard round dab of this diameter at opacity 0.5: the
+         // measured tip (BrushEngine RoundTip) has a soft shoulder of about a pixel past its radius.
+         auto shows = [&](float dia) {
+            int n = 0;
+            for (int x = 0; x < (int)doc->Doc().w; x++)
+               n += BrushEngine::RoundTipWeight(std::fabs((float)x + 0.5f - dx), dia * 0.5f, 1.0f) * 0.5f * 255.0f >= 0.5f ? 1 : 0;
+            return n;
+         };
          expect("parity: each dynamic responds through its own curve",
-                c1 && c2 && std::abs(wCurve - 8) <= 2 && std::abs(wLin - 20) <= 2 && std::fabs(aCurve - 0.5f) < 0.06f &&
+                c1 && c2 && std::abs(wCurve - shows(8.0f)) <= 2 && std::abs(wLin - shows(20.0f)) <= 2 && std::fabs(aCurve - 0.5f) < 0.06f &&
                     std::fabs(aLin - 0.5f) < 0.06f);
          // Round trip through the preset fields, then set the curve back to linear.
          std::map<std::string, std::vector<float>> kept;
@@ -30021,8 +30406,13 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             std::vector<uint8_t> d;
             float g[3] = {};
             const bool ok4 = greyDab(i4, cx, cy, big, 0.5f) && impStroke(i4, 1234u, 7, d) && doc->Pick(55.0f, 10.0f, g, 1, i4);
-            fprintf(stderr, "PROBE pattern impressionist behind: %.2f %.2f %.2f\n", g[0], g[1], g[2]);
-            expect("parity: impressionist paints as in normal when behind is picked", ok4 && std::fabs(g[0] - 0.5f) > 0.3f);
+            // The same seeded stroke in Normal over the same grey: Behind must give the same pixels, and must paint.
+            const int i5 = doc->AddPaintLayer();
+            std::vector<uint8_t> e;
+            const bool ok5 = greyDab(i5, cx, cy, big, 0.5f) && impStroke(i5, 1234u, 0, e);
+            expect("parity: impressionist paints as in normal when behind is picked",
+                   ok4 && ok5 && d == e && std::fabs(g[0] - 0.5f) > 0.05f);
+            doc->RemoveLayer(i5);
             doc->RemoveLayer(i4);
             doc->RemoveLayer(i3);
             doc->RemoveLayer(i2);
@@ -30511,13 +30901,19 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             ParseUserPresets(text);
             BrushEngine::Brush a = p.brush, b = sUserPresets.empty() ? BrushEngine::Brush() : sUserPresets[0].brush;
             std::vector<float> va, vb;
-            BrushFields(a, [&](const char*, float* v, int c) { va.insert(va.end(), v, v + c); });
+            std::vector<std::string> names;
+            BrushFields(a, [&](const char* n, float* v, int c) { va.insert(va.end(), v, v + c); names.insert(names.end(), (size_t)c, n); });
             BrushFields(b, [&](const char*, float* v, int c) { vb.insert(vb.end(), v, v + c); });
             bool same = sUserPresets.size() == 1 && sUserPresets[0].name == p.name && va.size() == vb.size();
+            std::string field;
             for (size_t k = 0; same && k < va.size(); k++)
+            {
                same = std::fabs(va[k] - vb[k]) <= 1e-4f * std::max(1.0f, std::fabs(va[k]));
+               if (!same)
+                  field = names[k] + " " + std::to_string(va[k]) + " -> " + std::to_string(vb[k]);
+            }
             if (!same && bad.empty())
-               bad = p.name;
+               bad = std::string(p.name) + (field.empty() ? "" : " (" + field + ")");
             trip = trip && same;
             if (p.brush.mode == BrushEngine::kNormal && doc != nullptr)
             {

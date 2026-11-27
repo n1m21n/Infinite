@@ -3016,6 +3016,8 @@ namespace params
       constexpr float marquee_fixed_1_hi = 8192.0f;
       constexpr float marquee_fixed_1_lo = 1.0f;
       constexpr float fill_angle_lo = -180.0f;
+      constexpr float fill_scale_lo = 0.1f, fill_scale_hi = 1.5f;      // Gradient Fill Scale, 10..150 % (Photoshop)
+      constexpr float fill_offset_lo = -1.0f, fill_offset_hi = 1.0f;   // Gradient Fill Offset, a share of the box
       constexpr float fill_angle_hi = 180.0f;
       constexpr float width_hi = 200.0f;
       constexpr float width_lo = 0.0f;

@@ -1,4 +1,5 @@
 #include "Scene2DNode.h"
+#include "app/graph/NodeParams.h"
 #include <map>
 #include <set>
 
@@ -682,6 +683,8 @@ namespace
             "uniform vec4 uColA;\n"
             "uniform vec4 uColB;\n"
             "uniform float uFillAngle;\n"
+            "uniform float uFillScale;\n"
+            "uniform vec2 uFillOff;\n"
             "uniform float uFillNoise;\n"
             "uniform float uGamma;\n"
             + std::string(Scene2DNode::kStopGlsl) +
@@ -724,23 +727,28 @@ namespace
            "}\n"
            "vec4 fillAt(vec2 uvb) {\n"
            "   if (uKind == 1) return uColA;\n"
-           "   if (uKind == 2) {\n"
-           "      float a = radians(uFillAngle);\n"
-           "      vec2 d = vec2(cos(a), sin(a));\n"
-           "      float t = clamp(dot(uvb - 0.5, d) / (abs(d.x) + abs(d.y)) * 2.0 * 0.5 + 0.5, 0.0, 1.0);\n"
-           "      return gradAt(t, uColA, uColB);\n"
+           "   float sc = max(uFillScale, 1e-3);\n"
+           "   vec2 off = vec2(uFillOff.x, -uFillOff.y);\n"   // the offset is y down, the box uv y up
+           "   if (uKind == 2 || uKind == 5) {\n"
+           "      // Linear / Reflected (PhotoCraft effects gradient_t): along the angle over the box's chord through the\n"
+           "      // centre, min(w / |cos|, h / |sin|), sampled at the pixel's top-left corner; end points snapped on the CPU.\n"
+           "      float a = radians(uFillAngle), c = cos(a), s = sin(a);\n"
+           "      vec2 pd = vec2(uvb.x - 0.5 - uFillOff.x, 0.5 - uvb.y - uFillOff.y) * uBox;\n"
+           "      float along = pd.x * c - pd.y * s - 0.5 * (c - s);\n"
+           "      float chord = max(min(uBox.x / max(abs(c), 1e-6), uBox.y / max(abs(s), 1e-6)), 1.0) * sc;\n"
+           "      float t = uKind == 2 ? along / chord + 0.5 : abs(along / (chord * 0.5));\n"
+           "      return gradAt(clamp(t, 0.0, 1.0), uColA, uColB);\n"
            "   }\n"
-           "   if (uKind == 3) return gradAt(length(uvb - 0.5) * 2.0, uColA, uColB);\n"
+           "   if (uKind == 3) return gradAt(length(uvb - 0.5 - off) / sc * 2.0, uColA, uColB);\n"
            "   if (uKind == 7) {\n"   // conical: once round the centre, from the angle, clockwise on screen
-           "      vec2 p = (uvb - 0.5) * uBox;\n"
+           "      vec2 p = (uvb - 0.5 - off) * uBox;\n"
            "      float t = (atan(p.y, p.x) - radians(uFillAngle)) / 6.2831853;\n"
            "      return gradAt(t - floor(t), uColA, uColB);\n"
            "   }\n"
            "   if (uKind == 8) return texture(uTex, uvb);\n"   // bitmap, stretched over the document (rows top first)
-           "   float a = radians(uFillAngle);\n"   // reflected: from the centre line out; diamond: to a turned square
-           "   vec2 d = vec2(cos(a), sin(a)), e = vec2(-d.y, d.x), p = uvb - 0.5;\n"
-           "   float t = uKind == 5 ? abs(dot(p, d)) / (abs(d.x) + abs(d.y)) * 2.0 : (abs(dot(p, d)) + abs(dot(p, e))) * 2.0;\n"
-           "   return gradAt(t, uColA, uColB);\n"
+           "   float a = radians(uFillAngle);\n"   // diamond: to a turned square
+           "   vec2 d = vec2(cos(a), sin(a)), e = vec2(-d.y, d.x), p = (uvb - 0.5 - off) / sc;\n"
+           "   return gradAt((abs(dot(p, d)) + abs(dot(p, e))) * 2.0, uColA, uColB);\n"
            "}\n"
            "vec4 layerAt(vec2 uvb, vec2 uv) {\n"
            "   if (uvb.x < uCrop.x || uvb.x > uCrop.z || uvb.y < uCrop.y || uvb.y > uCrop.w) return vec4(0.0);\n"
@@ -2137,6 +2145,191 @@ std::vector<int> Scene2DNode::PasteLayers(const std::vector<Layer>& clip, int ab
    return tops;
 }
 
+void Scene2DNode::AdoptLayers(std::vector<Layer>& clip, const TextStyles& from)
+{
+   Layers();
+   // Link groups: every source group gets one fresh group here (a lone copy too: it is still linked in its own file).
+   std::map<uint64_t, uint64_t> links;
+   uint64_t used = 0;
+   for (const Layer& l : mLayers)
+      used = std::max(used, l.link);
+   for (Layer& c : clip)
+      if (c.link != 0)
+      {
+         if (links.count(c.link) == 0)
+            links[c.link] = ++used;
+         c.link = links[c.link];
+      }
+   // Type styles by name: the destination's same-named style, or a copy of the source's under a fresh id.
+   TextStyles& ds = mDoc.textStyles;
+   const TextStyles& ss = from;
+   std::map<uint32_t, uint32_t> chr, para;
+   auto mapChar = [&](uint32_t id) -> uint32_t {
+      if (id == 0)
+         return 0;
+      if (auto it = chr.find(id); it != chr.end())
+         return it->second;
+      const CharStyleDef* s = ss.Char(id);
+      uint32_t to = 0;
+      if (s != nullptr)
+      {
+         auto same = std::find_if(ds.character.begin(), ds.character.end(), [&](const CharStyleDef& d) { return d.name == s->name; });
+         if (same != ds.character.end())
+            to = same->id;
+         else if (ds.NextCharId(to))
+         {
+            CharStyleDef n = *s;
+            n.id = to;
+            ds.character.push_back(n);
+         }
+      }
+      return chr[id] = to;
+   };
+   auto mapPara = [&](uint32_t id) -> uint32_t {
+      if (id == 0)
+         return 0;
+      if (auto it = para.find(id); it != para.end())
+         return it->second;
+      const ParaStyleDef* s = ss.Para(id);
+      uint32_t to = 0;
+      if (s != nullptr)
+      {
+         auto same = std::find_if(ds.paragraph.begin(), ds.paragraph.end(), [&](const ParaStyleDef& d) { return d.name == s->name; });
+         if (same != ds.paragraph.end())
+            to = same->id;
+         else if (ds.NextParaId(to))
+         {
+            ParaStyleDef n = *s;
+            n.id = to;
+            ds.paragraph.push_back(n);
+         }
+      }
+      return para[id] = to;
+   };
+   for (Layer& c : clip)
+      if (c.kind == Kind::Text)
+      {
+         SyncTextRuns(c);
+         c.paraStyle = mapPara(c.paraStyle);
+         for (TextRun& r : c.runs)
+            r.st.charStyle = mapChar(r.st.charStyle);
+         c.runSummary.charStyle = mapChar(c.runSummary.charStyle);
+      }
+}
+
+std::vector<int> Scene2DNode::CopyLayersFrom(Scene2DNode& src, const std::vector<int>& ids, int above, std::string* err)
+{
+   Layers();
+   std::vector<Layer> clip = src.CopyLayers(ids);
+   if (clip.empty())
+      return {};
+   // Depth: the paste point's own depth plus the copied groups' nesting must stay within the cap (refused, not moved).
+   int parentOfPaste = 0;
+   if (const Layer* a = FindConst(above))
+      parentOfPaste = (a->kind == Kind::Group && a->open) ? a->id : a->parent;
+   for (const Layer& c : clip)
+   {
+      if (c.kind != Kind::Group)
+         continue;
+      int d = 1;
+      for (int p = c.parent, hops = 0; p != 0 && hops < 64; hops++)
+      {
+         auto up = std::find_if(clip.begin(), clip.end(), [&](const Layer& o) { return o.id == p; });
+         if (up == clip.end())
+            break;
+         d++;
+         p = up->parent;
+      }
+      if ((parentOfPaste != 0 ? Depth(parentOfPaste) + 1 : 0) + d > kMaxGroupDepth)
+      {
+         if (err != nullptr)
+            *err = "the copied groups would nest the layers deeper than " + std::to_string(kMaxGroupDepth) + " groups";
+         return {};
+      }
+   }
+   AdoptLayers(clip, src.mDoc.textStyles);
+   // A pasted group's place: PasteLayers would move it beside an enclosing group, but the check above already holds.
+   return PasteLayers(clip, above, 0.0f, 0.0f);
+}
+
+std::vector<int> Scene2DNode::TakeLayersAsNewDocument(Scene2DNode& src, const std::vector<int>& ids, const std::string& name,
+                                                      const std::string& docName)
+{
+   Layers();
+   const Document& s = src.mDoc;
+   CanvasSize(s.w, s.h, 0);
+   mDoc.dpi = s.dpi;
+   mDoc.linear = s.linear;
+   mDoc.headroom = s.headroom;
+   mDoc.background = 3;   // the copies alone: nothing under them
+   mDoc.textStyles.basic = s.textStyles.basic;
+   mDoc.name = docName;
+   std::vector<int> drop;
+   for (const Layer& l : mLayers)
+      if (l.parent == 0)
+         drop.push_back(l.id);
+   for (int id : drop)
+      RemoveLayer(id);
+   std::vector<int> tops = CopyLayersFrom(src, ids, 0);
+   if (tops.size() == 1 && !name.empty())
+      if (Layer* l = FindLayer(tops[0]))
+         l->name = name;
+   Commit();
+   return tops;
+}
+
+int Scene2DNode::RefineIntoNewDocument(Scene2DNode& src, int layerId, bool withMask)
+{
+   const std::vector<int> tops = TakeLayersAsNewDocument(src, { layerId }, "", "");
+   if (tops.size() != 1 || src.mSel.size() != (size_t)mDoc.w * mDoc.h)
+      return 0;
+   const int id = tops[0];
+   mSel = src.mSel;
+   mSelAny = src.mSelAny;
+   mSelDirty = true;
+   const bool ok = MaskFromSelection(id);
+   if (ok && !withMask)
+      ApplyPixelMask(id);   // a paint layer takes the edge into its alpha; another kind keeps it as its mask
+   mSel.assign(mSel.size(), 0);
+   mSelAny = false;
+   mSelDirty = true;
+   Commit();
+   return ok ? id : 0;
+}
+
+void Scene2DNode::GradientLayout(bool linear, bool reflected, float& angle, float& scale, float& ox, float& oy, int w, int h)
+{
+   // Ported from PhotoCraft crates/compose/src/fill_layout.rs gradient_layout (MIT/Apache-2.0).
+   if (!(linear || reflected) || !std::isfinite(angle) || !std::isfinite(scale) || !std::isfinite(ox) || !std::isfinite(oy))
+      return;
+   const double W = std::max(w, 1), H = std::max(h, 1);
+   const double cx = W / 2.0 + (double)ox * W, cy = H / 2.0 + (double)oy * H;
+   auto chordOf = [&](double a) {
+      return std::max(std::min(W / std::max(std::fabs(std::cos(a)), 1e-6), H / std::max(std::fabs(std::sin(a)), 1e-6)), 1.0);
+   };
+   const double a = (double)angle * M_PI / 180.0, half = chordOf(a) * std::max((double)scale, 1e-3) / 2.0;
+   const double dx = std::cos(a) * half, dy = -std::sin(a) * half;
+   auto snap = [](double v) { return std::floor(v + 1e-4); };   // truncate, with slack for exact cases
+   const double ex = snap(cx + dx), ey = snap(cy + dy);
+   double sx = cx, sy = cy, mx = cx, my = cy;
+   if (!reflected)
+   {
+      sx = snap(cx - dx);
+      sy = snap(cy - dy);
+      mx = (sx + ex) / 2.0;
+      my = (sy + ey) / 2.0;
+   }
+   const double vx = ex - sx, vy = ey - sy, len = std::hypot(vx, vy);
+   if (len < 0.5)
+      return;
+   const double a2 = std::atan2(-vy, vx);
+   const double span = reflected ? 2.0 * len : len;
+   angle = (float)(a2 * 180.0 / M_PI);
+   scale = (float)(span / chordOf(a2));
+   ox += (float)((mx - cx) / W);
+   oy += (float)((my - cy) / H);
+}
+
 INode* Scene2DNode::Source(const Layer& l) const
 {
    if (l.kind != Kind::Node || l.uid == 0 || !ResolveUid)
@@ -2996,6 +3189,8 @@ void Scene2DNode::Serialize()
      << +d.linear << " " << +d.headroom << "\n";
    if (d.dpi != 72.0f)
       o << "dpi " << d.dpi << "\n";
+   if (!d.name.empty())
+      o << "docname " << EscapeToken(d.name) << "\n";
    if (d.guidesLocked)
       o << "guideslock 1\n";
    if (!d.guidesX.empty())
@@ -3107,6 +3302,8 @@ void Scene2DNode::Serialize()
             WriteStops(o, l.stops);
             o << "\n";
          }
+         if (l.kind == Kind::Fill && (l.fillScale != 1.0f || l.fillOff[0] != 0.0f || l.fillOff[1] != 0.0f))
+            o << "fillg " << l.id << " " << l.fillScale << " " << l.fillOff[0] << " " << l.fillOff[1] << "\n";
          if (l.kind == Kind::Fill && (l.fillNoise > 0.0f || !l.fillImage.empty()))
             o << "fillx " << l.id << " " << l.fillNoise << " " << EscapeToken(l.fillImage) << "\n";
       }
@@ -3388,6 +3585,12 @@ void Scene2DNode::Parse()
          s >> v;
          mDoc.guidesLocked = v != 0;
       }
+      else if (key == "docname")
+      {
+         std::string v;
+         if (s >> v)
+            mDoc.name = UnescapeToken(v);
+      }
       else if (key == "dpi")
       {
          float v = 72.0f;
@@ -3530,6 +3733,16 @@ void Scene2DNode::Parse()
          {
             s >> l->typeAA;
             l->typeAA = std::clamp(l->typeAA, 0, (int)kTypeAACount - 1);
+         }
+         else if (key == "fillg")
+         {
+            float sc = 1.0f, ox = 0.0f, oy = 0.0f;
+            if (s >> sc >> ox >> oy && std::isfinite(sc) && std::isfinite(ox) && std::isfinite(oy))
+            {
+               l->fillScale = std::clamp(sc, params::view2d::fill_scale_lo, params::view2d::fill_scale_hi);
+               l->fillOff[0] = std::clamp(ox, params::view2d::fill_offset_lo, params::view2d::fill_offset_hi);
+               l->fillOff[1] = std::clamp(oy, params::view2d::fill_offset_lo, params::view2d::fill_offset_hi);
+            }
          }
          else if (key == "fillx")
          {
@@ -4109,7 +4322,12 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
       {
          glUniform4fv(GLUtil::UniformLoc(prog, "uColA"), 1, a.fill->colorA);
          glUniform4fv(GLUtil::UniformLoc(prog, "uColB"), 1, a.fill->colorB);
-         glUniform1f(GLUtil::UniformLoc(prog, "uFillAngle"), a.fill->fillAngle);
+         // Linear (kind 2) and Reflected (5) snap their end points to whole pixels of the box (Photoshop).
+         float ang = a.fill->fillAngle, sc = a.fill->fillScale, ox = a.fill->fillOff[0], oy = a.fill->fillOff[1];
+         GradientLayout(a.kind == 2, a.kind == 5, ang, sc, ox, oy, (int)std::lround(a.box[0]), (int)std::lround(a.box[1]));
+         glUniform1f(GLUtil::UniformLoc(prog, "uFillAngle"), ang);
+         glUniform1f(GLUtil::UniformLoc(prog, "uFillScale"), sc);
+         glUniform2f(GLUtil::UniformLoc(prog, "uFillOff"), ox, oy);
       }
       StopUniforms(prog, a.fill != nullptr ? a.fill->stops : std::vector<GradStop>());
    };

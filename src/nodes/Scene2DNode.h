@@ -344,6 +344,10 @@ public:
       float colorA[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
       float colorB[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float fillAngle = 90.0f;      // linear: degrees, 90 = top to bottom
+      // Gradient Fill Scale (1 = the box's chord along the angle) and Offset (the centre moved by this share of the box,
+      // x right, y down), as Photoshop's Gradient Fill dialog.
+      float fillScale = 1.0f;
+      float fillOff[2] = { 0.0f, 0.0f };
       std::vector<GradStop> stops;  // gradients with more than two colours (empty: colorA to colorB)
       // Adjustment layers. adjDrive 1..4 moves the amount from adjAmt to adjTo with Drive A..D.
       // adjMap: after the effect, dark to colorA, light to colorB.
@@ -519,6 +523,7 @@ public:
       bool brushLive = false;                // sources follow the node mid-stroke; off = frozen when the stroke starts
       std::vector<ModSlot> slots;            // bound layer numbers (motion-first layers)
       TextStyles textStyles;                 // named character and paragraph styles
+      std::string name;                      // the document's own name (empty: "Document N" in the picker)
    };
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.
@@ -594,6 +599,13 @@ public:
    // Photoshop's Layers panel option Add "copy" to Copied Layers and Groups: off, a duplicate keeps its name.
    // An app preference (every document), not saved in a file.
    static inline bool sCopySuffix = true;
+   // Layers panel option Use Default Masks on Fill Layers (Photoshop, on by default): a new fill layer starts with a
+   // white (all shown) layer mask. An app preference, like sCopySuffix.
+   static inline bool sDefaultFillMasks = true;
+   // Gradient fill layout (PhotoCraft compose fill_layout.rs gradient_layout): a Linear or Reflected gradient's end
+   // points truncate to whole pixels of the w x h box, as Photoshop's do, and the angle, scale and offset that draw
+   // between the snapped points come back. Other styles (reflected = false and linear = false) and bad input pass.
+   static void GradientLayout(bool linear, bool reflected, float& angle, float& scale, float& ox, float& oy, int w, int h);
    // Link Layers (PhotoCraft layer.linkLayers): want 1 puts `ids` in one fresh group, 0 unlinks them, -1 toggles
    // (unlinks when they already share one group, or when there is only one). A group left with one member is dropped.
    // Returns whether `ids` end up linked; *changed says whether anything moved (a repeat is no edit at all).
@@ -609,6 +621,25 @@ public:
    // with fresh ids above `above` (0: the top), nudged by (dx, dy). Returns the new top-level ids.
    std::vector<Layer> CopyLayers(const std::vector<int>& ids);
    std::vector<int> PasteLayers(const std::vector<Layer>& clip, int above, float dx, float dy);
+   // Copy to another document (PhotoCraft layer.copyToDocument): `ids`, with everything inside copied groups, from
+   // `src` into this document above `above` (0: the top), in one edit and at the same canvas place; `src` is untouched.
+   // Each source link group becomes a fresh group here, so copies never join a group this document already has. A
+   // run's character style and a paragraph style map to this document's style of the same name, or are added (fresh
+   // id) when it has none; type keeps its pixel size. Refused (empty, *err says "deeper than", nothing copied) when a
+   // copied group would nest past kMaxGroupDepth. Returns the new top-level ids, bottom first.
+   std::vector<int> CopyLayersFrom(Scene2DNode& src, const std::vector<int>& ids, int above, std::string* err = nullptr);
+   // CopyLayersFrom's mapping for a clip taken from another document (whose styles were `from`): fresh link groups,
+   // styles by name. Paste between documents runs it before PasteLayers.
+   void AdoptLayers(std::vector<Layer>& clip, const TextStyles& from);
+   // Duplicate Layers > Document: New (PhotoCraft layer.duplicate document "new"): this (new) document takes the
+   // source's size, resolution, colour settings and Basic Paragraph, and copies of `ids` in their order. name renames
+   // the copy when one top-level layer is copied; docName names the document. Returns the new top-level ids.
+   std::vector<int> TakeLayersAsNewDocument(Scene2DNode& src, const std::vector<int>& ids, const std::string& name,
+                                            const std::string& docName);
+   // Select and Mask > Output To New Document (withMask false: the refined edge baked into a paint layer's alpha) or New
+   // Document with Layer Mask: a copy of the source layer, refined by the source's selection, into this new document
+   // at the source's size and resolution. No selection here; the source keeps its layers and selection.
+   int RefineIntoNewDocument(Scene2DNode& src, int layerId, bool withMask);
 
    // The layer's own box before the transform (node: after Fit), in pixels.
    bool LayerBox(const Layer& l, float& w, float& h);

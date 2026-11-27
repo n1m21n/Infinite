@@ -57,6 +57,19 @@ namespace BrushEngine
          "   return mix(mix(h1(i), h1(i + vec2(1.0, 0.0)), f.x), mix(h1(i + vec2(0.0, 1.0)), h1(i + vec2(1.0, 1.0)), f.x), f.y); }\n"
          "float rnd(float k) { return fract(sin(uSeed * 12.9898 + k * 78.233) * 43758.5453); }\n"
          "vec2 turn(vec2 p, float t) { float c = cos(t), s = sin(t); return vec2(c * p.x + s * p.y, -s * p.x + c * p.y); }\n"
+         // Photoshop's round tip as PhotoCraft measured it (crates/paint tip_shape, MIT/Apache-2.0): a solid core of
+         // r0 R, then a Gaussian shoulder of s R, both by hardness; a soft tip reaches past its radius (h 0: 8 % at 1.05 R).
+         "const float kTipR0[11] = float[11](0.0, 0.14, 0.28, 0.40, 0.52, 0.63, 0.70, 0.78, 0.84, 0.89, 1.0);\n"
+         "const float kTipS[11] = float[11](0.664, 0.58, 0.50, 0.44, 0.36, 0.29, 0.24, 0.19, 0.15, 0.11, 0.0);\n"
+         "float RoundTip(float d, float rad, float hard) {\n"
+         "   float h = clamp(hard, 0.0, 1.0) * 10.0; int i = min(int(floor(h)), 9); float t = h - float(i);\n"
+         "   float r0 = mix(kTipR0[i], kTipR0[i + 1], t), s = mix(kTipS[i], kTipS[i + 1], t);\n"
+         "   float edge = max(min(1.2, 0.3 * rad), 0.25);\n"
+         "   float core = max(min(r0 * rad, rad - edge), 0.0), sh = max(max(s * rad, edge), 1e-3);\n"
+         "   if (d <= core) return 1.0;\n"
+         "   float x = (d - core) / sh; float g = clamp(1.0 - x * x / 64.0, 0.0, 1.0);\n"   // exp(-x^2) as (1 - u/64)^64
+         "   g *= g; g *= g; g *= g; g *= g; g *= g; g *= g; return g;\n"
+         "}\n"
          "// One tip's mask at p (the tip's own frame, px from its centre), fc the surface pixel.\n"
          "float Tip(int tip, vec2 p, vec2 fc, float rad, float hard) {\n"
          "   float r = length(p) / rad;\n"
@@ -64,14 +77,14 @@ namespace BrushEngine
          // Hard edge on a soft round or square tip: fully on wherever the soft tip would show at all, so it keeps the
          // soft tip's reach (PhotoCraft replace_anti_alias_tests); a hard tip is the plain aliased disc or square.
          "   if (uPencil == 1) {\n"
-         "      if ((tip == 0 || tip == 1 || tip == 3) && hard < 1.0 - aa) {\n"
-         "         float m = tip == 3 ? max(abs(p.x), abs(p.y)) / rad : r;\n"
+         "      if ((tip == 0 || tip == 1) && hard < 1.0 - aa) return step(0.002, RoundTip(length(p), rad, hard));\n"
+         "      if (tip == 3 && hard < 1.0 - aa) {\n"
          // "Would show": at least half an 8-bit level (1/510), the smallest change a soft dab leaves in the picture.
-         "         return step(0.002, 1.0 - smoothstep(hard, 1.0, m));\n"
+         "         return step(0.002, 1.0 - smoothstep(hard, 1.0, max(abs(p.x), abs(p.y)) / rad));\n"
          "      }\n"
          "      return (tip == 3) ? step(max(abs(p.x), abs(p.y)), rad) : step(length(p), rad);\n"
          "   }\n"
-         "   if (tip == 0 || tip == 1) return 1.0 - smoothstep(min(hard, 1.0 - aa), 1.0, r);\n"
+         "   if (tip == 0 || tip == 1) return RoundTip(length(p), rad, hard);\n"
          "   if (tip == 2) return 1.0 - smoothstep(min(0.94, 1.0 - aa), 1.0, r);\n"
          "   if (tip == 3) { float m = max(abs(p.x), abs(p.y)) / rad; return 1.0 - smoothstep(min(hard, 1.0 - aa), 1.0, m); }\n"
          "   if (tip == 4) return (1.0 - smoothstep(0.0, 1.0, r)) * step(0.55, hash(floor(fc)));\n"
@@ -322,6 +335,8 @@ namespace BrushEngine
          "uniform vec3 uKey;\n"
          "uniform float uKeyTol;\n"
          "uniform int uProtectFg;\n"
+         "uniform float uBgTol;\n"   // Background Eraser Tolerance, 0..1 of the channel range
+         "float bgDist(vec3 c, vec3 k) { vec3 v = c - k; return max(max(v.r, max(v.g, v.b)), 0.0) + max(max(-v.r, max(-v.g, -v.b)), 0.0); }\n"
          "uniform int uDither;\n"   // 8-bit soft paint: noise under one level, so a low-flow falloff does not band
          "uniform int uFinal;\n"
          "uniform sampler2D uSrcTex;\n"
@@ -431,10 +446,18 @@ namespace BrushEngine
          "         fragColor = uLock == 1 ? vec4(mix(d.rgb, s.rgb, a), d.a) : mix(d, s, a); return; }\n"
          "      if (uMode == 24) { vec4 s = srcAt(vUv); if (uSrcBlend > 0) s.rgb = mix(s.rgb, cloneBlend(d.rgb, s.rgb), d.a);\n"
          "         fragColor = uLock == 1 ? vec4(mix(d.rgb, s.rgb, a), d.a) : mix(d, s, a); return; }\n"   // undo brush: the earlier state
-         "      if (uMode == 26) { float tol = uKeyTol;\n"   // background erase; Protect Foreground narrows the tolerance
-         "         if (uProtectFg == 1) { float lim = distance(uKey, uColor); if (lim <= 1e-4) { fragColor = d; return; } tol = min(tol, lim); }\n"
-         "         float k = 1.0 - smoothstep(tol * 0.6, tol, distance(d.rgb, uKey));\n"
-         "         fragColor = vec4(d.rgb, d.a * (1.0 - a * k)); return; }\n"
+         // Background erase as PhotoCraft measured Photoshop's (crates/paint bg_erase, MIT/Apache-2.0): the distance is the
+         // largest rise plus the largest fall over the channels; a match is erased fully up to a short plateau, then
+         // less, linearly, out to the Tolerance; what stays is decontaminated of the sampled colour. Protect Foreground
+         // narrows the Tolerance to the foreground's distance.
+         "      if (uMode == 26) { if (d.a <= 0.0) { fragColor = d; return; } float tol = uBgTol;\n"
+         "         if (uProtectFg == 1) { float lim = bgDist(uColor, uKey); if (lim <= 0.0) { fragColor = d; return; } tol = min(tol, lim); }\n"
+         "         float e = bgDist(d.rgb, uKey), w = e <= 0.0 ? 1.0 : 0.0;\n"
+         "         if (e > 0.0 && e < tol) { float d0 = min(tol / 20.0, 8.0 / 255.0); w = e <= d0 ? 1.0 : clamp(1.0 - (e - d0) / (tol - d0), 0.0, 1.0); }\n"
+         "         float keep = 1.0 - min(a * w, 1.0);\n"
+         "         if (keep <= 0.0) { fragColor = vec4(0.0); return; }\n"
+         "         if (keep >= 1.0) { fragColor = d; return; }\n"
+         "         fragColor = vec4(clamp((d.rgb - uKey * (1.0 - keep)) / keep, vec3(0.0), max(d.rgb, vec3(1.0))), d.a * keep); return; }\n"
          "      if (uMode == 28) { fragColor = uFinal == 1 ? d : vec4(mix(d.rgb, vec3(1.0, 0.25, 0.3), a * 0.55), max(d.a, a * 0.55)); return; }\n"
          "      if ((uMode == 6 || uMode == 7) && uHasSrc == 1) {\n"   // Sample All Layers: the picture's blur / sharpen lands here
          "         vec4 b = srcAt(vUv); vec3 bl = softSrc(vUv), o = bl;\n"
@@ -1405,9 +1428,12 @@ namespace BrushEngine
          mDabCount++;
          return;
       }
-      int sc[4] = { (int)std::floor(cx - r - 2), (int)std::floor(cy - r - 2), 0, 0 };
-      sc[2] = (int)std::ceil(cx + r + 2) - sc[0];
-      sc[3] = (int)std::ceil(cy + r + 2) - sc[1];
+      // A soft round tip paints past its radius (RoundTip): clip to where it still shows.
+      const bool round = (b.tip == kRound || b.tip == kSoftRound) && b.tipTex == 0 && !(b.pencil && b.hardness >= 0.999f);
+      const float rc = round ? std::max(r, RoundTipReach(r, std::clamp(b.hardness * q.hard, 0.0f, 0.98f))) : r;
+      int sc[4] = { (int)std::floor(cx - rc - 2), (int)std::floor(cy - rc - 2), 0, 0 };
+      sc[2] = (int)std::ceil(cx + rc + 2) - sc[0];
+      sc[3] = (int)std::ceil(cy + rc + 2) - sc[1];
       int x0 = std::max(0, sc[0]), y0 = std::max(0, sc[1]);
       int x1 = std::min(mW, sc[0] + sc[2]), y1 = std::min(mH, sc[1] + sc[3]);
       // Wrapped: a dab that leaves the surface comes back on the far side, so it may touch any row or column it spans
@@ -1683,6 +1709,7 @@ namespace BrushEngine
          glUniform3f(GLUtil::UniformLoc(sMerge, "uKey"), mBrush.key[0], mBrush.key[1], mBrush.key[2]);
          glUniform1f(GLUtil::UniformLoc(sMerge, "uKeyTol"), std::max(0.005f, mBrush.keyTolerance * 1.7320508f));
          glUniform1i(GLUtil::UniformLoc(sMerge, "uProtectFg"), mBrush.protectFg && mBrush.mode == kBgErase ? 1 : 0);
+         glUniform1f(GLUtil::UniformLoc(sMerge, "uBgTol"), std::clamp(mBrush.keyTolerance, 0.0f, 1.0f));
          glUniform1i(GLUtil::UniformLoc(sMerge, "uFinal"), mFinal ? 1 : 0);
          glUniform1i(GLUtil::UniformLoc(sMerge, "uDither"), !mBrush.pencil && mBrush.mode == 0 ? 1 : 0);
          glUniform1i(GLUtil::UniformLoc(sMerge, "uSharpMode"), mBrush.sharpMode);
@@ -1830,6 +1857,37 @@ namespace BrushEngine
          static std::vector<SampledTip>* tips = new std::vector<SampledTip>();
          return *tips;
       }
+   }
+
+   // The same table as the shader's RoundTip (PhotoCraft tip_shape, MIT/Apache-2.0): a solid core, then a Gaussian shoulder.
+   static void RoundTipShape(float radius, float hardness, float& core, float& sh)
+   {
+      static const float kR0[11] = { 0.0f, 0.14f, 0.28f, 0.40f, 0.52f, 0.63f, 0.70f, 0.78f, 0.84f, 0.89f, 1.0f };
+      static const float kS[11] = { 0.664f, 0.58f, 0.50f, 0.44f, 0.36f, 0.29f, 0.24f, 0.19f, 0.15f, 0.11f, 0.0f };
+      const float h = std::clamp(hardness, 0.0f, 1.0f) * 10.0f;
+      const int i = std::min((int)std::floor(h), 9);
+      const float t = h - (float)i;
+      const float r0 = kR0[i] + (kR0[i + 1] - kR0[i]) * t, s = kS[i] + (kS[i + 1] - kS[i]) * t;
+      const float edge = std::max(std::min(1.2f, 0.3f * radius), 0.25f);
+      core = std::max(std::min(r0 * radius, radius - edge), 0.0f);
+      sh = std::max(std::max(s * radius, edge), 1e-3f);
+   }
+
+   float RoundTipReach(float radius, float hardness)
+   {
+      float core = 0.0f, sh = 1.0f;
+      RoundTipShape(radius, hardness, core, sh);
+      return core + 2.6f * sh;   // exp(-2.6^2) ~ 0.0012, under the 0.002 a dab can show
+   }
+
+   float RoundTipWeight(float d, float radius, float hardness)
+   {
+      float core = 0.0f, sh = 1.0f;
+      RoundTipShape(radius, hardness, core, sh);
+      if (d <= core)
+         return 1.0f;
+      const float x = (d - core) / sh;
+      return std::exp(-x * x);
    }
 
    int AddSampledTip(const std::vector<uint8_t>& rgba, int w, int h)
