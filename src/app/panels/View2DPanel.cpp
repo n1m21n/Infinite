@@ -8393,7 +8393,7 @@ namespace
    }
    // The Type menu's submenus and their parents (Photoshop Type > OpenType > Numerals / Stylistic Sets): the menu is
    // drawn from these names, and the self-test reads the paths back.
-   const char* const kTypeSubs[][2] = { { "Type", "" }, { "OpenType", "Type" }, { "Numerals", "OpenType" }, { "Stylistic Sets", "OpenType" } };
+   const char* const kTypeSubs[][2] = { { "Type", "" }, { "OpenType", "Type" }, { "Numerals", "OpenType" }, { "Stylistic Sets", "OpenType" }, { "Anti-Alias", "Type" } };
    std::string TypeMenuPath(const char* leaf)
    {
       std::string path;
@@ -8438,6 +8438,23 @@ namespace
          sSel = { a->id };
          sTab = 1;
          sSideOpen = true;
+      }
+      // Anti-Alias: how the selected type layers' letter edges are shaded (one setting per layer).
+      if (MenuParts::SubMenu(T(kTypeSubs[4][0]), !ids.empty()))
+      {
+         static const char* const kTypeAA[] = { "None", "Sharp", "Crisp", "Strong", "Smooth" };
+         static const int kTypeAAMode[] = { SN::kTypeAANone, SN::kTypeAASharp, SN::kTypeAACrisp, SN::kTypeAAStrong, SN::kTypeAASmooth };
+         const int now = text ? a->typeAA : -1;
+         for (int i = 0; i < SN::kTypeAACount; i++)
+            if (MenuParts::Choice(T(kTypeAA[i]), now == kTypeAAMode[i]))
+            {
+               PushUndoCheckpoint(T("Anti-Alias"));
+               for (int id : ids)
+                  if (Layer* l = doc->FindLayer(id))
+                     l->typeAA = kTypeAAMode[i];
+               Touch();
+            }
+         ImGui::EndMenu();
       }
       if (MenuParts::SubMenu(T(kTypeSubs[1][0]), !ids.empty()))
       {

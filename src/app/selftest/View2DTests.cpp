@@ -4058,6 +4058,56 @@ void RunView2DTest()
          std::string err;
          Check("UX: Ornaments is a known OpenType feature", d.SetTypeFeature({ t1 }, "ornm", 1, std::string::npos, std::string::npos, nullptr, &err));
       }
+      // Type > Anti-Alias: None is in or out, Sharp has fewer part-covered edge pixels than Smooth, Strong more ink;
+      // the setting saves, and a file without it opens as Smooth.
+      {
+         using SN = Scene2DNode;
+         std::vector<uint8_t> ramp(256 * 4, 0);
+         for (int i = 0; i < 256; i++) ramp[i * 4 + 3] = (uint8_t)i;
+         auto shaped = [&](int mode, float op) {
+            std::vector<uint8_t> r = ramp;
+            for (size_t i = 3; i < r.size(); i += 4) r[i] = (uint8_t)std::lround(r[i] * op);
+            SN::ShapeTypeEdges(mode, op, r);
+            int part = 0; long ink = 0;
+            for (size_t i = 3; i < r.size(); i += 4) { part += (r[i] > 0 && r[i] < 255 * op - 0.5f) ? 1 : 0; ink += r[i]; }
+            return std::make_pair(part, ink);
+         };
+         const auto sm = shaped(SN::kTypeAASmooth, 1.0f), no = shaped(SN::kTypeAANone, 1.0f), sh = shaped(SN::kTypeAASharp, 1.0f),
+                    cr = shaped(SN::kTypeAACrisp, 1.0f), st = shaped(SN::kTypeAAStrong, 1.0f), half = shaped(SN::kTypeAANone, 0.5f);
+         printf("  UX anti-alias part/ink: smooth %d/%ld none %d/%ld sharp %d/%ld crisp %d/%ld strong %d/%ld none@50%% %d\n", sm.first,
+                sm.second, no.first, no.second, sh.first, sh.second, cr.first, cr.second, st.first, st.second, half.first);
+         Check("UX: Anti-Alias None leaves no part-covered pixels, at full or half opacity", no.first == 0 && half.first == 0);
+         Check("UX: Anti-Alias Sharp and Crisp steepen the edge (Sharp most)", sh.first < cr.first && cr.first < sm.first);
+         Check("UX: Anti-Alias Strong puts down more ink than Smooth", st.second > sm.second);
+
+         Scene2DNode d;
+         make(d, 0, 0, 0, 0);
+         const int tx = d.AddTextLayer("Ag", 4.0f, 4.0f, 0.0f);
+         d.FindLayer(tx)->fontSize = 30.0f;
+         d.Commit();
+         auto parts = [&](const std::vector<uint8_t>& px) {
+            int n = 0, on = 0;
+            for (size_t i = 3; i < px.size(); i += 4) { n += (px[i] > 0 && px[i] < 255) ? 1 : 0; on += px[i] > 0 ? 1 : 0; }
+            return std::make_pair(n, on);
+         };
+         const auto smooth = parts(alone(d, tx));
+         d.FindLayer(tx)->typeAA = SN::kTypeAANone;
+         d.Commit();
+         const auto none = parts(alone(d, tx));
+         printf("  UX anti-alias text: smooth %d part of %d, none %d part of %d\n", smooth.first, smooth.second, none.first, none.second);
+         Check("UX: Anti-Alias None draws the type with hard edges", smooth.first > 0 && none.first == 0 && none.second > 0);
+         Scene2DNode copy;
+         copy.SetDocText(d.DocText());
+         const Layer* c = copy.FindLayer(tx);
+         std::string old = d.DocText(), tag = "taa " + std::to_string(tx) + " 1\n";
+         const size_t at = old.find(tag);
+         if (at != std::string::npos) old.erase(at, tag.size());
+         Scene2DNode before;
+         before.SetDocText(old);
+         const Layer* b = before.FindLayer(tx);
+         Check("UX: Anti-Alias saves, and a file without it opens as Smooth",
+               c != nullptr && c->typeAA == SN::kTypeAANone && at != std::string::npos && b != nullptr && b->typeAA == SN::kTypeAASmooth);
+      }
       {
          Scene2DNode d;
          std::vector<uint8_t> px((size_t)20 * 20 * 4, 255);

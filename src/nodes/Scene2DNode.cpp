@@ -3072,6 +3072,8 @@ void Scene2DNode::Serialize()
         << " " << l.ay << " " << +l.flipX << " " << +l.flipY << " " << l.fit << " " << +l.nearest << "\n";
       if (l.shear != 0.0f || l.blendGamma != 2.2f || l.aaMode != 0 || l.noExport)
          o << "lx " << l.id << " " << l.shear << " " << l.blendGamma << " " << l.aaMode << " " << +l.noExport << "\n";
+      if (l.typeAA != 0)
+         o << "taa " << l.id << " " << l.typeAA << "\n";
       if (!l.name.empty())
          o << "name " << l.id << " " << l.name << "\n";
       if (l.cropOn || l.crop[0] != 0 || l.crop[1] != 0 || l.crop[2] != 0 || l.crop[3] != 0)
@@ -3523,6 +3525,11 @@ void Scene2DNode::Parse()
             l->blendGamma = std::isfinite(l->blendGamma) ? std::clamp(l->blendGamma, 0.1f, 10.0f) : 2.2f;
             l->aaMode = std::clamp(l->aaMode, 0, 2);
             l->noExport = ne != 0;
+         }
+         else if (key == "taa")
+         {
+            s >> l->typeAA;
+            l->typeAA = std::clamp(l->typeAA, 0, (int)kTypeAACount - 1);
          }
          else if (key == "fillx")
          {

@@ -427,6 +427,8 @@ public:
       bool ulOwn = false, stOwn = false, noBreak = false, optical = false, outline = false;
       float ulC[4] = { 0.0f, 0.0f, 0.0f, 1.0f }, stC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float offsetX = 0.0f, outlineW = 2.0f;
+      // Type anti-alias (Photoshop's Type > Anti-Alias): how the glyph edges are shaded. See TypeAALabel.
+      int typeAA = 0;
       float outlineC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       std::string lang;
       // Styled runs (see RunStyle): cover the text exactly, in order. runText / runSummary are what the runs were last
@@ -1755,6 +1757,12 @@ private:
    struct TextBox { unsigned long long key = 0; int w = 0, h = 0, gw = 0, gh = 0; std::vector<uint8_t> rgba; };
    void GlyphTypeRaster(const Layer& l, TextBox& tb);
    void WarpTypeRaster(const Layer& l, TextBox& tb);
+public:
+   enum TypeAA { kTypeAASmooth = 0, kTypeAANone, kTypeAASharp, kTypeAACrisp, kTypeAAStrong, kTypeAACount };
+   static const char* TypeAALabel(int mode);
+   // Shapes a type raster's edge coverage by the anti-alias mode (straight RGBA; opacity is the text's own alpha).
+   static void ShapeTypeEdges(int mode, float opacity, std::vector<uint8_t>& rgba);
+private:
    int ShapesLayerFromText(int id, int preW, int preH, std::vector<Shape> shapes);
    std::map<int, TextBox> mTextBoxes;
    BrushEngine::Stroke mStroke;

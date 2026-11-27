@@ -6500,6 +6500,7 @@ bool Scene2DNode::CopyLayerStyle(int from, int to, int parts)
          b->optical = a->optical;
          b->outline = a->outline;
          b->outlineW = a->outlineW;
+         b->typeAA = a->typeAA;
          std::copy(a->outlineC, a->outlineC + 4, b->outlineC);
          b->offsetX = a->offsetX;
          b->lang = a->lang;
