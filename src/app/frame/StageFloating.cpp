@@ -12,6 +12,8 @@
 #include "core/MediaCollect.h"
 #include "core/SelfUpdate.h"
 #include "core/Notices.h"
+#include "core/ml/ModelRegistry.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -252,6 +254,24 @@ int DrawFloating(FrameCtx& fc)
             }
             ImGui::SetCursorPos(ImVec2(x0, y + lineH));
             Ui::Spacer(Ui::Space::S1);
+         }
+         {
+            const auto mlModels = Ml::ModelRegistry::Installed();
+            if (!mlModels.empty())
+            {
+               DialogParts::Message(T("Installed ML models"));
+               for (const auto& im : mlModels)
+               {
+                  char row[256];
+                  snprintf(row, sizeof(row), "%s (%s, %s)",
+                           im.spec.name.c_str(), im.spec.licenceId.c_str(),
+                           UiFmt::Bytes(static_cast<double>(im.diskBytes)).c);
+                  ImGui::TextUnformatted(row);
+                  if (!im.spec.noticeText.empty())
+                     HelpTip("%s", im.spec.noticeText.c_str());
+               }
+               Ui::Spacer(Ui::Space::S1);
+            }
          }
          const int pick = DialogParts::Buttons({ L("Check for updates"), L("Website"), L("Close") });
          if (pick == 0)

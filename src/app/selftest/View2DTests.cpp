@@ -8,8 +8,18 @@
 #include "nodes/FilterNode.h"
 #include "nodes/SceneNodes.h"
 #include "core/BlendModes.h"
+#include "core/Extensions.h"
 #include "core/TileStore.h"
 #include "core/ml/AiSelect.h"
+#include "core/ml/ModelRegistry.h"
+#include "core/ml/ModNet.h"
+#include "core/ml/TextOcr.h"
+#include "core/ml/ObjectDetect.h"
+#include "core/ml/Upscale.h"
+#include "core/ml/LineArt.h"
+#include "core/ml/Colorize.h"
+#include "core/ml/CleanInpaint.h"
+#include "core/ml/PoseDetect.h"
 #include "stb_image.h"
 #include "gl3.h"
 #include "stb_image_write.h"
@@ -17,8 +27,11 @@
 extern bool gScene2DBounds;   // Scene2DNode.cpp: bounded layer passes
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <cstdio>
 #include <cstring>
@@ -3944,6 +3957,230 @@ void RunView2DTest()
       pic.CombineSelection(a, Scene2DNode::kSelNew);
       pic.CombineSelection(b, Scene2DNode::kSelIntersect);
       Check("AI1: intersect keeps the overlap", pic.SelectionAt(5, 5) < 0.01f && pic.SelectionAt(30, 5) > 0.99f && pic.SelectionAt(60, 5) < 0.01f);
+      // Phase 2 ModelRegistry checks: builtins, SHA-256 verification, latest-only worker.
+      {
+         Check("ML-REG: builtins registered", Ml::ModelRegistry::Find("modnet") != nullptr &&
+               Ml::ModelRegistry::Find("ppocr_det") != nullptr && Ml::ModelRegistry::Find("dfine_s") != nullptr);
+         Check("ML-REG: unknown model reports missing", !Ml::ModelRegistry::Available("nonexistent_model_xyz"));
+         std::string shaErr;
+         const std::string tmpPath = (std::filesystem::temp_directory_path() / "infinite_ml_reg_sha_test.bin").string();
+         {
+            std::ofstream tf(tmpPath, std::ios::binary);
+            tf << "infinite-ml-test";
+         }
+         const std::string goodSha = Extensions::Sha256Hex("infinite-ml-test", 16);
+         Check("ML-REG: sha256 accepts matching file", Ml::ModelRegistry::VerifyFileSha256(tmpPath, goodSha, shaErr));
+         Check("ML-REG: sha256 rejects mismatched file", !Ml::ModelRegistry::VerifyFileSha256(tmpPath, "0000000000000000000000000000000000000000000000000000000000000000", shaErr));
+         std::error_code ec;
+         std::filesystem::remove(tmpPath, ec);
+         Ml::LatestWorker w;
+         std::atomic<uint64_t> lastRan{ 0 };
+         const uint64_t s1 = w.Submit([&](uint64_t ser) { lastRan.store(ser); });
+         const auto wt0 = std::chrono::steady_clock::now();
+         while (w.CompletedSerial() < s1 && std::chrono::steady_clock::now() - wt0 < std::chrono::seconds(5))
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+         Check("ML-REG: LatestWorker completes monotonic serial", w.CompletedSerial() == s1 && lastRan.load() == s1);
+
+         // Phase 3 real-picture checks for MODNet, PP-OCRv4, D-FINE-S + offline fallback + 1-model residency.
+         auto loadRgbaFile = [](const std::string& p, std::vector<uint8_t>& out, int& w, int& h) -> bool {
+            std::ifstream in(p, std::ios::binary);
+            if (!in) return false;
+            std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            int ch = 0;
+            unsigned char* raw = bytes.empty() ? nullptr : stbi_load_from_memory(bytes.data(), (int)bytes.size(), &w, &h, &ch, 4);
+            if (!raw || w <= 0 || h <= 0) { if (raw) stbi_image_free(raw); return false; }
+            out.assign(raw, raw + (size_t)w * h * 4);
+            stbi_image_free(raw);
+            return true;
+         };
+         const char* evalEnv = std::getenv("INFINITE_AIEVAL_DIR");
+         const std::string evalRoot = (evalEnv && evalEnv[0])
+            ? std::string(evalEnv)
+            : (std::string(std::getenv("HOME") ? std::getenv("HOME") : "") + "/Infinite/datasets/ai-eval");
+         // 3a. MODNet
+         if (!Ml::ModNet::Available())
+            printf("  [skip] ML-MODNET: %s\n", Ml::ModNet::Missing().c_str());
+         else
+         {
+            const std::string s2Img = evalRoot + "/S2/000000001503.jpg";
+            int iw = 0, ih = 0;
+            std::vector<uint8_t> rgba;
+            if (!loadRgbaFile(s2Img, rgba, iw, ih))
+            {
+               iw = 256; ih = 256;
+               rgba.assign((size_t)iw * ih * 4, 220);
+               for (int y = 40; y < 230; y++)
+                  for (int x = 80; x < 176; x++)
+                  {
+                     uint8_t* q = &rgba[((size_t)y * iw + x) * 4];
+                     q[0] = 60; q[1] = 40; q[2] = 35; q[3] = 255;
+                  }
+            }
+            std::vector<uint8_t> matte;
+            std::string err;
+            const bool okM = Ml::ModNet::RunNow(rgba, iw, ih, matte, err);
+            size_t fg = 0;
+            for (uint8_t v : matte) fg += (v > 127);
+            const float cov = matte.empty() ? 0.0f : (float)fg / (float)matte.size();
+            printf("  ML-MODNET: ok=%d cov=%.3f active=%s err=%s\n", okM, cov, Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
+            Check("ML-MODNET: produces non-trivial portrait matte", okM && cov > 0.02f && cov < 0.98f);
+         }
+
+         // 3b. PP-OCRv4 + offline fallback
+         {
+            const std::string ocrImg = evalRoot + "/S6_ocr/ocr_00.png";
+            int iw = 0, ih = 0;
+            std::vector<uint8_t> rgba;
+            if (loadRgbaFile(ocrImg, rgba, iw, ih))
+            {
+               std::vector<uint8_t> fbMask;
+               Ml::TextOcr::FallbackTextMask(rgba, iw, ih, fbMask);
+               size_t fbHit = 0;
+               for (uint8_t v : fbMask) fbHit += (v > 127);
+               Check("ML-OCR: offline FallbackTextMask selects text edges", fbHit > 100);
+               if (!Ml::TextOcr::Available())
+                  printf("  [skip] ML-OCR: %s\n", Ml::TextOcr::Missing().c_str());
+               else
+               {
+                  std::vector<Ml::TextOcr::TextLine> lines;
+                  std::vector<uint8_t> mask;
+                  std::string err;
+                  const bool okO = Ml::TextOcr::RunNow(rgba, iw, ih, lines, mask, err);
+                  bool matched = false;
+                  for (const auto& ln : lines)
+                     if (ln.text.find("LIVE") != std::string::npos || ln.text.find("STUDIO") != std::string::npos ||
+                         ln.text.find("INFINITE") != std::string::npos)
+                        matched = true;
+                  printf("  ML-OCR: ok=%d lines=%zu matched=%d active=%s\n", okO, lines.size(), matched, Ml::ModelRegistry::ActiveFamily().c_str());
+                  Check("ML-OCR: detects and recognizes poster text", okO && !lines.empty() && matched);
+               }
+            }
+         }
+
+         // 3c. D-FINE-S COCO + single-resident eviction check
+         if (!Ml::ObjectDetect::Available())
+            printf("  [skip] ML-DFINE: %s\n", Ml::ObjectDetect::Missing().c_str());
+         else
+         {
+            int iw = 0, ih = 0;
+            std::vector<uint8_t> rgba;
+            bool loaded = loadRgbaFile(evalRoot + "/S1/000000001503.jpg", rgba, iw, ih);
+            if (!loaded)
+            {
+               std::error_code ec;
+               for (const auto& de : std::filesystem::directory_iterator(evalRoot + "/S1", ec))
+                  if (de.path().extension() == ".jpg" && loadRgbaFile(de.path().string(), rgba, iw, ih)) { loaded = true; break; }
+            }
+            if (loaded)
+            {
+               std::vector<Ml::ObjectDetect::Box> boxes;
+               std::string err;
+               const bool okD = Ml::ObjectDetect::DetectNow(rgba, iw, ih, boxes, err);
+               printf("  ML-DFINE: ok=%d boxes=%zu top=%s(%.2f) active=%s\n",
+                      okD, boxes.size(), boxes.empty() ? "-" : boxes[0].label.c_str(),
+                      boxes.empty() ? 0.0f : boxes[0].score, Ml::ModelRegistry::ActiveFamily().c_str());
+               Check("ML-DFINE: detects objects on real COCO image", okD && !boxes.empty() && Ml::ModelRegistry::ActiveFamily() == "dfine");
+            }
+         }
+         // 3d. Clean-room SPAN 2x upscaler + offline fallback
+         {
+            std::vector<uint8_t> small(64 * 64 * 4, 255);
+            for (int y = 0; y < 64; y++)
+               for (int x = 0; x < 64; x++)
+               {
+                  uint8_t* p = &small[(y * 64 + x) * 4];
+                  p[0] = (uint8_t)(x * 4); p[1] = (uint8_t)(y * 4); p[2] = (uint8_t)((x + y) * 2); p[3] = 255;
+               }
+            std::vector<uint8_t> fb; int fw = 0, fh = 0;
+            Ml::Upscale::Fallback2x(small, 64, 64, fb, fw, fh);
+            Check("ML-SPAN: offline Fallback2x doubles dimensions", fw == 128 && fh == 128 && fb.size() == 128 * 128 * 4);
+            if (!Ml::Upscale::Available())
+               printf("  [skip] ML-SPAN: %s\n", Ml::Upscale::Missing().c_str());
+            else
+            {
+               std::vector<uint8_t> up; int uw = 0, uh = 0; std::string err;
+               const bool okU = Ml::Upscale::Run2xNow(small, 64, 64, up, uw, uh, err);
+               printf("  ML-SPAN: ok=%d out=%dx%d active=%s err=%s\n", okU, uw, uh, Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
+               Check("ML-SPAN: upscales 2x cleanly via ModelRegistry", okU && uw == 128 && uh == 128 && Ml::ModelRegistry::ActiveFamily() == "span");
+            }
+         }
+         // 3e. Clean-room Photo-to-Lineart & Auto-Colorize + offline fallbacks
+         {
+            int iw = 0, ih = 0; std::vector<uint8_t> rgba;
+            if (!loadRgbaFile(evalRoot + "/S1/000000001503.jpg", rgba, iw, ih))
+            {
+               std::error_code ec;
+               for (const auto& de : std::filesystem::directory_iterator(evalRoot + "/S1", ec))
+                  if (de.path().extension() == ".jpg" && loadRgbaFile(de.path().string(), rgba, iw, ih)) break;
+            }
+            if (!rgba.empty())
+            {
+               std::vector<uint8_t> fbLa, fbCol;
+               Ml::LineArt::Fallback(rgba, iw, ih, fbLa);
+               Ml::Colorize::Fallback(rgba, iw, ih, fbCol);
+               Check("ML-LINEART: offline Sobel fallback matches size", fbLa.size() == rgba.size());
+               Check("ML-COLORIZE: offline sepia fallback matches size", fbCol.size() == rgba.size());
+               if (!Ml::LineArt::Available())
+                  printf("  [skip] ML-LINEART: %s\n", Ml::LineArt::Missing().c_str());
+               else
+               {
+                  std::vector<uint8_t> ink; std::string err;
+                  const bool okL = Ml::LineArt::RunNow(rgba, iw, ih, ink, err);
+                  size_t dark = 0;
+                  for (size_t i = 0; i < ink.size(); i += 4) dark += (ink[i] < 180);
+                  const float frac = ink.empty() ? 0.0f : (float)dark / (float)(ink.size() / 4);
+                  printf("  ML-LINEART: ok=%d dark=%.3f active=%s err=%s\n", okL, frac, Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
+                  Check("ML-LINEART: produces non-trivial ink sketch", okL && frac > 0.01f && frac < 0.80f);
+               }
+               if (!Ml::Colorize::Available())
+                  printf("  [skip] ML-COLORIZE: %s\n", Ml::Colorize::Missing().c_str());
+               else
+               {
+                  std::vector<uint8_t> col; std::string err;
+                  const bool okC = Ml::Colorize::RunNow(rgba, iw, ih, col, err);
+                  size_t chroma = 0;
+                  for (size_t i = 0; i < col.size(); i += 4)
+                     chroma += (std::abs((int)col[i] - (int)col[i + 1]) + std::abs((int)col[i + 1] - (int)col[i + 2])) > 8;
+                  const float cfrac = col.empty() ? 0.0f : (float)chroma / (float)(col.size() / 4);
+                  printf("  ML-COLORIZE: ok=%d chroma=%.3f active=%s err=%s\n", okC, cfrac, Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
+                  Check("ML-COLORIZE: produces colour channels on photo", okC && cfrac > 0.05f);
+               }
+               // 3f. Clean-room MI-GAN 512 Inpaint (zero Places2)
+               if (!Ml::CleanInpaint::Available())
+                  printf("  [skip] ML-INPAINT-CLEAN: %s\n", Ml::CleanInpaint::Missing().c_str());
+               else
+               {
+                  std::vector<uint8_t> mask((size_t)iw * ih, 0);
+                  for (int y = ih / 3; y < ih * 2 / 3; y++)
+                     for (int x = iw / 3; x < iw * 2 / 3; x++)
+                        mask[(size_t)y * iw + x] = 255;
+                  std::vector<uint8_t> filled; std::string err;
+                  const bool okI = Ml::CleanInpaint::RunNow(rgba, mask, iw, ih, filled, err);
+                  printf("  ML-INPAINT-CLEAN: ok=%d active=%s err=%s\n", okI, Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
+                  Check("ML-INPAINT-CLEAN: fills masked hole cleanly", okI && filled.size() == rgba.size());
+               }
+            }
+            // 3g. Pure-COCO 17-Keypoint Pose
+            if (!Ml::PoseDetect::Available())
+               printf("  [skip] ML-POSE: %s\n", Ml::PoseDetect::Missing().c_str());
+            else
+            {
+               int pw = 0, ph = 0; std::vector<uint8_t> prgba;
+               std::error_code ec;
+               for (const auto& de : std::filesystem::directory_iterator(evalRoot + "/S2", ec))
+                  if (de.path().extension() == ".jpg" && loadRgbaFile(de.path().string(), prgba, pw, ph)) break;
+               if (!prgba.empty())
+               {
+                  std::vector<Ml::PoseDetect::Keypoint> kpts; std::string err;
+                  const bool okP = Ml::PoseDetect::DetectNow(prgba, pw, ph, 0, 0, pw, ph, kpts, err);
+                  printf("  ML-POSE: ok=%d kpts=%zu active=%s err=%s\n", okP, kpts.size(), Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
+                  Check("ML-POSE: returns 17 COCO keypoints cleanly", okP && kpts.size() == 17 && Ml::ModelRegistry::ActiveFamily() == "pose");
+               }
+            }
+         }
+         Ml::ModelRegistry::Unload();
+         Check("ML-REG: Unload clears active family", Ml::ModelRegistry::ActiveFamily().empty());
+      }
       if (!AiSelect::Available())
          printf("  [skip] AI1 model checks: %s\n", AiSelect::Missing().c_str());
       else

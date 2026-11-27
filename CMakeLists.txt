@@ -739,6 +739,15 @@ set(COMMON_SOURCES
     src/core/MediaCollect.cpp
     src/core/tracking/OrtRuntime.cpp
     src/core/ml/AiSelect.cpp
+    src/core/ml/ModelRegistry.cpp
+    src/core/ml/ModNet.cpp
+    src/core/ml/TextOcr.cpp
+    src/core/ml/ObjectDetect.cpp
+    src/core/ml/Upscale.cpp
+    src/core/ml/LineArt.cpp
+    src/core/ml/Colorize.cpp
+    src/core/ml/CleanInpaint.cpp
+    src/core/ml/PoseDetect.cpp
     src/core/SelectMaths.cpp
     src/core/tracking/HandTracker.cpp
     src/core/tracking/FaceTracker.cpp

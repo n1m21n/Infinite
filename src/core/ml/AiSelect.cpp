@@ -1,4 +1,5 @@
 #include "AiSelect.h"
+#include "ModelRegistry.h"
 
 #include "core/Extensions.h"
 #include "core/tracking/OrtRuntime.h"
@@ -55,7 +56,10 @@ namespace AiSelect
 
       State& S()
       {
-         static State* s = new State();   // never destroyed: the worker may outlive static teardown
+         static State* s = [] {
+            Ml::ModelRegistry::SetExternalEvict(AiSelect::Unload);
+            return new State();   // never destroyed: the worker may outlive static teardown
+         }();
          return *s;
       }
 
@@ -94,6 +98,7 @@ namespace AiSelect
             s.rt.CloseModel(s.depth);
             s.depth = nullptr;
          }
+         Ml::ModelRegistry::EvictLocal();
          if (!s.enc && !(s.enc = s.rt.OpenModel(dir + "/models/sam_enc.onnx", false, gpu, err)))
             return false;
          if (!s.dec && !(s.dec = s.rt.OpenModel(dir + "/models/sam_dec.onnx", false, gpu, err)))
@@ -141,6 +146,7 @@ namespace AiSelect
             return false;
          s.rt.CloseModel(s.enc);   // one model family resident; cached embeddings stay (the decoder is small)
          s.enc = nullptr;
+         Ml::ModelRegistry::EvictLocal();
          bool gpu = false;
          s.depth = s.rt.OpenModel(dir + "/models/depth.onnx", false, gpu, err);
          return s.depth != nullptr;
@@ -486,7 +492,7 @@ namespace AiSelect
 
    void Tick(double nowSeconds)
    {
-      (void)nowSeconds;
+      Ml::ModelRegistry::Tick(nowSeconds);
       State& s = S();
       std::unique_lock<std::mutex> lk(s.m, std::try_to_lock);
       if (!lk.owns_lock() || s.running || s.queued || s.depthQueued || (!s.enc && !s.dec && !s.depth && !s.inpaint && s.cache.empty()))
@@ -633,6 +639,7 @@ namespace AiSelect
       s.lastUse = Now();
       if (!s.inpaint)
       {
+         Ml::ModelRegistry::EvictLocal();
          if (!s.rt.Load(InpaintRuntime(), err))
             return false;
          bool gpu = false;
