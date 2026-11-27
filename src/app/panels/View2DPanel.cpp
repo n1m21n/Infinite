@@ -15212,8 +15212,33 @@ namespace
       { "Remove Background", "Mask", "Remove Background", "Compositing", false, true },
       { "Chroma Key", "Mask", "chroma key", "Compositing", false, false },
       { "Luma Key", "Mask", "luma key", "Compositing", false, false },
+      // PhotoCraft Filter menu (owner yes 2026-11-27)
+      { "Crystallize", "Pixelate", "crystallize", "Effects", false, false },
+      { "Facet", "Pixelate", "facet", "Effects", false, false },
+      { "Fragment", "Pixelate", "fragment", "Effects", false, false },
+      { "Mezzotint", "Pixelate", "mezzotint", "Effects", false, false },
+      { "Pointillize", "Pixelate", "pointillize", "Effects", false, false },
+      { "Diffuse", "Stylize", "diffuse", "Effects", false, false },
+      { "Extrude", "Stylize", "extrude", "Effects", false, false },
+      { "Oil Paint", "Stylize", "oil paint", "Effects", false, false },
+      { "Tiles", "Stylize", "tiles", "Effects", false, false },
+      { "Trace Contour", "Stylize", "trace contour", "Effects", false, false },
+      { "Wind", "Stylize", "wind streaks", "Effects", false, false },
+      { "Tilt-Shift", "Blur", "tilt shift", "Effects", false, false },
+      { "Iris Blur", "Blur", "iris blur", "Effects", false, false },
+      { "Spin Blur", "Blur", "spin blur", "Effects", false, false },
+      { "Field Blur", "Blur", "field blur", "Effects", false, false },
+      { "Path Blur", "Blur", "path blur", "Effects", false, false },
+      { "Smart Blur", "Blur", "smart blur", "Effects", false, false },
+      { "Shape Blur", "Blur", "shape blur", "Effects", false, false },
+      { "ZigZag", "Distort", "zigzag", "Effects", false, false },
+      { "Reduce Noise", "Noise", "reduce noise", "Effects", false, false },
+      { "HSB/HSL", "Colour", "hsb hsl", "Effects", false, false },
+      { "Fibers", "Render", "fibers", "Effects", false, false },
+      { "Lens Flare", "Render", "lens flare", "Effects", false, false },
+      { "Lighting Effects", "Render", "lighting effects", "Effects", false, false },
    };
-   const char* const kEffGroups[] = { "Adjust", "Blur", "Distort", "Stylize", "Colour", "Time", "Sim", "Code", "Mask" };
+   const char* const kEffGroups[] = { "Adjust", "Blur", "Distort", "Pixelate", "Stylize", "Noise", "Colour", "Render", "Time", "Sim", "Code", "Mask" };
 
    struct EffAdd { int layer = 0; int native = -1; int node = -1; uint64_t doc = 0; } sEffAdd;
    // 1 up, 2 down, 3 delete, 4 move to `to`, 5 duplicate (native), 6 reset (native)
@@ -20489,6 +20514,37 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("Esc during a turn puts the view back", std::fabs(sViewAngle - 30.0f * 3.14159265f / 180.0f) < 1e-5f && std::fabs(sPan.x - panTurn.x) < 1e-3f && std::fabs(sPan.y - panTurn.y) < 1e-3f);
       sOp = Op();
       sZoom = zoom0, sPan = pan0, sViewAngle = angle0, sViewMn = mn0, sViewMx = mx0;
+   }
+   // Effect Add sheet: every entry makes its node, every "Effects" entry is a filter of that name, and every
+   // group is a listed tab (catches a key that names another node, as "wind" names the Wind synth).
+   {
+      int badNode = 0, badFilter = 0, badGroup = 0;
+      for (const NodeEffectEntry& ne : kNodeEffects)
+      {
+         bool inGroup = false;
+         for (const char* g : kEffGroups)
+            inGroup = inGroup || std::strcmp(g, ne.group) == 0;
+         badGroup += inGroup ? 0 : 1;
+         std::unique_ptr<INode> made(NodeFactory::Instance().MakeNode(ne.type));
+         if (made == nullptr)
+         {
+            printf("  panel: no node for effect %s (%s)\n", ne.label, ne.type);
+            badNode++;
+            continue;
+         }
+         if (std::strcmp(ne.category, "Effects") == 0)
+         {
+            auto* fn = dynamic_cast<FilterNode*>(made.get());
+            if (fn == nullptr || fn->Def().name != ne.type)
+            {
+               printf("  panel: effect %s (%s) is not that filter\n", ne.label, ne.type);
+               badFilter++;
+            }
+         }
+      }
+      expect("every Add-sheet effect makes its node", badNode == 0);
+      expect("every Add-sheet filter is the filter it names", badFilter == 0);
+      expect("every Add-sheet effect sits in a listed group", badGroup == 0);
    }
    // Swatches round-trip through their saved text; recent colours keep ten, newest first, no repeats.
    {
