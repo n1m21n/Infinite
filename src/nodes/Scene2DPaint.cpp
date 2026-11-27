@@ -12,6 +12,9 @@
 
 #include "TileStore.h"
 #include "core/ml/AiSelect.h"
+#include "core/ml/ModNet.h"
+#include "core/ml/TextOcr.h"
+#include "core/ml/ObjectDetect.h"
 #include "platform/Platform.h"
 #include <chrono>
 
@@ -5020,5 +5023,217 @@ bool Scene2DNode::CopyLayerStyle(int from, int to, int parts)
       }
    }
    Commit();
+   return true;
+}
+
+// ---- Block 5A ML selection & OCR helpers (internal/plans/2d-view/ml-models/PLAN.md) ----
+
+bool Scene2DNode::SelectText(int op, bool sampleAll, int layerId, std::string* outHint)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> px;
+   const Layer* l = FindConst(layerId);
+   auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
+   if (!sampleAll && it != mSurfaces.end() && l->pw == W && l->ph == H)
+      ReadRect(it->second.fbo, 0, 0, W, H, px);
+   else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
+      ReadRect(mOut, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return false;
+
+   std::vector<uint8_t> topDown(px.size());
+   for (int y = 0; y < H; y++)
+      std::memcpy(&topDown[(size_t)y * W * 4], &px[(size_t)(H - 1 - y) * W * 4], (size_t)W * 4);
+
+   std::vector<uint8_t> maskTop;
+   if (Ml::TextOcr::Available())
+   {
+      std::vector<Ml::TextOcr::TextLine> lines;
+      std::string err;
+      if (!Ml::TextOcr::RunNow(topDown, W, H, lines, maskTop, err))
+      {
+         if (outHint) *outHint = err;
+         Ml::TextOcr::FallbackTextMask(topDown, W, H, maskTop);
+      }
+   }
+   else
+   {
+      if (outHint) *outHint = Ml::TextOcr::Missing();
+      Ml::TextOcr::FallbackTextMask(topDown, W, H, maskTop);
+   }
+
+   std::vector<uint8_t> region((size_t)W * H, 0);
+   for (int y = 0; y < H; y++)
+      std::memcpy(&region[(size_t)(H - 1 - y) * W], &maskTop[(size_t)y * W], (size_t)W);
+   CombineSelection(region, op);
+   return true;
+}
+
+int Scene2DNode::ExtractTextLayers(bool sampleAll, int layerId, std::string* outHint)
+{
+   if (!Ml::TextOcr::Available())
+   {
+      if (outHint) *outHint = Ml::TextOcr::Missing();
+      return 0;
+   }
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> px;
+   const Layer* l = FindConst(layerId);
+   auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
+   if (!sampleAll && it != mSurfaces.end() && l->pw == W && l->ph == H)
+      ReadRect(it->second.fbo, 0, 0, W, H, px);
+   else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
+      ReadRect(mOut, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return 0;
+
+   std::vector<uint8_t> topDown(px.size());
+   for (int y = 0; y < H; y++)
+      std::memcpy(&topDown[(size_t)y * W * 4], &px[(size_t)(H - 1 - y) * W * 4], (size_t)W * 4);
+
+   std::vector<Ml::TextOcr::TextLine> lines;
+   std::vector<uint8_t> maskTop;
+   std::string err;
+   if (!Ml::TextOcr::RunNow(topDown, W, H, lines, maskTop, err))
+   {
+      if (outHint) *outHint = err;
+      return 0;
+   }
+
+   int added = 0;
+   int above = layerId;
+   for (const auto& ln : lines)
+   {
+      if (ln.text.empty())
+         continue;
+      const float x = static_cast<float>(ln.x0);
+      const float y = static_cast<float>(ln.y0);
+      const float bw = static_cast<float>(std::max(16, ln.x1 - ln.x0));
+      const int tid = AddTextLayer(ln.text, x, y, bw, above);
+      if (tid > 0)
+      {
+         above = tid;
+         added++;
+      }
+   }
+   return added;
+}
+
+bool Scene2DNode::SelectAllObjectsAi(int op, bool sampleAll, int layerId, std::string* outHint)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   if (!Ml::ObjectDetect::Available())
+   {
+      if (outHint) *outHint = Ml::ObjectDetect::Missing();
+      SelectObject(0.0f, 0.0f, static_cast<float>(W), static_cast<float>(H), op, sampleAll, layerId);
+      return true;
+   }
+   std::vector<uint8_t> px;
+   const Layer* l = FindConst(layerId);
+   auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
+   if (!sampleAll && it != mSurfaces.end() && l->pw == W && l->ph == H)
+      ReadRect(it->second.fbo, 0, 0, W, H, px);
+   else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
+      ReadRect(mOut, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return false;
+
+   std::vector<uint8_t> topDown(px.size());
+   for (int y = 0; y < H; y++)
+      std::memcpy(&topDown[(size_t)y * W * 4], &px[(size_t)(H - 1 - y) * W * 4], (size_t)W * 4);
+
+   std::vector<Ml::ObjectDetect::Box> boxes;
+   std::string err;
+   if (!Ml::ObjectDetect::DetectNow(topDown, W, H, boxes, err))
+   {
+      if (outHint) *outHint = err;
+      SelectObject(0.0f, 0.0f, static_cast<float>(W), static_cast<float>(H), op, sampleAll, layerId);
+      return true;
+   }
+
+   std::vector<uint8_t> region((size_t)W * H, 0);
+   if (AiSelect::Available() && !boxes.empty())
+   {
+      AiSelect::Picture pic;
+      pic.w = W;
+      pic.h = H;
+      pic.rgba = topDown;
+      const uint64_t key = AiSelect::KeyOf(pic);
+      if (AiSelect::Ready(key) || AiSelect::EncodeNow(pic, key, err))
+      {
+         const int cap = std::min((int)boxes.size(), 12);
+         for (int i = 0; i < cap; i++)
+         {
+            AiSelect::Prompt pr;
+            pr.hasBox = true;
+            pr.box[0] = boxes[i].x0; pr.box[1] = boxes[i].y0;
+            pr.box[2] = boxes[i].x1; pr.box[3] = boxes[i].y1;
+            std::vector<uint8_t> mTop;
+            if (AiSelect::Decode(key, pr, mTop, err) && mTop.size() == (size_t)W * H)
+            {
+               for (int y = 0; y < H; y++)
+               {
+                  uint8_t* dst = &region[(size_t)(H - 1 - y) * W];
+                  const uint8_t* src = &mTop[(size_t)y * W];
+                  for (int x = 0; x < W; x++)
+                     dst[x] = std::max(dst[x], src[x]);
+               }
+            }
+         }
+         CombineSelection(region, op);
+         return true;
+      }
+   }
+
+   // Fallback when SAM is absent: fill detected boxes directly.
+   for (const auto& b : boxes)
+   {
+      const int x0 = std::clamp((int)std::floor(b.x0), 0, W - 1);
+      const int y0 = std::clamp((int)std::floor(b.y0), 0, H - 1);
+      const int x1 = std::clamp((int)std::ceil(b.x1), 0, W);
+      const int y1 = std::clamp((int)std::ceil(b.y1), 0, H);
+      for (int y = y0; y < y1; y++)
+      {
+         uint8_t* dst = &region[(size_t)(H - 1 - y) * W];
+         for (int x = x0; x < x1; x++)
+            dst[x] = 255;
+      }
+   }
+   CombineSelection(region, op);
+   return true;
+}
+
+bool Scene2DNode::PreviewSubjectMatte(int op, bool sampleAll, int layerId)
+{
+   if (!Ml::ModNet::Available())
+      return false;
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> px;
+   const Layer* l = FindConst(layerId);
+   auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
+   if (!sampleAll && it != mSurfaces.end() && l->pw == W && l->ph == H)
+      ReadRect(it->second.fbo, 0, 0, W, H, px);
+   else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
+      ReadRect(mOut, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return false;
+
+   std::vector<uint8_t> topDown(px.size());
+   for (int y = 0; y < H; y++)
+      std::memcpy(&topDown[(size_t)y * W * 4], &px[(size_t)(H - 1 - y) * W * 4], (size_t)W * 4);
+
+   std::vector<uint8_t> alphaTop;
+   std::string err;
+   if (!Ml::ModNet::RunNow(topDown, W, H, alphaTop, err) || alphaTop.size() != (size_t)W * H)
+      return false;
+
+   std::vector<uint8_t> region((size_t)W * H, 0);
+   for (int y = 0; y < H; y++)
+      std::memcpy(&region[(size_t)(H - 1 - y) * W], &alphaTop[(size_t)y * W], (size_t)W);
+   CombineSelection(region, op);
    return true;
 }

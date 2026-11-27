@@ -729,6 +729,11 @@ public:
    // on a worker; with the "select" pack SAM then redraws it from its box (sharper edges, COCO median IoU 0.77 -> 0.85),
    // keeping the matting's own mask when the two disagree. False when the picture can't be read.
    bool SelectSubject(int op, bool sampleAll, int layerId);
+   // Block 5A ML selection & OCR helpers (fallback cleanly when packs are absent).
+   bool SelectText(int op, bool sampleAll, int layerId, std::string* outHint = nullptr);
+   int ExtractTextLayers(bool sampleAll, int layerId, std::string* outHint = nullptr);
+   bool SelectAllObjectsAi(int op, bool sampleAll, int layerId, std::string* outHint = nullptr);
+   bool PreviewSubjectMatte(int op, bool sampleAll, int layerId);
    // Once a frame: applies a waiting prompt when its picture is ready. True when the selection changed.
    bool AiSelectPoll();
    bool AiSelectWaiting() const { return mAiWait.on || mSubjectJob.valid(); }

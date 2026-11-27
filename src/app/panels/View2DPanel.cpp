@@ -5370,6 +5370,7 @@ namespace
    void TransformSubMenu(Scene2DNode* doc);
    void CropToSelection(Scene2DNode* doc);
    void TrimDocument(Scene2DNode* doc);
+   bool TrimByCornerColour(Scene2DNode* doc, bool bottomRight);
    void SelectLayerPixels(Scene2DNode* doc, int id, int op);
 
    bool DrawScreenAnts(ImDrawList* dl, Scene2DNode* doc)
@@ -9774,6 +9775,22 @@ namespace
       const bool focOpen = sLiveDlg == 4;
       if (TextChip(L("Focus##v2dfocus"), focOpen, T("Focus Area: select the parts in focus")))
          LiveOpen(doc, focOpen ? 0 : 4);
+      FormParts::Inline(0.0f, tok::space_1);
+      if (TextChip(L("Text##v2dtext"), false, T("Select Text: select text regions (uses PP-OCR when installed, edge fallback offline)")))
+      {
+         Layer* al = Active(doc);
+         PushUndoCheckpoint("Select Text");
+         doc->SelectText(Scene2DNode::kSelNew, sAllLayers, al != nullptr ? al->id : 0);
+         Touch();
+      }
+      FormParts::Inline(0.0f, tok::space_1);
+      if (TextChip(L("All Objects##v2dallobj"), false, T("Select All Objects: detect objects with D-FINE-S and select them")))
+      {
+         Layer* al = Active(doc);
+         PushUndoCheckpoint("Select All Objects");
+         doc->SelectAllObjectsAi(Scene2DNode::kSelNew, sAllLayers, al != nullptr ? al->id : 0);
+         Touch();
+      }
       const ImVec2 at = ImGui::GetItemRectMax();
       static const char* const kTitles[5] = { "", "Select and Mask", "Color Range", "Depth Select", "Focus Area" };
       for (int which = 1; which <= 4; which++)
@@ -13114,6 +13131,12 @@ namespace
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Text Node"), nullptr)) sPending.what = Pending::ToText;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Shapes"), nullptr)) sPending.what = Pending::ToShapes;
             if (l->kind != Kind::Group && !adj && MenuParts::Item(T("Trace to Vector..."), nullptr)) sTraceAsk = true;
+            if (l->kind != Kind::Group && !adj && MenuParts::Item(T("Extract Text to Type Layer"), nullptr))
+            {
+               PushUndoCheckpoint("Extract Text");
+               if (doc->ExtractTextLayers(false, l->id) > 0)
+                  Touch();
+            }
             if (!adj && MenuParts::Item(T("Layer as Output"), nullptr, l->output)) sPending.what = Pending::LayerOutput;
             if (!adj && doc->CanTakeBelow(*l) && MenuParts::Item(T("Effect on Below"), nullptr, l->below)) sPending.what = Pending::LayerBelow;
             if (l->warpOn && MenuParts::Item(T("Reset Distort"), nullptr))
