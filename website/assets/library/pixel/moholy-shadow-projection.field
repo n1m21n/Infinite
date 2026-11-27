@@ -1,0 +1,16 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Moholy Shadow Projection",
+    "author": "Infinite",
+    "description": "Rotating perforated Bauhaus discs and steel rod gratings casting overlapping tungsten shadow projections.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "# Moholy Shadow Projection (Field Pixel)\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\na = atan2(p.y, p.x);\n\n# Rotating perforated disc shadow mask\nc1 = cos(t * 0.35); s1 = sin(t * 0.35);\np1 = vec2(p.x * c1 - p.y * s1, p.x * s1 + p.y * c1);\ngrid = p1 * 12.0;\ncell = fract(grid) - 0.5;\nhole = smoothstep(0.32, 0.24, length(cell));\ndisc = smoothstep(0.42, 0.40, r) * (1.0 - hole * 0.85);\n\n# Parallel linear rod grating shadow\nc2 = cos(-0.48 + t * 0.18); s2 = sin(-0.48 + t * 0.18);\nx2 = p.x * c2 - p.y * s2;\ngrate = smoothstep(0.35, 0.75, sin(x2 * 56.0));\n\n# Directional tungsten light cone & steel rim\ncone = smoothstep(0.65, -0.2, dot(p, normalize(vec2(0.7, -0.7)))) * (0.45 + 0.55 * (1.0 - grate * 0.6));\nring = smoothstep(0.012, 0.0, abs(r - 0.40));\n\ncSlate = vec3(0.043, 0.047, 0.063);\ncSteel = vec3(0.784, 0.800, 0.831);\ncAmber = vec3(0.910, 0.659, 0.314);\n\ncol = cSlate;\ncol = mix(col, cAmber * 0.72, clamp(cone * (1.0 - disc * 0.72), 0.0, 1.0));\ncol = mix(col, cSteel, clamp(ring + disc * grate * 0.35, 0.0, 1.0));\n",
+    "params": {
+      "speed": 0.35
+    }
+  }
+}

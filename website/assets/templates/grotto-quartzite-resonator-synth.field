@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Grotto Quartzite Resonator Synth",
+    "author": "Infinite",
+    "description": "Modal mineral-chamber resonator coupling fundamental, slightly stretched octave, and stone-plate partials with smooth thermal envelope.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float ratioA = 1.994 [0.5, 4.0];\nparam float ratioB = 2.756 [1.0, 6.0];\nparam float breath = 0.28 [0.0, 0.8];\nparam float decay = 0.9994 [0.997, 0.9998];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0; state float env = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.04, env * decay);\nfc = clamp(freq, 40.0, 2800.0);\np1 = (p1 + fc / sr) % 1.0;\np2 = (p2 + (fc * ratioA) / sr) % 1.0;\np3 = (p3 + (fc * ratioB) / sr) % 1.0;\n\nm1 = sin(6.2831853 * p1);\nm2 = sin(6.2831853 * p2) * 0.55;\nm3 = sin(6.2831853 * p3 + m1 * breath) * 0.32;\nsumSig = (m1 + m2 + m3) * env;\n\ncut = 420.0 + 3600.0 * env;\ng = clamp(2.0 * sin(3.14159265 * cut / sr), 0.04, 0.78);\nlp = lp + g * (sumSig - lp);\n\nout = (lp / (1.0 + abs(lp))) * 0.62;\n",
+    "params": {
+      "ratioA": 1.994,
+      "ratioB": 2.756,
+      "breath": 0.28,
+      "decay": 0.9994
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

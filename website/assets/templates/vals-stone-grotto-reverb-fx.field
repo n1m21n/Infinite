@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Vals Stone Grotto Reverb FX",
+    "author": "Infinite",
+    "description": "Four-stage staggered allpass stone-chamber diffuser with water-ripple drift and dual-pole quartzite damping.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float diffusion = 0.66 [0.15, 0.90];\nparam float dampHz = 2600.0 [600.0, 7200.0];\nparam float feedback = 0.62 [0.0, 0.84];\nparam float rippleHz = 0.35 [0.05, 2.5];\nparam float mix = 0.64 [0.0, 1.0];\nstate float lfo = 0; state float fb = 0;\nstate float ap1 = 0; state float ap2 = 0; state float ap3 = 0; state float ap4 = 0;\nstate float lp1 = 0; state float lp2 = 0;\n\nlfo = (lfo + rippleHz / sr) % 1.0;\nk1 = clamp(diffusion + sin(6.2831853 * lfo) * 0.08, 0.1, 0.92);\nk2 = clamp(diffusion * 0.84 - cos(6.2831853 * lfo) * 0.07, 0.1, 0.92);\n\nsrc = in + fb * feedback;\ny1 = -k1 * src + ap1; ap1 = src + k1 * y1;\ny2 = -k2 * y1 + ap2; ap2 = y1 + k2 * y2;\ny3 = -0.71 * y2 + ap3; ap3 = y2 + 0.71 * y3;\ny4 = -0.58 * y3 + ap4; ap4 = y3 + 0.58 * y4;\n\ng = clamp(2.0 * sin(3.14159265 * dampHz / sr), 0.04, 0.85);\nlp1 = lp1 + g * (y4 - lp1);\nlp2 = lp2 + (g * 0.65) * (lp1 - lp2);\ndrv = lp2 * 1.2;\nfb = drv / (1.0 + abs(drv));\n\nout = (in * (1.0 - mix) + fb * mix) * 0.78;\n",
+    "params": {
+      "diffusion": 0.66,
+      "dampHz": 2600.0,
+      "feedback": 0.62,
+      "rippleHz": 0.35,
+      "mix": 0.64
+    }
+  }
+}

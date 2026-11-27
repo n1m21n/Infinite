@@ -3418,6 +3418,74 @@
         "Ogata Korin Yatsuhashi & Heian Katawaguruma urushi maki-e & raden inlay",
         "Format 1452, Sporting Grotesque & Getai Grotesk Display"
       ]
+    },
+    {
+      "id": "moholy_light_space_modulator",
+      "taxonomy": "new",
+      "name": "Moholy-Nagy Light-Space Modulator & Kinetic Shadow",
+      "palette": [
+        "#0B0C10",
+        "#C8CCD4",
+        "#1E2026",
+        "#E8A850",
+        "#58A688"
+      ],
+      "sources": [
+        "Sketch",
+        "Sketch 3D",
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.45,
+      "pairs": [
+        "serge_slope_wavefolder",
+        "serge_variable_q_phasor"
+      ],
+      "refs": [
+        "Laszlo Moholy-Nagy Light Prop for an Electric Stage (1930), perforated discs, rod gratings & shadow projection",
+        "Steps Mono (Velvetyne), Overused Grotesk (Uncut) & Terminal Grotesque"
+      ]
+    },
+    {
+      "id": "therme_vals_quartzite",
+      "taxonomy": "new",
+      "name": "Therme Vals Layered Quartzite & Clerestory Light",
+      "palette": [
+        "#1C2024",
+        "#4A5157",
+        "#9AA1A6",
+        "#3D7880",
+        "#D9CBB5"
+      ],
+      "sources": [
+        "Sketch",
+        "Sketch 3D",
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "bloom"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "grotto_quartzite_resonator",
+        "vals_stone_grotto_reverb"
+      ],
+      "refs": [
+        "Peter Zumthor Therme Vals 15 cm modular Valser quartzite masonry & 8 cm clerestory light slits",
+        "Micro Grotesk (Uncut), Clash Grotesk (Fontshare) & Steps Mono"
+      ]
     }
   ]
 }

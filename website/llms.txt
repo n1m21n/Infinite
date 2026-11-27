@@ -421,6 +421,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Metallic Gong Inharmonic Synth](https://infinitedevices.org/library/metallic-gong-inharmonic-synth.html): Four-partial inharmonic bronze gong and metallophone synthesizer with mallet strike transient, shimmer beating, and warm nonlinear saturation. (file: https://infinitedevices.org/assets/templates/metallic-gong-inharmonic-synth.inf)
 - [Quadrature Allpass Phaser FX](https://infinitedevices.org/library/quadrature-allpass-phaser-fx.html): Six-stage staggered allpass phaser-chorus driven by quadrature LFOs with resonant feedback and soft compander saturation. (file: https://infinitedevices.org/assets/templates/quadrature-allpass-phaser-fx.inf)
 - [Twin Peak Formant Filter FX](https://infinitedevices.org/library/twin-peak-formant-filter-fx.html): Parallel dual-SVF vowel formant resonator swept by an envelope follower and slow LFO morphing with warm nonlinear drive. (file: https://infinitedevices.org/assets/templates/twin-peak-formant-filter-fx.inf)
+- [Serge Slope Wavefolder Synth](https://infinitedevices.org/library/serge-slope-wavefolder-synth.html): West-Coast patch-programmable dual-slope envelope driving a 4-stage trigonometric wavefolder with sub-octave divider and soft analog saturation. (file: https://infinitedevices.org/assets/templates/serge-slope-wavefolder-synth.inf)
+- [Grotto Quartzite Resonator Synth](https://infinitedevices.org/library/grotto-quartzite-resonator-synth.html): Modal mineral-chamber resonator coupling fundamental, slightly stretched octave, and stone-plate partials with smooth thermal envelope. (file: https://infinitedevices.org/assets/templates/grotto-quartzite-resonator-synth.inf)
+- [Vals Stone Grotto Reverb FX](https://infinitedevices.org/library/vals-stone-grotto-reverb-fx.html): Four-stage staggered allpass stone-chamber diffuser with water-ripple drift and dual-pole quartzite damping. (file: https://infinitedevices.org/assets/templates/vals-stone-grotto-reverb-fx.inf)
+- [Serge Variable-Q Phasor FX](https://infinitedevices.org/library/serge-variable-q-phasor-fx.html): Resonant state-variable bandpass-to-allpass dispersion cascade with LFO sweep and soft asymmetric saturation. (file: https://infinitedevices.org/assets/templates/serge-variable-q-phasor-fx.inf)
 
 ## Library: Community
 
@@ -844,7 +848,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 161 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 163 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -861,4 +865,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 146 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 148 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

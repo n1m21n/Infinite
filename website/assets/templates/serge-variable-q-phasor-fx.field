@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Serge Variable-Q Phasor FX",
+    "author": "Infinite",
+    "description": "Resonant state-variable bandpass-to-allpass dispersion cascade with LFO sweep and soft asymmetric saturation.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float rateHz = 0.45 [0.05, 4.0];\nparam float cutoffHz = 950.0 [180.0, 4200.0];\nparam float qRes = 0.38 [0.08, 0.85];\nparam float mix = 0.76 [0.0, 1.0];\nstate float lfo = 0; state float ic1 = 0; state float ic2 = 0;\nstate float a1 = 0; state float a2 = 0; state float a3 = 0; state float a4 = 0;\n\nlfo = (lfo + rateHz / sr) % 1.0;\nmod = 0.5 + 0.5 * sin(6.2831853 * lfo);\nfc = clamp(cutoffHz * (0.55 + 1.15 * mod), 120.0, 6400.0);\ng = clamp(tan(3.14159265 * fc / sr), 0.02, 0.85);\nk = 2.0 * (1.0 - qRes);\na_1 = 1.0 / (1.0 + g * (g + k));\na_2 = g * a_1; a_3 = g * a_2;\nv3 = in - ic2;\nv1 = a_1 * ic1 + a_2 * v3;\nv2 = ic2 + a_2 * ic1 + a_3 * v3;\nic1 = 2.0 * v1 - ic1; ic2 = 2.0 * v2 - ic2;\n\nkp = clamp(0.28 + 0.46 * mod, 0.08, 0.90);\ny1 = -kp * v1 + a1; a1 = v1 + kp * y1;\ny2 = -kp * y1 + a2; a2 = y1 + kp * y2;\ny3 = -kp * y2 + a3; a3 = y2 + kp * y3;\ny4 = -kp * y3 + a4; a4 = y3 + kp * y4;\n\nwet = y4 / (1.0 + 0.4 * abs(y4));\nout = (in * (1.0 - mix) + wet * mix) * 0.78;\n",
+    "params": {
+      "rateHz": 0.45,
+      "cutoffHz": 950.0,
+      "qRes": 0.38,
+      "mix": 0.76
+    }
+  }
+}

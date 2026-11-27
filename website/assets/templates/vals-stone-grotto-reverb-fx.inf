@@ -1,0 +1,73 @@
+infinite-patch 1
+# Vals Stone Grotto Reverb FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 1.0
+  i steps 16
+  i note0 48
+  i note1 52
+  i note2 55
+  i note3 59
+  i note4 60
+  i note5 59
+  i note6 55
+  i note7 52
+  i note8 45
+  i note9 48
+  i note10 52
+  i note11 55
+  i note12 57
+  i note13 55
+  i note14 52
+  i note15 48
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id src
+  pos 340 1024
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 680 1024
+  s code param float diffusion = 0.66 [0.15, 0.90];\nparam float dampHz = 2600.0 [600.0, 7200.0];\nparam float feedback = 0.62 [0.0, 0.84];\nparam float rippleHz = 0.35 [0.05, 2.5];\nparam float mix = 0.64 [0.0, 1.0];\nstate float lfo = 0; state float fb = 0;\nstate float ap1 = 0; state float ap2 = 0; state float ap3 = 0; state float ap4 = 0;\nstate float lp1 = 0; state float lp2 = 0;\n\nlfo = (lfo + rippleHz / sr) % 1.0;\nk1 = clamp(diffusion + sin(6.2831853 * lfo) * 0.08, 0.1, 0.92);\nk2 = clamp(diffusion * 0.84 - cos(6.2831853 * lfo) * 0.07, 0.1, 0.92);\n\nsrc = in + fb * feedback;\ny1 = -k1 * src + ap1; ap1 = src + k1 * y1;\ny2 = -k2 * y1 + ap2; ap2 = y1 + k2 * y2;\ny3 = -0.71 * y2 + ap3; ap3 = y2 + 0.71 * y3;\ny4 = -0.58 * y3 + ap4; ap4 = y3 + 0.58 * y4;\n\ng = clamp(2.0 * sin(3.14159265 * dampHz / sr), 0.04, 0.85);\nlp1 = lp1 + g * (y4 - lp1);\nlp2 = lp2 + (g * 0.65) * (lp1 - lp2);\ndrv = lp2 * 1.2;\nfb = drv / (1.0 + abs(drv));\n\nout = (in * (1.0 - mix) + fb * mix) * 0.78;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.47 0.50
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Vals Stone Grotto Reverb FX. Four-stage staggered allpass stone-chamber diffuser with water-ripple drift and dual-pole quartzite damping.
+  f width 340
+  f height 120
+end
+note src 0 notes
+aud fx 0 src
+aud speakers 0 fx
+cable out 0 pic

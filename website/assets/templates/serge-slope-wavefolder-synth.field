@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Serge Slope Wavefolder Synth",
+    "author": "Infinite",
+    "description": "West-Coast patch-programmable dual-slope envelope driving a 4-stage trigonometric wavefolder with sub-octave divider and soft analog saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float fold = 2.8 [1.0, 6.0];\nparam float subMix = 0.42 [0.0, 1.0];\nparam float slopeEnv = 0.75 [0.0, 1.0];\nparam float decay = 0.9991 [0.996, 0.9997];\nstate float p = 0; state float psub = 0; state float env = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.09, env * decay);\nfc = clamp(freq, 36.0, 3200.0);\np = (p + fc / sr) % 1.0;\npsub = (psub + (fc * 0.5) / sr) % 1.0;\n\ntri = 1.0 - 4.0 * abs(p - 0.5);\nsub = sin(6.2831853 * psub) * subMix;\ndrive = fold * (0.4 + slopeEnv * env * 0.9);\nw1 = sin((tri + sub * 0.45) * drive);\nw2 = sin(w1 * 2.1 + 0.35 * sin(w1 * 3.0));\n\ncut = 260.0 + 4800.0 * env * env;\ng = clamp(2.0 * sin(3.14159265 * cut / sr), 0.04, 0.82);\nlp = lp + g * (w2 * env - lp);\n\nout = (lp / (1.0 + abs(lp))) * 0.68;\n",
+    "params": {
+      "fold": 2.8,
+      "subMix": 0.42,
+      "slopeEnv": 0.75,
+      "decay": 0.9991
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}
