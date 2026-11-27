@@ -361,7 +361,7 @@ namespace
    int sImageW = 0, sImageH = 0;   // Document tab's Image size fields (namespace scope: the audit sets them)
    float sImageDpi = 0.0f;         // its resolution field
    bool sImagePrint = false;       // Keep print size: a new resolution resamples
-   int sImageResample = 0;         // 0 smooth, 1 nearest neighbour
+   int sImageResample = 0;         // 0 smooth, 1 nearest neighbour, 2 preserve details
    uint64_t sSizeFor = 0;           // the document and size those fields were last synced to
    int sSizeSeenW = 0, sSizeSeenH = 0;
    float sCrop[4] = { 0, 0, 0, 0 };   // x0 y0 x1 y1, document px, before the box's turn
@@ -17415,12 +17415,12 @@ namespace
          }
       }
       BoolRow(T("Keep print size"), &sImagePrint);
-      ComboRow(T("Resample"), &sImageResample, { T("Smooth"), T("Nearest") });
+      ComboRow(T("Resample"), &sImageResample, { T("Smooth"), T("Nearest"), T("Preserve Details") });
       ImGui::BeginDisabled(sImageW == d.w && sImageH == d.h && sImageDpi == d.dpi);
       if (TextChip(L("Apply##v2dimage"), false, T("Scale the document and every layer with it")))
       {
          PushUndoCheckpoint("Image size");
-         doc->ImageSizeDpi(sImageW, sImageH, sImageDpi, false, sImageResample == 1);
+         doc->ImageSizeDpi(sImageW, sImageH, sImageDpi, false, sImageResample == 1, sImageResample == 2);
       }
       ImGui::EndDisabled();
 

@@ -3018,6 +3018,9 @@ namespace params
       constexpr float fill_angle_lo = -180.0f;
       constexpr float fill_scale_lo = 0.1f, fill_scale_hi = 1.5f;      // Gradient Fill Scale, 10..150 % (Photoshop)
       constexpr float fill_offset_lo = -1.0f, fill_offset_hi = 1.0f;   // Gradient Fill Offset, a share of the box
+      // Image Size > Preserve Details (PhotoCraft resample.rs): the Unsharp Mask after a Lanczos enlargement, amount 30%,
+      // radius 0.6 px per unit of scale.
+      constexpr float preserve_details_amount = 0.30f, preserve_details_radius = 0.6f;
       constexpr float fill_angle_hi = 180.0f;
       constexpr float width_hi = 200.0f;
       constexpr float width_lo = 0.0f;

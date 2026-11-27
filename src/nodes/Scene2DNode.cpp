@@ -2582,7 +2582,7 @@ void Scene2DNode::ImageSize(int w, int h)
    StoreSelection();   // commits
 }
 
-void Scene2DNode::ImageSizeDpi(int w, int h, float dpi, bool keepPrintSize, bool nearest)
+void Scene2DNode::ImageSizeDpi(int w, int h, float dpi, bool keepPrintSize, bool nearest, bool preserveDetails)
 {
    Layers();
    if (nearest)
@@ -2601,7 +2601,34 @@ void Scene2DNode::ImageSizeDpi(int w, int h, float dpi, bool keepPrintSize, bool
       w = (int)std::lround((double)h * mDoc.w / mDoc.h);
    mDoc.dpi = now;
    if (w > 0 && h > 0 && (w != mDoc.w || h != mDoc.h))
-      ImageSize(w, h);   // commits
+   {
+      const int ow = mDoc.w, oh = mDoc.h;
+      ImageSize(w, h);   // commits; it scales every layer's box
+      const float kx = (float)mDoc.w / (float)ow, ky = (float)mDoc.h / (float)oh;
+      if (preserveDetails && kx >= 1.0f && ky >= 1.0f)
+      {
+         // Preserve Details enlarges a plain paint layer's pixels (Lanczos, then the light sharpening) and takes the
+         // scale ImageSize just gave its box back, so it draws at the size it had.
+         bool any = false;
+         std::vector<int> ids;
+         for (const Layer& l : mLayers)
+            ids.push_back(l.id);
+         for (int id : ids)
+         {
+            const Layer* l = FindConst(id);
+            const int pw = l->pw, ph = l->ph;
+            const int nw = (int)std::lround(pw * kx), nh = (int)std::lround(ph * ky);
+            if (!PreserveDetailsLayer(id, nw, nh))
+               continue;
+            Layer* m = FindLayer(id);
+            m->sx *= (float)pw / (float)nw;
+            m->sy *= (float)ph / (float)nh;
+            any = true;
+         }
+         if (any)
+            Commit();
+      }
+   }
    else
       Commit();
 }
