@@ -9,6 +9,15 @@
   "url": "https://infinitedevices.org/blog/chop-and-remix-a-drum-loop-with-slicer.html"
  },
  {
+  "slug": "lock-free-audio-graph-pdc-and-parameter-mailboxes",
+  "title": "Lock-free audio graph scheduling, PDC, and parameter mailboxes",
+  "description": "How Infinite compiles audio graphs on the main thread, schedules parallel DAG execution, aligns branches with idempotent PDC, and smooths parameters per sample.",
+  "date": "2026-11-27",
+  "updated": "2026-11-27",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/lock-free-audio-graph-pdc-and-parameter-mailboxes.html"
+ },
+ {
   "slug": "16-line-hadamard-fdn-reverb-dsp",
   "title": "16-line Hadamard FDN reverb: diffusion, modulation, and SIMD DSP",
   "description": "How Infinite's Reverb node pairs dual 4-stage Schroeder diffusers, a 16-line Hadamard FDN, Hermite modulation, and damping-compensated RT60 in SIMD.",

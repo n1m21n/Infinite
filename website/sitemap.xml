@@ -12,6 +12,7 @@
   <url><loc>https://infinitedevices.org/piano/</loc><lastmod>2026-11-27</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/</loc><lastmod>2026-11-27</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/blog/chop-and-remix-a-drum-loop-with-slicer.html</loc><lastmod>2026-11-27</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/blog/lock-free-audio-graph-pdc-and-parameter-mailboxes.html</loc><lastmod>2026-11-27</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/16-line-hadamard-fdn-reverb-dsp.html</loc><lastmod>2026-11-27</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/generative-melody-and-chords-in-infinite.html</loc><lastmod>2026-11-27</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/aliasing-free-virtual-analog-dsp-blep-zdf-oversampling.html</loc><lastmod>2026-11-27</lastmod><priority>0.7</priority></url>
