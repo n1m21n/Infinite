@@ -14,6 +14,7 @@
 #include "core/ml/ModNet.h"
 #include "core/ml/TextOcr.h"
 #include "core/ml/ObjectDetect.h"
+#include "core/ml/Upscale.h"
 #include "stb_image.h"
 #include "gl3.h"
 #include "stb_image_write.h"
@@ -3868,6 +3869,28 @@ void RunView2DTest()
                       okD, boxes.size(), boxes.empty() ? "-" : boxes[0].label.c_str(),
                       boxes.empty() ? 0.0f : boxes[0].score, Ml::ModelRegistry::ActiveFamily().c_str());
                Check("ML-DFINE: detects objects on real COCO image", okD && !boxes.empty() && Ml::ModelRegistry::ActiveFamily() == "dfine");
+            }
+         }
+         // 3d. Clean-room SPAN 2x upscaler + offline fallback
+         {
+            std::vector<uint8_t> small(64 * 64 * 4, 255);
+            for (int y = 0; y < 64; y++)
+               for (int x = 0; x < 64; x++)
+               {
+                  uint8_t* p = &small[(y * 64 + x) * 4];
+                  p[0] = (uint8_t)(x * 4); p[1] = (uint8_t)(y * 4); p[2] = (uint8_t)((x + y) * 2); p[3] = 255;
+               }
+            std::vector<uint8_t> fb; int fw = 0, fh = 0;
+            Ml::Upscale::Fallback2x(small, 64, 64, fb, fw, fh);
+            Check("ML-SPAN: offline Fallback2x doubles dimensions", fw == 128 && fh == 128 && fb.size() == 128 * 128 * 4);
+            if (!Ml::Upscale::Available())
+               printf("  [skip] ML-SPAN: %s\n", Ml::Upscale::Missing().c_str());
+            else
+            {
+               std::vector<uint8_t> up; int uw = 0, uh = 0; std::string err;
+               const bool okU = Ml::Upscale::Run2xNow(small, 64, 64, up, uw, uh, err);
+               printf("  ML-SPAN: ok=%d out=%dx%d active=%s err=%s\n", okU, uw, uh, Ml::ModelRegistry::ActiveFamily().c_str(), err.c_str());
+               Check("ML-SPAN: upscales 2x cleanly via ModelRegistry", okU && uw == 128 && uh == 128 && Ml::ModelRegistry::ActiveFamily() == "span");
             }
          }
          Ml::ModelRegistry::Unload();

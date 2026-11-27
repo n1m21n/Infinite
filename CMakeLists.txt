@@ -742,6 +742,7 @@ set(COMMON_SOURCES
     src/core/ml/ModNet.cpp
     src/core/ml/TextOcr.cpp
     src/core/ml/ObjectDetect.cpp
+    src/core/ml/Upscale.cpp
     src/core/SelectMaths.cpp
     src/core/tracking/HandTracker.cpp
     src/core/tracking/FaceTracker.cpp

@@ -157,6 +157,10 @@ namespace Ml
                "", 0, "MIT",
                "P3M-Net & P3M-10k (MIT). Li et al., Privacy-Preserving Portrait Matting, ACM MM 2021. https://github.com/JizhiziLi/P3M",
                { 1, 3, 512, 512 }, EpPref::CpuOnly, "p3m" });
+         add({ "span_2x_clean", "Clean SPAN 2x Upscaler", "1.0.0", "upscale", "models/span_2x_clean.onnx",
+               "5dafe91d3466726d03a2c07c5c8020fc77d66e806428eaa88941ceb6e9fef509", 1618174, "Apache-2.0",
+               "Clean-room SPAN 2x (Apache-2.0), trained on PD12M CC0 + Infinite headless renders + LPIPS (BSD-2).",
+               { 1, 3, 256, 256 }, EpPref::CpuOnly, "span" });
       }
 
       void CloseAllSessionsLocked(RegistryState& s)
