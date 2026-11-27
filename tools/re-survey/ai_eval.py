@@ -4,6 +4,7 @@
   build   pick the eval sets from COCO val2017 and write masks + prompts
   models  run the pack's ONNX models (SAM 2.1 tiny, BEN2) in Python and score them
   app     score masks written by the app's INFINITE_AIEVAL=1 hook
+  app_s4  score the app's Image Trace SVGs (same hook) against the S4 pictures, beside the s4 baseline
   ep      EP gate (section 15): CoreML vs CPU masks on S1/S2 must agree (IoU >= 0.99 per picture)
           and loading the CoreML sessions must add <= 600 MB of resident memory
   s4      trace baseline (ai-tools step 2.0): make 20 own logos / line art + 10 own photo-like
@@ -389,6 +390,39 @@ def cmd_s4(a):
    return 0
 
 
+def cmd_app_s4(a):
+   """Scores the app's Image Trace (INFINITE_AIEVAL=1 writes s4/<name>_app.svg + results/app_s4_times.txt) like cmd_s4."""
+   from skimage.metrics import structural_similarity
+   times = {}
+   tf = a.data / "results/app_s4_times.txt"
+   if tf.exists():
+      for line in tf.read_text().split("\n"):
+         f = line.split()
+         if len(f) >= 3:
+            times[f[0]] = float(f[2]) / 1000.0
+   pics = s4_pictures(a.data / "s4")
+   kinds = ["logo"] * 10 + ["line"] * 10 + ["photo"] * 10
+   rows = []
+   for path, kind in zip(pics, kinds):
+      sp = path.with_name(path.stem + "_app.svg")
+      if not sp.exists():
+         continue
+      grey = np.asarray(Image.open(path).convert("L"), np.float32)
+      h, w = grey.shape
+      svg = sp.read_text()
+      n = svg.count("<path")
+      ss = structural_similarity(grey, s4_raster(svg, w, h), data_range=255)
+      rows.append([path.name, kind, float(ss), n, times.get(path.stem, float("nan"))])
+      print(f"{path.name} {kind:5s}  app SSIM {ss:.3f} paths {n:4d}")
+   res = {"app": rows}
+   base = a.data / "results" / "s4_baseline.json"
+   if base.exists():
+      res.update(json.loads(base.read_text())["trace"])
+   (a.data / "results" / "s4_app.json").write_text(json.dumps({"trace": res}, indent=1))
+   s4_print(res)
+   return 0
+
+
 def s4_print(res):
    for tool, rows in res.items():
       for kind in ("logo", "line", "photo"):
@@ -420,12 +454,12 @@ def cmd_report(a):
 
 def main():
    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-   ap.add_argument("cmd", choices=["build", "models", "app", "ep", "s4", "report"])
+   ap.add_argument("cmd", choices=["build", "models", "app", "ep", "s4", "app_s4", "report"])
    ap.add_argument("--data", type=Path, default=DATA)
    ap.add_argument("--save", action="store_true", help="write model masks next to the pictures")
    ap.add_argument("--limit", type=int, default=None, help="ep: only the first N pictures of each set")
    a = ap.parse_args()
-   return {"build": cmd_build, "models": cmd_models, "app": cmd_app, "ep": cmd_ep, "s4": cmd_s4, "report": cmd_report}[a.cmd](a)
+   return {"build": cmd_build, "models": cmd_models, "app": cmd_app, "ep": cmd_ep, "s4": cmd_s4, "app_s4": cmd_app_s4, "report": cmd_report}[a.cmd](a)
 
 
 if __name__ == "__main__":

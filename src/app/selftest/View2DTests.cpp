@@ -223,6 +223,61 @@ static void RunAiEval()
    printf("  AIEVAL: %d pictures written under %sS1\n", n, root.c_str());
 }
 
+// INFINITE_AIEVAL=1, S4 (ai-tools M6): the app's Image Trace on the 30 S4 pictures (ai_eval.py s4 makes them) with
+// its default options. Writes s4/<name>_app.svg and results/app_s4_times.txt; `ai_eval.py app_s4` scores them
+// with the same rasteriser and SSIM as the VTracer baseline.
+static void RunS4TraceEval()
+{
+   const char* home = std::getenv("HOME");
+   const std::string root = std::string(home != nullptr ? home : ".") + "/Infinite/datasets/ai-eval/";
+   std::FILE* tf = std::fopen((root + "results/app_s4_times.txt").c_str(), "w");
+   int n = 0;
+   for (int i = 0; i < 30; i++)
+   {
+      char name[32];
+      std::snprintf(name, sizeof(name), "s4_%02d", i);
+      std::vector<unsigned char> bytes;
+      if (FILE* f = std::fopen((root + "s4/" + name + ".png").c_str(), "rb"))
+      {
+         unsigned char buf[1 << 16];
+         for (size_t got; (got = std::fread(buf, 1, sizeof(buf), f)) > 0;)
+            bytes.insert(bytes.end(), buf, buf + got);
+         std::fclose(f);
+      }
+      int w = 0, h = 0, ch = 0;
+      unsigned char* data = bytes.empty() ? nullptr : stbi_load_from_memory(bytes.data(), (int)bytes.size(), &w, &h, &ch, 4);
+      if (data == nullptr)
+         continue;
+      std::vector<uint8_t> rgba(data, data + (size_t)w * h * 4);
+      stbi_image_free(data);
+      Scene2DNode d;
+      d.Layers();
+      d.Doc().w = w;
+      d.Doc().h = h;
+      d.Commit();
+      const int pic = d.AddFileLayer(0, "pic", 0, 0, w, h, rgba);
+      d.CookIfNeeded(++sFrame);
+      const auto t = std::chrono::steady_clock::now();
+      const int vec = d.TraceLayer(pic, ++sFrame, Scene2DNode::TraceOpts{});
+      const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t).count();
+      const Scene2DNode::Layer* l = vec != 0 ? d.FindLayer(vec) : nullptr;
+      if (l == nullptr)
+         continue;
+      if (FILE* o = std::fopen((root + "s4/" + name + "_app.svg").c_str(), "w"))
+      {
+         const std::string svg = d.ToSvg(*l);
+         std::fwrite(svg.data(), 1, svg.size(), o);
+         std::fclose(o);
+      }
+      if (tf != nullptr)
+         std::fprintf(tf, "%s trace_ms %.1f paths %zu\n", name, ms, l->shapes.size());
+      n++;
+   }
+   if (tf != nullptr)
+      std::fclose(tf);
+   printf("  AIEVAL: %d S4 traces written under %ss4\n", n, root.c_str());
+}
+
 void RunView2DTest()
 {
    bool ok = sDockOk;
@@ -3920,6 +3975,8 @@ void RunView2DTest()
       }
       if (std::getenv("INFINITE_AIEVAL") != nullptr && AiSelect::Available())
          RunAiEval();
+      if (std::getenv("INFINITE_AIEVAL") != nullptr)
+         RunS4TraceEval();
    }
    if (doc != nullptr && View2DPanelSelfCheck(doc) > 0)
       ok = false;
