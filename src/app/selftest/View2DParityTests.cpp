@@ -349,6 +349,64 @@ namespace
       s.Check("parity: Gradient Fill Scale and Offset save and load", saved);
    }
 
+   // sharpen/tests.rs preserve_details_resampling_keeps_the_same_sharpening: Preserve Details' enlargement is Lanczos
+   // followed by a 30% Unsharp Mask of radius 0.6 x the larger scale; a reduction does not sharpen.
+   void PreserveDetails(Section& s)
+   {
+      using SN = Scene2DNode;
+      const int W = 16, H = 12;
+      std::vector<uint8_t> edge((size_t)W * H * 4);
+      for (int y = 0; y < H; y++)
+         for (int x = 0; x < W; x++)
+         {
+            uint8_t* q = &edge[((size_t)y * W + x) * 4];
+            q[0] = q[1] = q[2] = x < W / 2 ? 40 : 220;
+            q[3] = 255;
+         }
+      auto Make = [&](SN& d) {
+         d.Layers();
+         d.Doc().w = W;
+         d.Doc().h = H;
+         d.Commit();
+         return d.AddFileLayer(0, "edge", 0, 0, W, H, edge);
+      };
+      SN d;
+      const int id = Make(d);
+      std::vector<uint8_t> before, after;
+      int bw = 0, bh = 0, aw = 0, ah = 0;
+      const bool read = d.ReadPaint(id, before, bw, bh);
+      d.ImageSizeDpi(2 * W, 3 * H / 2, 0.0f, false, false, true);   // 2 x 1.5, as PhotoCraft's case
+      const bool read2 = d.ReadPaint(id, after, aw, ah);
+      std::vector<uint8_t> want = SN::ResampleRgba(before, bw, bh, 2 * W, 3 * H / 2, 3);
+      const std::vector<uint8_t> lanczos = want;
+      SN::UnsharpRgba(want, 2 * W, 3 * H / 2, 0.30f, 0.6f * 2.0f);
+      int worst = 255;
+      if (read && read2 && after.size() == want.size())
+      {
+         worst = 0;
+         for (size_t i = 0; i < want.size(); i++)
+            worst = std::max(worst, std::abs((int)after[i] - (int)want[i]));
+      }
+      if (worst > 1)
+         fprintf(stderr, "PROBE preserve details: read %d %d size %dx%d worst %d\n", read ? 1 : 0, read2 ? 1 : 0, aw, ah, worst);
+      s.Check("parity: Preserve Details enlarges by Lanczos, then a 30% Unsharp Mask of radius 0.6 x scale", worst <= 1);
+      // Sharper than Lanczos alone at the edge; flat parts keep their value; the layer still covers the canvas.
+      const int row = (3 * H / 2) / 2, xl = W - 3, xr = W + 2;
+      auto at = [&](const std::vector<uint8_t>& v, int x) { return (int)v[((size_t)row * 2 * W + x) * 4]; };
+      const SN::Layer* l = d.FindLayer(id);
+      const bool steeper = !after.empty() && at(after, xr) - at(after, xl) > at(lanczos, xr) - at(lanczos, xl) && at(after, 0) == 40 &&
+                           at(after, 2 * W - 1) == 220;
+      s.Check("parity: Preserve Details steepens the edge past Lanczos and keeps flat parts", steeper);
+      s.Check("parity: Preserve Details keeps the layer the canvas' size (pixels 32 x 18, scale 1)",
+              l != nullptr && l->pw == 2 * W && l->ph == 3 * H / 2 && std::fabs(l->sx - 1.0f) < 1e-5f && std::fabs(l->sy - 1.0f) < 1e-5f);
+      SN e;
+      const int id2 = Make(e);
+      e.ImageSizeDpi(W / 2, H / 2, 0.0f, false, false, true);
+      const SN::Layer* m = e.FindLayer(id2);
+      s.Check("parity: a Preserve Details reduction keeps the pixels and scales the layer as Smooth",
+              m != nullptr && m->pw == W && m->ph == H && std::fabs(m->sx - 0.5f) < 1e-5f);
+   }
+
    // layer_copy_cmds/tests.rs + layers_panel_parity_tests.rs + smartselect_cmds/tests.rs: copying layers between open
    // documents, Duplicate To a new document, and Select and Mask's new-document outputs.
    void CrossDoc(Section& s)
@@ -554,6 +612,8 @@ int RunView2DParitySection(Scene2DNode* doc, const char* only)
       CrossDoc(s);
    if (s.Want("parity.gradient"))
       GradientFill(s);
+   if (s.Want("parity.resample"))
+      PreserveDetails(s);
    return s.fails + View2DPanelParityTests(doc, s.only);
 }
 }

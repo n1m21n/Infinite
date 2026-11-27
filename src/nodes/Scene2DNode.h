@@ -771,7 +771,10 @@ public:
    // size stays (a side given still wins, the other keeping the proportions); without it the pixels stay and only the
    // resolution changes unless w / h are given. Type keeps its pixel size, so it scales with the pixels only.
    // nearest: paint layers sample nearest neighbour from then on, so a reduction keeps source values (Resample: Nearest).
-   void ImageSizeDpi(int w, int h, float dpi, bool keepPrintSize, bool nearest = false);
+   // preserveDetails (Resample: Preserve Details, PhotoCraft Resample::PreserveDetails): an enlargement resamples each
+   // plain paint layer's pixels with Lanczos, then sharpens them with a 30% Unsharp Mask of radius 0.6 x the scale. A
+   // reduction, or a layer that is turned, sheared, warped or masked, scales as Smooth does.
+   void ImageSizeDpi(int w, int h, float dpi, bool keepPrintSize, bool nearest = false, bool preserveDetails = false);
    // The Crop tool's target W x H x Resolution: crop to the box (turned by deg when not 0), then resample the result to
    // tw x th (0 = as cropped) and set dpi (0 = keep). One edit.
    void CropToTarget(float x0, float y0, float x1, float y1, float deg, int tw, int th, float dpi);
@@ -1661,8 +1664,15 @@ public:
    // *err naming the bad part ("resample", "scale", "layer", "empty", "write").
    bool ExportLayerPng(int id, const std::string& path, int scalePct, const std::string& resample, std::string* err = nullptr,
                        int* outW = nullptr, int* outH = nullptr);
-   // rgba (top row first, straight alpha) resized to nw x nh: method 0 nearest, 1 bilinear, 2 bicubic (premultiplied).
+   // rgba (top row first, straight alpha) resized to nw x nh: method 0 nearest, 1 bilinear, 2 bicubic, 3 Lanczos (3 lobes,
+   // for enlargement); 1-3 filter premultiplied values.
    static std::vector<uint8_t> ResampleRgba(const std::vector<uint8_t>& rgba, int w, int h, int nw, int nh, int method);
+   // Unsharp Mask on straight RGBA in place, as the unsharpmask effect: a Gaussian (sigma = radius, reach ceil(3 sigma),
+   // edges held) of premultiplied values, each colour pushed from the blur by amount (1 = 100%); alpha and clear pixels kept.
+   static void UnsharpRgba(std::vector<uint8_t>& rgba, int w, int h, float amount, float radius);
+   // Preserve Details for one paint layer: its pixels to nw x nh by Lanczos, then the 30% Unsharp Mask of radius
+   // 0.6 x scale (PhotoCraft resample.rs preserve_details). False (nothing changed) when it is not a plain paint layer.
+   bool PreserveDetailsLayer(int id, int nw, int nh);
 private:
    RunStyle mDefaultType;
    bool mDefaultTypeSet = false;

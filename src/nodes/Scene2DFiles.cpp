@@ -22,6 +22,7 @@
 #include <sstream>
 #include "BlendModes.h"
 #include "TileStore.h"
+#include "app/graph/NodeParams.h"
 #include "miniz.h"
 #include "stb_image.h"
 #include "stb_image_write.h"
@@ -1611,6 +1612,15 @@ std::vector<uint8_t> Scene2DNode::ResampleRgba(const std::vector<uint8_t>& rgba,
       t = std::fabs(t);
       return t < 1 ? (a + 2) * t * t * t - (a + 3) * t * t + 1 : t < 2 ? a * t * t * t - 5 * a * t * t + 8 * a * t - 4 * a : 0.0;
    };
+   auto lanczos = [](double t) {   // sinc(t) sinc(t / 3), |t| < 3
+      t = std::fabs(t);
+      if (t < 1e-9)
+         return 1.0;
+      if (t >= 3.0)
+         return 0.0;
+      const double a = 3.14159265358979323846 * t;
+      return 3.0 * std::sin(a) * std::sin(a / 3.0) / (a * a);
+   };
    for (int y = 0; y < nh; y++)
       for (int x = 0; x < nw; x++)
       {
@@ -1623,13 +1633,14 @@ std::vector<uint8_t> Scene2DNode::ResampleRgba(const std::vector<uint8_t>& rgba,
             continue;
          }
          const int x0 = (int)std::floor(sx), y0 = (int)std::floor(sy);
-         const int r = method == 1 ? 1 : 2;
+         const int r = method == 1 ? 1 : method == 3 ? 3 : 2;
          double sum = 0;
          for (int j = y0 - r + 1; j <= y0 + r; j++)
             for (int i = x0 - r + 1; i <= x0 + r; i++)
             {
-               const double wgt = method == 1 ? std::max(0.0, 1 - std::fabs(sx - i)) * std::max(0.0, 1 - std::fabs(sy - j))
-                                              : cubic(sx - i) * cubic(sy - j);
+               const double wgt = method == 1   ? std::max(0.0, 1 - std::fabs(sx - i)) * std::max(0.0, 1 - std::fabs(sy - j))
+                                  : method == 3 ? lanczos(sx - i) * lanczos(sy - j)
+                                                : cubic(sx - i) * cubic(sy - j);
                if (wgt == 0)
                   continue;
                sum += wgt;
@@ -1854,6 +1865,80 @@ bool Scene2DNode::SeamCarve(const std::vector<uint8_t>& rgba, int w, int h, int 
       out.swap(back);
       h = th;
    }
+   return true;
+}
+
+void Scene2DNode::UnsharpRgba(std::vector<uint8_t>& rgba, int w, int h, float amount, float radius)
+{
+   if (w <= 0 || h <= 0 || rgba.size() < (size_t)w * h * 4 || radius < 0.05f || amount == 0.0f)
+      return;
+   const int r = std::min((int)std::ceil(radius * 3.0f), 300);
+   std::vector<double> k((size_t)(2 * r + 1));
+   double kt = 0;
+   for (int i = -r; i <= r; i++)
+      kt += k[(size_t)(i + r)] = std::exp(-(double)i * i / (2.0 * radius * radius));
+   for (double& q : k)
+      q /= kt;
+   const size_t n = (size_t)w * h;
+   std::vector<double> pm(n * 4), tmp(n * 4);
+   for (size_t i = 0; i < n; i++)
+   {
+      const double a = rgba[i * 4 + 3] / 255.0;
+      for (int c = 0; c < 3; c++)
+         pm[i * 4 + c] = rgba[i * 4 + c] / 255.0 * a;
+      pm[i * 4 + 3] = a;
+   }
+   for (int y = 0; y < h; y++)   // horizontal, edges held
+      for (int x = 0; x < w; x++)
+         for (int c = 0; c < 4; c++)
+         {
+            double s = 0;
+            for (int i = -r; i <= r; i++)
+               s += k[(size_t)(i + r)] * pm[((size_t)y * w + std::clamp(x + i, 0, w - 1)) * 4 + c];
+            tmp[((size_t)y * w + x) * 4 + c] = s;
+         }
+   for (int y = 0; y < h; y++)   // vertical, then push each colour away from the blur
+      for (int x = 0; x < w; x++)
+      {
+         const size_t o = ((size_t)y * w + x) * 4;
+         if (rgba[o + 3] == 0)
+            continue;
+         double b[4] = { 0, 0, 0, 0 };
+         for (int i = -r; i <= r; i++)
+            for (int c = 0; c < 4; c++)
+               b[c] += k[(size_t)(i + r)] * tmp[((size_t)std::clamp(y + i, 0, h - 1) * w + x) * 4 + c];
+         for (int c = 0; c < 3; c++)
+         {
+            const double v = rgba[o + c] / 255.0, bl = b[3] > 0 ? b[c] / b[3] : 0.0;
+            rgba[o + c] = (uint8_t)std::lround(std::clamp(v + amount * (v - bl), 0.0, 1.0) * 255.0);
+         }
+      }
+}
+
+bool Scene2DNode::PreserveDetailsLayer(int id, int nw, int nh)
+{
+   Layers();
+   const Layer* l = FindConst(id);
+   if (l == nullptr || l->kind != Kind::Paint || l->pw <= 0 || l->ph <= 0 || l->angle != 0.0f || l->shear != 0.0f || l->warpOn ||
+       l->is3d || l->HasPixelMask() || l->fmw > 0 || (EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
+      return false;
+   std::vector<uint8_t> px;
+   int w = 0, h = 0;
+   nw = std::clamp(nw, 1, GLUtil::kMaxTargetSide);
+   nh = std::clamp(nh, 1, GLUtil::kMaxTargetSide);
+   if (!ReadPaint(id, px, w, h) || w != l->pw || h != l->ph || nw < w || nh < h || (nw == w && nh == h))
+      return false;
+   // ReadPaint rows are bottom first; both filters are symmetric in y, and the tiles want top-down after.
+   std::vector<uint8_t> out = ResampleRgba(px, w, h, nw, nh, 3);
+   const float scale = std::max((float)nw / (float)w, (float)nh / (float)h);
+   UnsharpRgba(out, nw, nh, params::view2d::preserve_details_amount, params::view2d::preserve_details_radius * scale);
+   std::vector<uint8_t> top((size_t)nw * nh * 4);
+   for (int y = 0; y < nh; y++)
+      std::memcpy(&top[(size_t)y * nw * 4], &out[(size_t)(nh - 1 - y) * nw * 4], (size_t)nw * 4);
+   Layer* m = FindLayer(id);
+   m->pw = nw;
+   m->ph = nh;
+   m->tiles = CutTiles(top, nw, nh, false);
    return true;
 }
 
