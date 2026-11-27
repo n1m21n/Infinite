@@ -15,6 +15,8 @@
 #include <cstring>
 #include <deque>
 #include <numeric>
+#include <cctype>
+#include <sstream>
 
 namespace
 {
@@ -1559,4 +1561,137 @@ int Scene2DNode::ShapesToShapeLayer(const std::vector<Shape>& subs, int above, c
    fprintf(stderr, "PROBE [2d] path to shape: layer %d from %zu subpaths, consume %d\n", vid, subs.size(), consumeWorkPath ? 1 : 0);
    Commit();
    return vid;
+}
+
+// ---- Edit > Find and Replace Text, Layer Style scaling, Global Light, Paths to Illustrator ------------------------
+
+int Scene2DNode::FindReplaceText(const std::string& find, const std::string& with, bool matchCase, const std::vector<int>& ids)
+{
+   Layers();
+   if (find.empty())
+      return 0;
+   auto lower = [](std::string s) {
+      for (char& c : s)
+         c = (char)std::tolower((unsigned char)c);
+      return s;
+   };
+   const std::string key = matchCase ? find : lower(find);
+   std::vector<int> todo = ids;
+   if (todo.empty())
+      for (const Layer& l : mLayers)
+         if (l.kind == Kind::Text)
+            todo.push_back(l.id);
+   int n = 0;
+   for (int id : todo)
+   {
+      const Layer* l = FindConst(id);
+      if (l == nullptr || l->kind != Kind::Text)
+         continue;
+      const std::string hay = matchCase ? l->text : lower(l->text);
+      std::vector<size_t> at;
+      for (size_t p = hay.find(key); p != std::string::npos; p = hay.find(key, p + key.size()))
+         at.push_back(p);
+      // From the end, so earlier offsets stay right.
+      for (auto it = at.rbegin(); it != at.rend(); ++it)
+         if (ReplaceText(id, *it, *it + find.size(), with))
+            n++;
+   }
+   std::fprintf(stderr, "PROBE find and replace text: %d replaced\n", n);
+   return n;
+}
+
+bool Scene2DNode::ScaleEffects(int id, float pct)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || !std::isfinite(pct) || pct <= 0.0f || !l->AnyFx())
+      return false;
+   const float k = pct / 100.0f;
+   auto scale = [&](Fx& f) {
+      f.size *= k;
+      f.dist *= k;
+   };
+   for (Fx& f : l->fx)
+      scale(f);
+   for (auto& m : l->fxMore)
+      scale(m.second);
+   Commit();
+   return true;
+}
+
+void Scene2DNode::SetGlobalLight(float angle)
+{
+   Layers();
+   if (!std::isfinite(angle))
+      return;
+   const float a = std::remainder(angle, 360.0f);
+   auto lit = [](int type) { return type == kFxShadow || type == kFxInner || type == kFxBevel || type == kFxSatin; };
+   for (Layer& l : mLayers)
+   {
+      for (int k = 0; k < kFxCount; k++)
+         if (lit(k))
+            l.fx[k].angle = a;
+      for (auto& m : l.fxMore)
+         if (lit(m.first))
+            m.second.angle = a;
+   }
+   Commit();
+}
+
+std::string Scene2DNode::PathsSvg()
+{
+   if (mPaths.empty())
+      return "";
+   std::ostringstream o;
+   o << "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" << mDoc.w << "\" height=\"" << mDoc.h << "\" viewBox=\"0 0 "
+     << mDoc.w << " " << mDoc.h << "\">\n";
+   for (const DocPath& p : mPaths)
+   {
+      std::vector<std::vector<float>> lines;
+      std::vector<int> ops;
+      PathPolylines(p, lines, ops);
+      std::string d;
+      for (const std::vector<float>& ln : lines)
+      {
+         for (size_t i = 0; i + 1 < ln.size(); i += 2)
+            d += (i == 0 ? "M" : " L") + std::to_string(ln[i]) + " " + std::to_string(ln[i + 1]);
+         if (!ln.empty())
+            d += " Z ";
+      }
+      std::string id = p.name;
+      for (char& c : id)
+         if (!std::isalnum((unsigned char)c))
+            c = '_';
+      o << "  <path id=\"" << id << "\" d=\"" << d << "\" fill=\"none\" stroke=\"black\"/>\n";
+   }
+   o << "</svg>\n";
+   return o.str();
+}
+
+bool Scene2DNode::VectorMaskFromPath(int id, const std::string& name)
+{
+   Layers();
+   const DocPath* found = FindPath(name);
+   Layer* l = FindLayer(id);
+   if (found == nullptr || l == nullptr || found->subs.empty())
+      return false;
+   std::vector<Shape> mask;
+   for (Shape s : found->subs)
+   {
+      for (size_t i = 0; i + 1 < s.pts.size(); i += 2)
+      {
+         float bx = 0, by = 0;
+         DocToBox(*l, s.pts[i], s.pts[i + 1], bx, by);
+         s.pts[i] = bx, s.pts[i + 1] = by;
+      }
+      s.fillOn = true;
+      s.strokeOn = false;
+      mask.push_back(std::move(s));
+   }
+   l->vmask = std::move(mask);
+   l->hasVMask = true;
+   l->vmaskOn = true;
+   fprintf(stderr, "PROBE vector mask from path: layer %d, %zu subpaths\n", id, l->vmask.size());
+   Commit();
+   return true;
 }

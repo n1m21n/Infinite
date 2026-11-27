@@ -4,7 +4,7 @@
 ux_seed.py matched any string literal once, on 2026-11-18. This scanner lists every place a user can reach a command
 in View2DPanel.cpp and passes a row only when its PhotoCraft label is one of them (allowlist, not a pattern grep):
 
-  menu    a MenuParts::Item / SubMenu / Choice / Toggle line: its T("...") / L("...") labels, the literal arrays it
+  menu    a MenuParts::Item / SubMenu / Choice / Toggle / Check line: its T("...") / L("...") labels, the literal arrays it
           indexes or loops over (1D or 2D), and the *Label() / AdjName() functions it calls (their literal strings)
   chip    a TextChip / ZoomChip line: its label (text before ##) and its tip's lead words ("Grow: ...", "Zoom in (Ctrl++)")
   effect  a label in kNodeEffects (the effect stack's Add sheet: Photoshop's Filter menu)
@@ -53,7 +53,7 @@ REVIEWED = {'cmd:type.orientation.vertical': 'vertical',
             'cmd:edit.pasteSpecial.pasteInPlace': 'paste'}   # our own copy pastes back where it was
 SPELL = ((r'centre', 'center'), (r'colour', 'color'), (r'grey', 'gray'))
 
-CALL = re.compile(r'MenuParts::(Item|SubMenu|Choice|Toggle)\(|(?:Text|Zoom)Chip\(')
+CALL = re.compile(r'MenuParts::(Item|SubMenu|Choice|Toggle|Check)\(|(?:Text|Zoom)Chip\(')
 LITS = re.compile(r'\b[TL]\(\s*"([^"]+)"|TextChip\(\s*"([^"]+)"')
 ARR_REF = re.compile(r'\b(k\w+)\s*\[')
 LOOP_REF = re.compile(r'for\s*\([^:;]*:\s*(k\w+)\s*\)')

@@ -2851,6 +2851,16 @@ namespace params
    namespace view2d
    {
       constexpr size_t kRgba = 4;   // bytes per pixel in an RGBA8 readback
+      // The canvas menu's prompts (AskDialog): Arbitrary rotation, guides, guide layout, Defringe, Scale Effects, Global Light.
+      constexpr float kAskDegLo = -359.9f, kAskDegHi = 359.9f, kAskArbitraryDeg = 90.0f;
+      constexpr float kAskPosLo = -100000.0f, kAskPosHi = 100000.0f;   // a guide's position, document px
+      constexpr float kAskCountHi = 64.0f, kAskLayoutCols = 4.0f;       // guide layout columns / rows
+      constexpr float kAskDefringeHi = 64.0f;                           // Defringe width, px
+      constexpr float kAskScaleHi = 1000.0f, kAskScalePct = 100.0f;    // Scale Effects, percent
+      constexpr float kAskLightLo = -180.0f, kAskLightHi = 180.0f, kAskLightDeg = 120.0f;   // Global Light angle (Photoshop's default)
+   constexpr float kAskFillRing = 2.0f;   // Edit > Content-Aware Fill: the Remove stroke round the selection, px
+   constexpr float kGuideSame = 0.5f;                                // px: a new guide this close to one is the same guide
+      constexpr float kViewTurnStep = 0.2617994f;                       // View > Rotate Left / Right: 15 degrees, radians
       constexpr float kHueShiftLo = -180.0f, kHueShiftHi = 180.0f;   // Hue/Saturation range hue (deg)
       constexpr float kHueBoundLo = -180.0f, kHueBoundHi = 540.0f;   // a range's four bounds (deg), before they are tidied
       constexpr double kFolderLutRescanSec = 2.0;   // how often the Colour Lookup folder list is read again

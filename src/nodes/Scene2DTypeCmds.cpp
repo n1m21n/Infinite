@@ -70,7 +70,7 @@ namespace
    bool ValidTag(const std::string& tag)
    {
       static const char* known[] = { "liga", "dlig", "frac", "swsh", "salt", "ordn", "titl", "sups", "sinf", "calt", "smcp",
-                                     "c2sc", "zero", "case", "hlig" };
+                                     "c2sc", "zero", "case", "hlig", "ornm" };
       for (const char* k : known)
          if (tag == k)
             return true;
