@@ -245,6 +245,10 @@ namespace BrushEngine
 
    // Sampled tips (Photoshop's Define Brush Preset): a picture becomes a tip, dark and opaque paints most. Kept for
    // the run; saved presets carry the picture (SampledTipPixels) and add it back when they load. Returns an id > 0.
+   // How far a round tip of this radius (px) and hardness still paints: Photoshop's soft tip reaches past its radius.
+   float RoundTipReach(float radius, float hardness);
+   // The round tip's weight d px from its centre (the shader's RoundTip; exp where the shader uses (1 - u/64)^64).
+   float RoundTipWeight(float d, float radius, float hardness);
    int AddSampledTip(const std::vector<uint8_t>& rgbaTopDown, int w, int h);
    unsigned SampledTipTexture(int id);   // 0 for an unknown id
    bool SampledTipPixels(int id, std::vector<uint8_t>& mask, int& side);   // the square mask, one byte per pixel

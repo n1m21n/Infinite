@@ -285,22 +285,47 @@ const std::vector<FilterDef>& GetFilterDefs()
           LIN() } },
 
       // ---------------- Effects: sharpen ----------------
+      // Unsharp Mask, ported from PhotoCraft crates/algo/src/sharpen/reference.rs (MIT/Apache-2.0): a true Gaussian
+      // (sigma = Radius, reach ceil(3 sigma)) on premultiplied values, run as a horizontal prePass and a vertical main pass;
+      // a channel sharpens only where |pixel - blur| + 1e-6 reaches Threshold / 255; alpha and transparent pixels are kept.
       { "unsharpmask", "Effects",
         "uniform float uAmount;\n"
         "uniform float uRadius;\n"
+        "uniform float uThreshold;\n"
+        "void main() {\n"
+        "   vec4 o = texture(uSrc, vUv);\n"
+        "   if (o.a <= 0.0) { fragColor = o; return; }\n"
+        "   vec4 b = texture(uPass, vUv);\n"
+        "   if (uRadius >= 0.05) {\n"
+        "      int r = min(int(ceil(uRadius * 3.0)), 300);\n"
+        "      b = vec4(0.0); float t = 0.0;\n"
+        "      for (int i = -r; i <= r; i++) {\n"
+        "         float w = exp(-float(i * i) / (2.0 * uRadius * uRadius));\n"
+        "         b += texture(uPass, vUv + vec2(0.0, float(i) * uTexelSize.y)) * w; t += w;\n"
+        "      }\n"
+        "      b /= t;\n"
+        "   }\n"
+        "   vec3 bl = b.a > 0.0 ? b.rgb / b.a : vec3(0.0);\n"
+        "   vec3 d = o.rgb - bl;\n"
+        "   vec3 on = step(vec3(uThreshold / 255.0), abs(d) + 1e-6);\n"
+        "   fragColor = vec4(o.rgb + uAmount * d * on, o.a);\n"
+        "}\n",
+        { P("Amount", "uAmount", T::Float, 0.0f, 5.0f, 0.6f),
+          F("%.1f px", P("Radius", "uRadius", T::Float, 0.1f, 100.0f, 1.5f)),
+          F("%.0f levels", P("Threshold", "uThreshold", T::Float, 0.0f, 255.0f, 0.0f)) }, 1,
+        "uniform float uRadius;\n"
         "void main() {\n"
         "   vec4 c = texture(uSrc, vUv);\n"
-        "   vec4 blur = vec4(0.0); float total = 0.0;\n"
-        "   for (int x = -2; x <= 2; x++) for (int y = -2; y <= 2; y++) {\n"
-        "      vec2 off = vec2(float(x), float(y)) * uTexelSize * uRadius;\n"
-        "      float w = exp(-float(x*x + y*y) / 4.0);\n"
-        "      blur += texture(uSrc, vUv + off) * w; total += w;\n"
+        "   if (uRadius < 0.05) { fragColor = vec4(c.rgb * c.a, c.a); return; }\n"
+        "   int r = min(int(ceil(uRadius * 3.0)), 300);\n"
+        "   vec4 s = vec4(0.0); float t = 0.0;\n"
+        "   for (int i = -r; i <= r; i++) {\n"
+        "      float w = exp(-float(i * i) / (2.0 * uRadius * uRadius));\n"
+        "      vec4 q = texture(uSrc, vUv + vec2(float(i) * uTexelSize.x, 0.0));\n"
+        "      s += vec4(q.rgb * q.a, q.a) * w; t += w;\n"
         "   }\n"
-        "   blur /= total;\n"
-        "   fragColor = vec4(c.rgb + (c.rgb - blur.rgb) * uAmount, c.a);\n"
-        "}\n",
-        { P("Amount", "uAmount", T::Float, 0.0f, 3.0f, 0.6f),
-          F("%.1f px", P("Radius", "uRadius", T::Float, 0.1f, 5.0f, 1.5f)) } },
+        "   fragColor = s / t;\n"
+        "}\n" },
 
       // ---------------- Effects: distortion family ----------------
       { "twirl", "Effects",
@@ -1813,28 +1838,49 @@ const std::vector<FilterDef>& GetFilterDefs()
         "}\n",
         { F("%.1f px", P("Radius", "uRadius", T::Float, 1.0f, 24.0f, 3.0f)), P("Threshold", "uThreshold", T::Float, 0.0f, 1.0f, 0.1f), E("Mode", "uMode", { "Normal", "Edge Only", "Edge Overlay" }, 0), LIN() } },
 
-      // Filter > Blur > Shape Blur: a blur whose kernel is a shape (circle, hexagon, star, heart, square), like a lens's bokeh.
+      // Filter > Blur > Shape Blur: the mean over a shape (circle, hexagon, star, heart, square, ring, diamond, triangle,
+      // cross), like a lens's bokeh. The kernel is PhotoCraft's (crates/algo/src/blur2.rs, MIT/Apache-2.0): every pixel
+      // offset (dx, dy) within ceil(Radius) whose (dx, dy) / Radius is inside the shape, so Circle r3 covers 29 pixels and a
+      // fractional Square r2.5 covers 7 x 7. Above a reach of 12 the offsets are stepped (25 x 25 taps) to bound the cost.
       { "shape blur", "Effects",
         "uniform float uRadius;\n"
         "uniform int uShape;\n"
-        "bool Inside(vec2 p) {\n"
-        "   if (dot(p, p) < 1e-6) return true;\n"
-        "   if (uShape == 0) return dot(p, p) <= 1.0;\n"
-        "   if (uShape == 1) { vec2 q = abs(p); return max(q.x * 0.866025 + q.y * 0.5, q.y) <= 1.0; }\n"
-        "   if (uShape == 2) { float a = atan(p.y, p.x); float lim = 0.42 + 0.58 * pow(0.5 + 0.5 * cos(5.0 * (a - 1.5708)), 3.0); return length(p) <= lim; }\n"
-        "   if (uShape == 3) { vec2 q = p * 1.25; q.y = q.y + 0.25; float k = q.x * q.x + q.y * q.y - 1.0; return k * k * k - q.x * q.x * q.y * q.y * q.y <= 0.0; }\n"
+        "bool Star(float u, float v) {\n"
+        "   bool inside = false;\n"
+        "   for (int i = 0, j = 9; i < 10; j = i++) {\n"
+        "      float ri = (i % 2 == 0) ? 1.0 : 0.42, rj = (j % 2 == 0) ? 1.0 : 0.42;\n"
+        "      float ai = -1.5707963 + float(i) * 0.62831853, aj = -1.5707963 + float(j) * 0.62831853;\n"
+        "      vec2 pi = ri * vec2(cos(ai), sin(ai)), pj = rj * vec2(cos(aj), sin(aj));\n"
+        "      if ((pi.y > v) != (pj.y > v) && u < (pj.x - pi.x) * (v - pi.y) / (pj.y - pi.y) + pi.x) inside = !inside;\n"
+        "   }\n"
+        "   return inside;\n"
+        "}\n"
+        "bool Inside(float u, float v) {\n"  // u right, v down (PhotoCraft image rows)
+        "   float d = u * u + v * v;\n"
+        "   if (uShape == 0) return d <= 1.0;\n"
+        "   if (uShape == 1) { float a = mod(atan(v, u), 1.0471976) - 0.5235988; return sqrt(d) <= 0.8660254 / cos(a); }\n"
+        "   if (uShape == 2) return Star(u, v);\n"
+        "   if (uShape == 3) { float x = u * 1.2, y = -v * 1.2 + 0.15; float k = x * x + y * y - 1.0; return k * k * k - x * x * y * y * y <= 0.0; }\n"
+        "   if (uShape == 5) return d >= 0.36 && d <= 1.0;\n"
+        "   if (uShape == 6) return abs(u) + abs(v) <= 1.0;\n"
+        "   if (uShape == 7) return v <= 0.75 && abs(u) <= (v + 1.0) / 1.75;\n"
+        "   if (uShape == 8) return abs(u) <= 0.3 || abs(v) <= 0.3;\n"
         "   return true;\n"
         "}\n"
         "void main() {\n"
-        "   vec4 s = vec4(0.0); float n = 0.0;\n"
-        "   for (int j = 0; j < 9; j++)\n"
-        "      for (int i = 0; i < 9; i++) {\n"
-        "         vec2 p = vec2(float(i), float(j)) / 4.0 - 1.0;\n"
-        "         if (Inside(p)) { s += ImgPre(vUv + p * uRadius * uTexelSize); n += 1.0; }\n"
+        "   float r = max(uRadius, 0.5);\n"
+        "   int n = int(ceil(r)); float st = 1.0;\n"
+        "   if (n > 12) { st = r / 12.0; n = 12; }\n"
+        "   vec4 s = vec4(0.0); float c = 0.0;\n"
+        "   for (int j = -n; j <= n; j++)\n"
+        "      for (int i = -n; i <= n; i++) {\n"
+        "         vec2 o = vec2(float(i), float(j)) * st;\n"
+        "         if (Inside(o.x / r, -o.y / r)) { s += ImgPre(vUv + o * uTexelSize); c += 1.0; }\n"
         "      }\n"
-        "   fragColor = ImgUnpremul(s / max(n, 1.0));\n"
+        "   fragColor = c > 0.0 ? ImgUnpremul(s / c) : ImgSrc(vUv);\n"
         "}\n",
-        { F("%.0f px", P("Radius", "uRadius", T::Float, 1.0f, 100.0f, 10.0f)), E("Shape", "uShape", { "Circle", "Hexagon", "Star", "Heart", "Square" }, 0), LIN() } },
+        { F("%.0f px", P("Radius", "uRadius", T::Float, 1.0f, 100.0f, 10.0f)),
+          E("Shape", "uShape", { "Circle", "Hexagon", "Star", "Heart", "Square", "Ring", "Diamond", "Triangle", "Cross" }, 0), LIN() } },
 
       // Filter > Distort > ZigZag: ridges rippling out from the centre, turning pixels around it, pushing them out, or both (pond ripples).
       { "zigzag", "Effects",

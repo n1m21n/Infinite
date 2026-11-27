@@ -5400,7 +5400,6 @@ bool Scene2DNode::ReplaceColor(int layerId, const std::vector<SelectMaths::Sampl
       SelectMaths::Sample f;
       std::copy(fromRgb, fromRgb + 3, f.rgb);
       clicks.insert(clicks.begin(), f);   // the From colour, then the clicks that take colours out of it
-      std::fprintf(stderr, "PROBE replace colour from %.3f %.3f %.3f before %zu subtracts\n", fromRgb[0], fromRgb[1], fromRgb[2], s.size());
    }
    SyncSurfaces();
    auto it = mSurfaces.find(layerId);
@@ -5432,7 +5431,6 @@ bool Scene2DNode::ReplaceColor(int layerId, const std::vector<SelectMaths::Sampl
    WriteRect(it->second.fbo, 0, 0, W, H, px.data());
    const int all[4] = { 0, 0, W, H };
    StoreTiles(it->second, l->tiles, all);
-   std::fprintf(stderr, "PROBE replace colour layer %d changed %zu px\n", layerId, n);
    Commit();
    return true;
 }

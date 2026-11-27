@@ -30,6 +30,7 @@ extern bool gScene2DBounds;   // Scene2DNode.cpp: bounded layer passes
 namespace app
 {
 int View2DPanelSelfCheck(Scene2DNode* doc); // View2DPanel.cpp
+int RunView2DParitySection(Scene2DNode* doc, const char* only); // View2DParityTests.cpp
 namespace
 {
    // Wall-clock budgets mean nothing on a shared CI runner's software GL; the picture checks still run there.
@@ -308,6 +309,14 @@ void RunView2DTest()
    {
       printf("VIEW2DTEST FAIL\n");
       return;
+   }
+   // INFINITE_VIEW2DTEST_ONLY=<tag prefix>: only that section (e.g. parity, parity.tip), to test what just changed.
+   if (const char* only = getenv("INFINITE_VIEW2DTEST_ONLY"); only != nullptr && *only != '\0')
+   {
+      const bool pass = RunView2DParitySection(doc, only) == 0;
+      printf("VIEW2DTEST %s\n", pass ? "OK" : "FAIL");
+      fflush(stdout);
+      std::_Exit(pass ? 0 : 1);
    }
    GraphNode* docGn = nullptr;
    for (GraphNode& g : gNodes)
@@ -842,6 +851,23 @@ void RunView2DTest()
       pic.FindLayer(L)->reliefMat = 0;
       pic.Commit();
       Line(L, 30, 100, 270, 100, clay);
+      // The upper flank: the row above the stroke's centre where its coverage is nearest half (the tip's falloff decides
+      // where that is, so it is found, not fixed).
+      int flankY = 90;
+      {
+         std::vector<uint8_t> px;
+         int pw = 0, ph = 0;
+         if (pic.ReadPaint(L, px, pw, ph) && px.size() >= (size_t)pw * ph * 4 && pw > 150)
+         {
+            float best = 2.0f;
+            for (int y = 60; y < 100; y++)
+            {
+               const float a = px[((size_t)(ph - 1 - y) * pw + 150) * 4 + 3] / 255.0f;
+               if (std::fabs(a - 0.5f) < best)
+                  best = std::fabs(a - 0.5f), flankY = y;
+            }
+         }
+      }
       float flank[4][2];
       for (int mat = 0; mat < 4; mat++)
       {
@@ -853,12 +879,12 @@ void RunView2DTest()
             Cook(&pic);
             float sum = 0.0f;
             for (int x = 140; x < 160; x++)   // stipple is dots: average a run
-               sum += Pixel(&pic, x, 90)[0];
+               sum += Pixel(&pic, x, flankY)[0];
             flank[mat][k] = sum / 20.0f;
          }
       }
-      printf("  relief upper flank lit from top / bottom: clay %.3f/%.3f metal %.3f/%.3f chrome %.3f/%.3f stipple %.3f/%.3f\n",
-             flank[0][0], flank[0][1], flank[1][0], flank[1][1], flank[2][0], flank[2][1], flank[3][0], flank[3][1]);
+      printf("  relief upper flank (row %d) lit from top / bottom: clay %.3f/%.3f metal %.3f/%.3f chrome %.3f/%.3f stipple %.3f/%.3f\n",
+             flankY, flank[0][0], flank[0][1], flank[1][0], flank[1][1], flank[2][0], flank[2][1], flank[3][0], flank[3][1]);
       Check("S3: a relief stroke relights when the light turns", flank[0][0] > flank[0][1] + 0.15f);
       Check("S3: metal, chrome and stipple relight too", std::fabs(flank[1][0] - flank[1][1]) > 0.1f && std::fabs(flank[2][0] - flank[2][1]) > 0.1f
                                                          && std::fabs(flank[3][0] - flank[3][1]) > 0.05f);
@@ -1815,9 +1841,11 @@ void RunView2DTest()
          st.End(surf, dirty);
          d = Read();
          bool untouched = true;
+         // Past the tip's reach (the measured soft tip paints beyond its radius), plus a pixel for the dab's centre.
+         const float reach = BrushEngine::RoundTipReach(small.size * 0.5f, small.hardness) + 1.5f;
          for (int y = 0; y < S; y++)
             for (int x = 0; x < S; x++)
-               if (std::hypot(x - 48.0f, y - 48.0f) > 14.0f)
+               if (std::hypot(x - 48.0f, y - 48.0f) > reach)
                   untouched = untouched && d[((size_t)y * S + x) * 4 + 3] == 0;
          fprintf(stderr, "PROBE dither exact: same colour %d untouched %d\n", (int)exact, (int)untouched);
          Check("Brush: dithering never moves an exact colour or an untouched pixel", exact && untouched);
@@ -4315,6 +4343,8 @@ void RunView2DTest()
                   && std::fabs(nl->opacity - 0.5f) < 1e-5f && nl->name == "wash");
       }
    }
+   if (RunView2DParitySection(doc, "") > 0)
+      ok = false;
    if (doc != nullptr && View2DPanelSelfCheck(doc) > 0)
       ok = false;
    printf("VIEW2DTEST %s\n", ok ? "OK" : "FAIL");

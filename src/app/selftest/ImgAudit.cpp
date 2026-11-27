@@ -556,6 +556,151 @@ namespace
          flag.Add(who, "spec", "%.4f", err);
    }
 
+   // PhotoCraft parity (2026-11-27). Shape Blur's binary kernel (crates/algo/src/blur2/shape_tests.rs) and Unsharp Mask's
+   // Gaussian, halo and threshold rule (crates/algo/src/sharpen/tests.rs), against a CPU port of PhotoCraft's reference.
+   void AuditParity(Flags& flag)
+   {
+      if (const FilterDef* d = FindDef("shape blur"))
+      {
+         struct Want { const char* name; int shape; float radius; int count; };
+         static const Want kWant[] = { { "circle r3", 0, 3.0f, 29 }, { "ring r3", 5, 3.0f, 20 }, { "square r3", 4, 3.0f, 49 },
+                                       { "square r2.5", 4, 2.5f, 49 }, { "diamond r3", 6, 3.0f, 25 },
+                                       { "triangle r3", 7, 3.0f, 18 }, { "cross r3", 8, 3.0f, 13 } };
+         Image dot(15, 15);
+         float* c = dot.At(7, 7);
+         c[0] = c[1] = c[2] = c[3] = 1.0f;
+         for (const Want& w : kWant)
+         {
+            FilterRig r(*d);
+            r.Set("uLinear", 0.0f);
+            r.Set("uShape", (float)w.shape);
+            r.Set("uRadius", w.radius);
+            Image out;
+            int n = 0;
+            float peak = 0.0f;
+            if (r.Run(dot, out))
+               for (int y = 0; y < out.h; y++)
+                  for (int x = 0; x < out.w; x++)
+                     if (out.At(x, y)[3] > 1e-4f)
+                     {
+                        n++;
+                        peak = std::max(peak, out.At(x, y)[3]);
+                     }
+            const std::string what = std::string("kernel ") + w.name;
+            printf("IMGAUDIT PARITY shape blur %-12s covers %d px (want %d), weight %.4f\n", w.name, n, w.count, peak);
+            Spec(flag, "shape blur", what.c_str(), (float)std::abs(n - w.count) + std::abs(peak - 1.0f / (float)w.count),
+                 0.002f, "pixel count and 1/count weight");
+         }
+      }
+      if (const FilterDef* d = FindDef("unsharpmask"))
+      {
+         // A soft step 0.25 | 0.75 at x = 30, rows identical, so only the horizontal kernel matters.
+         const int W = 64, H = 5;
+         auto Edge = [&](float alpha) {
+            Image im(W, H);
+            for (int y = 0; y < H; y++)
+               for (int x = 0; x < W; x++)
+               {
+                  float* p = im.At(x, y);
+                  p[0] = p[1] = p[2] = x >= 30 ? 0.75f : 0.25f;
+                  p[3] = alpha;
+               }
+            return im;
+         };
+         auto Blur = [&](const Image& im, int x, float sigma) {
+            if (sigma < 0.05f)
+               return im.At(x, 0)[0];
+            const int r = (int)std::ceil(sigma * 3.0f);
+            double s = 0.0, t = 0.0;
+            for (int i = -r; i <= r; i++)
+            {
+               const double w = std::exp(-(double)(i * i) / (2.0 * sigma * sigma));
+               s += w * im.At(std::clamp(x + i, 0, W - 1), 0)[0];
+               t += w;
+            }
+            return (float)(s / t);
+         };
+         for (float alpha : { 1.0f, 0.7f })
+            for (float radius : { 0.6f, 3.25f })
+            {
+               const Image in = Edge(alpha);
+               FilterRig r(*d);
+               r.Set("uAmount", 3.0f);
+               r.Set("uRadius", radius);
+               Image out;
+               float err = 1.0f, halo = 0.0f;
+               if (r.Run(in, out))
+               {
+                  err = 0.0f;
+                  for (int x = 12; x < W - 12; x++)
+                  {
+                     // Every shader's colour is floored at 0 (GLUtil's output wrap keeps headroom above 1, never below 0).
+                     const float o = in.At(x, 0)[0], want = std::max(0.0f, o + 3.0f * (o - Blur(in, x, radius)));
+                     err = std::max(err, std::abs(out.At(x, 2)[0] - want));
+                     err = std::max(err, std::abs(out.At(x, 2)[3] - alpha));
+                     halo = std::max(halo, out.At(x, 2)[0]);
+                  }
+               }
+               char what[64];
+               std::snprintf(what, sizeof(what), "halo a%.1f r%.2f", alpha, radius);
+               printf("IMGAUDIT PARITY unsharp %s err %.5f peak %.3f\n", what, err, halo);
+               // The blur pass is half float (a step of 1/2048 at 0.5..1), and the amount of 3 multiplies its rounding by 4.
+               Spec(flag, "unsharpmask", what, err, 4e-3f, "PhotoCraft o + k(o - gauss), floored at 0");
+            }
+         {
+            // Threshold: a channel sharpens only where |o - blur| reaches threshold / 255. Columns within 0.004 of the
+            // boundary are skipped (the pass texture is half float).
+            const Image in = Edge(1.0f);
+            const float radius = 3.25f, k = 2.0f;
+            const float level = std::abs(0.25f - Blur(in, 26, radius)) * 255.0f;
+            FilterRig r(*d);
+            r.Set("uAmount", k);
+            r.Set("uRadius", radius);
+            r.Set("uThreshold", level);
+            Image out;
+            float err = 1.0f;
+            int on = 0, off = 0;
+            if (r.Run(in, out))
+            {
+               err = 0.0f;
+               for (int x = 12; x < W - 12; x++)
+               {
+                  const float o = in.At(x, 0)[0], dd = o - Blur(in, x, radius);
+                  if (std::abs(std::abs(dd) * 255.0f - level) < 0.004f * 255.0f)
+                     continue;
+                  const bool sharp = std::abs(dd) + 1e-6f >= level / 255.0f;
+                  (sharp ? on : off)++;
+                  err = std::max(err, std::abs(out.At(x, 2)[0] - (sharp ? std::max(0.0f, o + k * dd) : o)));
+               }
+            }
+            printf("IMGAUDIT PARITY unsharp threshold %.2f levels: %d sharpened, %d kept, err %.5f\n", level, on, off, err);
+            Spec(flag, "unsharpmask", "threshold boundary", err + (on > 0 && off > 0 ? 0.0f : 1.0f), 2e-3f,
+                 "sharpen at or above, keep below");
+         }
+         {
+            // A flat field has no halo, and a transparent pixel keeps its hidden colour.
+            Image in(16, 16);
+            in.Fill(0.4f, 0.4f, 0.4f, 1.0f);
+            float* hole = in.At(8, 8);
+            hole[0] = 0.9f; hole[1] = 0.1f; hole[2] = 0.3f; hole[3] = 0.0f;
+            FilterRig r(*d);
+            r.Set("uAmount", 5.0f);
+            r.Set("uRadius", 2.0f);
+            Image out;
+            float err = 1.0f;
+            if (r.Run(in, out))
+            {
+               err = std::abs(out.At(8, 8)[0] - 0.9f) + std::abs(out.At(8, 8)[1] - 0.1f) + std::abs(out.At(8, 8)[3]);
+               for (int y = 0; y < 16; y++)
+                  for (int x = 0; x < 16; x++)
+                     if (std::abs(x - 8) > 7 || std::abs(y - 8) > 7)
+                        err = std::max(err, std::abs(out.At(x, y)[0] - 0.4f));
+            }
+            Spec(flag, "unsharpmask", "flat field and transparent pixel", err, 2e-3f, "unchanged");
+         }
+      }
+   }
+
    void AuditSpecs(Flags& flag)
    {
       const Image ramp = FullRamp();
@@ -1030,7 +1175,17 @@ bool RunImgAudit()
    Flags flag;
    bool ok = true;
    int audited = 0;
+   // INFINITE_IMGAUDIT_ONLY=parity runs only the PhotoCraft parity checks.
+   if (const char* only = std::getenv("INFINITE_IMGAUDIT_ONLY"); only != nullptr && std::string(only).rfind("parity", 0) == 0)
+   {
+      AuditParity(flag);
+      if (gReadFbo != 0)
+         glDeleteFramebuffers(1, &gReadFbo);
+      printf("IMGAUDIT parity, %d flag(s) %s\n", flag.count, flag.count == 0 ? "OK" : "FAIL");
+      return flag.count == 0;
+   }
    AuditFilters(flag, ok, audited);
+   AuditParity(flag);
    AuditCurvesBlend(flag);
    AuditSpecs(flag);
    if (gReadFbo != 0)
