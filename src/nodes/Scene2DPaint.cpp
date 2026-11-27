@@ -15,6 +15,7 @@
 #include "core/ml/ModNet.h"
 #include "core/ml/TextOcr.h"
 #include "core/ml/ObjectDetect.h"
+#include "core/ml/Upscale.h"
 #include "platform/Platform.h"
 #include <chrono>
 
@@ -5236,4 +5237,45 @@ bool Scene2DNode::PreviewSubjectMatte(int op, bool sampleAll, int layerId)
       std::memcpy(&region[(size_t)(H - 1 - y) * W], &alphaTop[(size_t)y * W], (size_t)W);
    CombineSelection(region, op);
    return true;
+}
+
+int Scene2DNode::UpscaleLayer2x(int layerId, std::string* outHint)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> px;
+   const Layer* l = FindConst(layerId);
+   const std::string baseName = l ? l->name : "Layer";
+   const int parent = l ? l->parent : 0;
+   auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
+   if (it != mSurfaces.end() && l->pw == W && l->ph == H)
+      ReadRect(it->second.fbo, 0, 0, W, H, px);
+   else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
+      ReadRect(mOut, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return 0;
+
+   std::vector<uint8_t> topDown(px.size());
+   for (int y = 0; y < H; y++)
+      std::memcpy(&topDown[(size_t)y * W * 4], &px[(size_t)(H - 1 - y) * W * 4], (size_t)W * 4);
+
+   std::vector<uint8_t> upTop;
+   int uw = 0, uh = 0;
+   if (Ml::Upscale::Available())
+   {
+      std::string err;
+      if (!Ml::Upscale::Run2xNow(topDown, W, H, upTop, uw, uh, err))
+      {
+         if (outHint) *outHint = err;
+         Ml::Upscale::Fallback2x(topDown, W, H, upTop, uw, uh);
+      }
+   }
+   else
+   {
+      if (outHint) *outHint = Ml::Upscale::Missing();
+      Ml::Upscale::Fallback2x(topDown, W, H, upTop, uw, uh);
+   }
+   if (uw < 2 || uh < 2 || upTop.size() != (size_t)uw * uh * 4)
+      return 0;
+   return AddFileLayer(parent, baseName + " 2x", 0, 0, uw, uh, upTop, layerId);
 }

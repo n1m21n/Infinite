@@ -13137,6 +13137,12 @@ namespace
                if (doc->ExtractTextLayers(false, l->id) > 0)
                   Touch();
             }
+            if (l->kind != Kind::Group && !adj && MenuParts::Item(T("Upscale 2x"), nullptr))
+            {
+               PushUndoCheckpoint("Upscale 2x");
+               if (doc->UpscaleLayer2x(l->id) > 0)
+                  Touch();
+            }
             if (!adj && MenuParts::Item(T("Layer as Output"), nullptr, l->output)) sPending.what = Pending::LayerOutput;
             if (!adj && doc->CanTakeBelow(*l) && MenuParts::Item(T("Effect on Below"), nullptr, l->below)) sPending.what = Pending::LayerBelow;
             if (l->warpOn && MenuParts::Item(T("Reset Distort"), nullptr))
