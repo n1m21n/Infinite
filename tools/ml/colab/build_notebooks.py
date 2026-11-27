@@ -32,7 +32,7 @@ def nb(cells):
    }
 
 
-COMMON_SETUP = """!pip -q install -U torch torchvision timm onnx onnxslim onnxruntime lpips pillow numpy tqdm huggingface_hub
+COMMON_SETUP = """!pip -q install -U torch torchvision timm onnx onnxscript onnxslim onnxruntime lpips pillow numpy tqdm huggingface_hub
 import os, hashlib, torch, onnx, onnxslim, onnxruntime as ort
 print("PyTorch:", torch.__version__, "CUDA:", torch.cuda.is_available())"""
 
