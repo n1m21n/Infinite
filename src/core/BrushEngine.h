@@ -110,6 +110,7 @@ namespace BrushEngine
       float refillJitter = 0.0f;   // 0..1, per dab: the same for `refill`
       // Node-fed: a canvas node's picture as the tip, the canvas texture or the colour (0 = built in).
       unsigned tipTex = 0;         // luma x alpha is the mask, in the tip's frame (angle, roundness, follow)
+      int sampledTip = 0;          // Edit > Define Brush Preset: a picture tip (AddSampledTip) used when no node feeds tipTex
       unsigned grainTex = 0;       // tiled at its own pixel size x grainScale, fixed to the canvas
       int grainTexW = 0, grainTexH = 0;
       unsigned colorTex = 0;       // stretched over the surface: each pixel takes the colour under it
@@ -241,6 +242,12 @@ namespace BrushEngine
       const char* group = nullptr;   // "Basic", "Creative", "Texture", "Eraser": the preset menu's headers
    };
    const std::vector<Preset>& Presets();
+
+   // Sampled tips (Photoshop's Define Brush Preset): a picture becomes a tip, dark and opaque paints most. Kept for
+   // the run; saved presets carry the picture (SampledTipPixels) and add it back when they load. Returns an id > 0.
+   int AddSampledTip(const std::vector<uint8_t>& rgbaTopDown, int w, int h);
+   unsigned SampledTipTexture(int id);   // 0 for an unknown id
+   bool SampledTipPixels(int id, std::vector<uint8_t>& mask, int& side);   // the square mask, one byte per pixel
 
    // One stroke on one surface at a time. Owns the coverage, display and merge
    // buffers, sized to the surface on Begin.

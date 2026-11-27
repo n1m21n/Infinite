@@ -4,8 +4,8 @@
 ux_seed.py matched any string literal once, on 2026-11-18. This scanner lists every place a user can reach a command
 in View2DPanel.cpp and passes a row only when its PhotoCraft label is one of them (allowlist, not a pattern grep):
 
-  menu    a MenuParts::Item / SubMenu / Choice / Toggle line: its T("...") / L("...") labels, the literal arrays it
-          indexes or loops over (1D or 2D), and the *Label() functions it calls (their literal strings)
+  menu    a MenuParts::Item / SubMenu / Choice / Toggle / Check line: its T("...") / L("...") labels, the literal arrays it
+          indexes or loops over (1D or 2D), and the *Label() / AdjName() functions it calls (their literal strings)
   chip    a TextChip / ZoomChip line: its label (text before ##) and its tip's lead words ("Grow: ...", "Zoom in (Ctrl++)")
   effect  a label in kNodeEffects (the effect stack's Add sheet: Photoshop's Filter menu)
 
@@ -33,14 +33,31 @@ RENAME = {'horizontally': 'horizontal spacing', 'vertically': 'vertical spacing'
 REVIEWED = {'cmd:type.orientation.vertical': 'vertical',
             'cmd:type.openType.numerals.lining': 'lining figures', 'cmd:type.openType.numerals.oldstyle': 'oldstyle figures',
             'cmd:type.openType.numerals.proportional': 'proportional figures',
-            'cmd:type.openType.numerals.tabular': 'tabular figures', 'cmd:type.openType.oldstyle': 'oldstyle figures'}
+            'cmd:type.openType.numerals.tabular': 'tabular figures', 'cmd:type.openType.oldstyle': 'oldstyle figures',
+            # 2026-11-27, each read in View2DPanel.cpp: the item does what the PhotoCraft command does.
+            'cmd:layer.layerMask.fromTransparency': 'mask from transparency',
+            'cmd:layer.layerMask.enabled': 'disable mask',
+            'cmd:layer.layerMask.revealSelection': 'mask from selection',
+            'cmd:layer.mergeGroup': 'flatten group',
+            'cmd:layer.layerContentOptions': 'edit fill',
+            'cmd:type.createWorkPath': 'work path from text',
+            'cmd:type.rasterize': 'rasterize layer', 'cmd:type.rasterizeTypeLayer': 'rasterize layer',
+            'cmd:shape.rasterize': 'rasterize layer',
+            'cmd:type.resolveMissingFonts': 'replace all missing fonts',
+            'cmd:edit.transform.splitWarpCrosswise': 'split cross', 'cmd:edit.transform.splitWarpHorizontally': 'split h',
+            'cmd:edit.transform.splitWarpVertically': 'split v', 'cmd:edit.transform.removeWarpSplit': 'remove split',
+            'cmd:view.clearCanvasGuides': 'clear guides',
+            'cmd:view.resetView': 'reset rotation',
+            'cmd:type.orientation.horizontal': 'vertical type',
+            'cmd:filter.pixelate.colorHalftone': 'halftone',
+            'cmd:edit.pasteSpecial.pasteInPlace': 'paste'}   # our own copy pastes back where it was
 SPELL = ((r'centre', 'center'), (r'colour', 'color'), (r'grey', 'gray'))
 
-CALL = re.compile(r'MenuParts::(Item|SubMenu|Choice|Toggle)\(|(?:Text|Zoom)Chip\(')
+CALL = re.compile(r'MenuParts::(Item|SubMenu|Choice|Toggle|Check)\(|(?:Text|Zoom)Chip\(')
 LITS = re.compile(r'\b[TL]\(\s*"([^"]+)"|TextChip\(\s*"([^"]+)"')
 ARR_REF = re.compile(r'\b(k\w+)\s*\[')
 LOOP_REF = re.compile(r'for\s*\([^:;]*:\s*(k\w+)\s*\)')
-FUNC_REF = re.compile(r'\b(\w+Label)\(')
+FUNC_REF = re.compile(r'\b(\w+Label|AdjName)\(')
 ARR_HEAD = re.compile(r'const\s+char\s*\*\s*(?:const\s+)?(k\w+)\s*(?:\[[^\]]*\])+\s*=\s*\{')
 TIP = re.compile(r'T\("([A-Z][^"]{2,40}?)(?::\s|\s\()')
 SUB_SPAN = 80   # lines: an item this close below a SubMenu is taken as inside it
@@ -51,6 +68,7 @@ def norm(s):
     for a_, b_ in SPELL:
         s = re.sub(a_, b_, s, flags=re.I)
     s = re.sub(r'\s*\[.*\]$', '', s)
+    s = re.sub(r'\s*/\s*', '/', s)
     return s.replace('…', '').replace('...', '').strip().lower()
 
 
@@ -71,9 +89,9 @@ def label_funcs():
     out = {}
     for f in (ROOT / 'src/nodes').glob('Scene2D*'):
         t = f.read_text(errors='ignore')
-        for m in re.finditer(r'\b(\w+Label)\s*\([^;{)]*\)\s*(?:const\s*)?\{', t):
+        for m in re.finditer(r'\b(\w+Label|Scene2DNode::AdjName)\s*\([^;{)]*\)\s*(?:const\s*)?\{', t):
             body = t[m.end():t.find('\n}', m.end())]
-            out.setdefault(m.group(1), re.findall(r'"([^"]{2,40})"', body))
+            out.setdefault(m.group(1).split('::')[-1], re.findall(r'"([^"]{2,40})"', body))
     return out
 
 

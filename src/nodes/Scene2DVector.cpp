@@ -1449,6 +1449,7 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
          key = HF(key, f);
    key = H(key, (unsigned)(l.typeMode | (l.pathFlip << 2) | (l.vertical << 3) | (l.warpVert << 4)));
    key = H(key, (unsigned)l.warpStyle);
+   key = H(key, (unsigned)l.typeAA + 101u);
    for (float f : { l.pathOffset, l.pathEnd, l.warpBend, l.warpH, l.warpV })
       key = HF(key, f);
    for (const Shape& s : l.typePath)
@@ -1665,6 +1666,7 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
       tb.gh = tb.h;
       if (l.warpStyle != 0)
          WarpTypeRaster(l, tb);
+      ShapeTypeEdges(l.typeAA, l.textC[3], tb.rgba);
    }
    w = tb.w;
    h = tb.h;

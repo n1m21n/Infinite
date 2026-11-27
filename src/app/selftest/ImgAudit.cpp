@@ -560,6 +560,29 @@ namespace
    {
       const Image ramp = FullRamp();
 
+      // PhotoCraft Filter menu (2026-11-27): at its defaults each one visibly changes a picture.
+      {
+         static const char* kPhotoCraft[] = { "crystallize", "facet", "fragment", "mezzotint", "pointillize", "diffuse",
+                                              "extrude", "oil paint", "tiles", "trace contour", "wind streaks",
+                                              "tilt shift", "iris blur", "spin blur", "field blur", "path blur",
+                                              "smart blur", "shape blur", "zigzag", "reduce noise", "hsb hsl", "fibers",
+                                              "lens flare", "lighting effects" };
+         const Image pic = RandomColours(128, 96, 5);
+         for (const char* n : kPhotoCraft)
+         {
+            const FilterDef* d = FindDef(n);
+            float changed = 0.0f;
+            if (d != nullptr)
+            {
+               FilterRig r(*d);
+               Image out;
+               if (r.Run(pic, out))
+                  changed = MaxAbsDiffRgb(out, pic);
+            }
+            Spec(flag, n, "changes the picture at defaults", std::max(0.0f, 0.05f - changed), 0.0f, "shortfall under a 0.05 change");
+         }
+      }
+
       // invert: 1 - x exactly.
       if (const FilterDef* d = FindDef("invert"))
       {

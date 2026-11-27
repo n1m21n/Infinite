@@ -1420,7 +1420,661 @@ const std::vector<FilterDef>& GetFilterDefs()
           F("%.1f px", P("Offset Y", "uOffsetY", T::Float, -20.0f, 20.0f, 4.0f)),
           P("Color", "uColor", T::Color, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f),
           P("Opacity", "uOpacity", T::Float, 0.0f, 1.0f, 0.6f) } },
+
+      // ---------------- Effects: the PhotoCraft Filter menu (2D View Add sheet, owner yes 2026-11-27) ----------------
+      // Filter > Pixelate > Crystallize: each pixel takes the colour at the nearest of a jittered grid of seeds (Voronoi cells).
+      { "crystallize", "Effects",
+        "float H21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n"
+        "vec2 H22(vec2 p) { float n = H21(p); return vec2(n, H21(p + n + 17.0)); }\n"
+        "uniform float uCell;\n"
+        "void main() {\n"
+        "   vec2 px = vUv / uTexelSize; float s = max(uCell, 1.0);\n"
+        "   vec2 g = floor(px / s), bp = px; float best = 1e20;\n"
+        "   for (int j = -1; j <= 1; j++)\n"
+        "      for (int i = -1; i <= 1; i++) {\n"
+        "         vec2 c = g + vec2(float(i), float(j)), p = (c + H22(c)) * s;\n"
+        "         float d = dot(p - px, p - px);\n"
+        "         if (d < best) { best = d; bp = p; }\n"
+        "      }\n"
+        "   fragColor = ImgSrc(clamp((floor(bp) + 0.5) * uTexelSize, vec2(0.0), vec2(1.0)));\n"
+        "}\n",
+        { N("%.0f px", P("Cell Size", "uCell", T::Float, 3.0f, 300.0f, 10.0f)), LIN() } },
+
+      // Filter > Pixelate > Facet: flat patches of like colour (a small Kuwahara: the quietest quarter of the neighbourhood wins).
+      { "facet", "Effects",
+        "float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
+        "vec4 Kuwahara(int r) {\n"
+        "   vec4 m[4]; float v[4];\n"
+        "   for (int q = 0; q < 4; q++) {\n"
+        "      vec2 sg = vec2((q == 1 || q == 3) ? -1.0 : 1.0, q >= 2 ? -1.0 : 1.0);\n"
+        "      vec4 s = vec4(0.0); float s2 = 0.0, n = 0.0;\n"
+        "      for (int j = 0; j <= 8; j++) {\n"
+        "         if (j > r) break;\n"
+        "         for (int i = 0; i <= 8; i++) {\n"
+        "            if (i > r) break;\n"
+        "            vec4 c = ImgPre(vUv + sg * vec2(float(i), float(j)) * uTexelSize);\n"
+        "            float l = clamp(Luma(c.rgb), -4.0, 4.0);\n"
+        "            s += c; s2 += l * l; n += 1.0;\n"
+        "         }\n"
+        "      }\n"
+        "      m[q] = s / n;\n"
+        "      float ml = clamp(Luma(m[q].rgb), -4.0, 4.0);\n"
+        "      v[q] = s2 / n - ml * ml;\n"
+        "   }\n"
+        "   int b = 0;\n"
+        "   for (int q = 1; q < 4; q++) if (v[q] < v[b]) b = q;\n"
+        "   return m[b];\n"
+        "}\n"
+        "void main() { fragColor = ImgUnpremul(Kuwahara(2)); }\n",
+        { LIN() } },
+
+      // Filter > Pixelate > Fragment: four copies of the picture offset around each pixel and averaged.
+      { "fragment", "Effects",
+        "uniform float uDistance;\n"
+        "void main() {\n"
+        "   vec2 d = uDistance * uTexelSize;\n"
+        "   vec4 s = ImgPre(vUv + vec2(d.x, 0.0)) + ImgPre(vUv - vec2(d.x, 0.0)) + ImgPre(vUv + vec2(0.0, d.y)) + ImgPre(vUv - vec2(0.0, d.y));\n"
+        "   fragColor = ImgUnpremul(s * 0.25);\n"
+        "}\n",
+        { F("%.1f px", P("Distance", "uDistance", T::Float, 1.0f, 20.0f, 4.0f)), LIN() } },
+
+      // Filter > Pixelate > Mezzotint: each channel becomes full or empty against a random screen of dots, lines or strokes.
+      { "mezzotint", "Effects",
+        "float H21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n"
+        "vec2 H22(vec2 p) { float n = H21(p); return vec2(n, H21(p + n + 17.0)); }\n"
+        "uniform int uType;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   vec2 px = floor(vUv / uTexelSize);\n"
+        "   vec2 cell = px;\n"
+        "   if (uType == 1) cell = floor(px / 2.0);\n"
+        "   else if (uType == 2) cell = floor(px / 3.0);\n"
+        "   else if (uType == 3) cell = vec2(floor(px.x / 4.0), px.y);\n"
+        "   else if (uType == 4) cell = vec2(floor(px.x / 12.0), px.y);\n"
+        "   else if (uType == 5) cell = vec2(floor((px.x + px.y) / 6.0), px.x - px.y);\n"
+        "   vec3 o;\n"
+        "   for (int k = 0; k < 3; k++) o[k] = step(H21(cell + float(k) * 31.7), clamp(c[k], 0.0, 1.0));\n"
+        "   fragColor = vec4(o, c.a);\n"
+        "}\n",
+        { E("Type", "uType", { "Fine Dots", "Medium Dots", "Coarse Dots", "Short Lines", "Long Lines", "Short Strokes" }, 0) } },
+
+      // Filter > Pixelate > Pointillize: round dots of the picture's colour, jittered, on the background colour.
+      { "pointillize", "Effects",
+        "float H21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n"
+        "vec2 H22(vec2 p) { float n = H21(p); return vec2(n, H21(p + n + 17.0)); }\n"
+        "uniform float uCell;\n"
+        "uniform vec3 uBack;\n"
+        "void main() {\n"
+        "   vec2 px = vUv / uTexelSize; float s = max(uCell, 1.0);\n"
+        "   vec2 g = floor(px / s), bp = px; float best = 1e20;\n"
+        "   for (int j = -1; j <= 1; j++)\n"
+        "      for (int i = -1; i <= 1; i++) {\n"
+        "         vec2 c = g + vec2(float(i), float(j)), p = (c + 0.2 + 0.6 * H22(c)) * s;\n"
+        "         float d = dot(p - px, p - px);\n"
+        "         if (d < best) { best = d; bp = p; }\n"
+        "      }\n"
+        "   float r = 0.5 * s, d = sqrt(best);\n"
+        "   float in_ = clamp(r - d + 0.5, 0.0, 1.0);\n"
+        "   vec4 dot_ = ImgSrc(clamp((floor(bp) + 0.5) * uTexelSize, vec2(0.0), vec2(1.0)));\n"
+        "   vec4 here = ImgSrc(vUv);\n"
+        "   vec4 back = vec4(ImgDecode(uBack), here.a);\n"
+        "   float a = mix(back.a, dot_.a, in_);\n"
+        "   vec3 pre = mix(back.rgb * back.a, dot_.rgb * dot_.a, in_);\n"
+        "   fragColor = vec4(a > 0.0 ? pre / a : vec3(0.0), a);\n"
+        "}\n",
+        { N("%.0f px", P("Cell Size", "uCell", T::Float, 3.0f, 300.0f, 8.0f)), P("Background", "uBack", T::Color, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f), LIN() } },
+
+      // Filter > Stylize > Diffuse: each pixel swapped with a random neighbour (Darken / Lighten Only keep the swap only when it is darker / lighter).
+      { "diffuse", "Effects",
+        "float H21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n"
+        "vec2 H22(vec2 p) { float n = H21(p); return vec2(n, H21(p + n + 17.0)); }\n"
+        "float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
+        "uniform int uMode;\n"
+        "uniform float uRadius;\n"
+        "void main() {\n"
+        "   vec2 px = floor(vUv / uTexelSize);\n"
+        "   vec2 o = floor((H22(px) * 2.0 - 1.0) * uRadius + 0.5);\n"
+        "   vec4 c = ImgSrc(vUv), n = ImgSrc(vUv + o * uTexelSize);\n"
+        "   float lc = Luma(c.rgb) * c.a, ln = Luma(n.rgb) * n.a;\n"
+        "   bool take = uMode == 0 || (uMode == 1 && ln < lc) || (uMode == 2 && ln > lc);\n"
+        "   fragColor = take ? n : c;\n"
+        "}\n",
+        { E("Mode", "uMode", { "Normal", "Darken Only", "Lighten Only" }, 0), F("%.0f px", P("Radius", "uRadius", T::Float, 1.0f, 8.0f, 2.0f)), LIN() } },
+
+      // Filter > Stylize > Extrude: the picture cut into square blocks or pyramids, each lit from the top left.
+      { "extrude", "Effects",
+        "uniform int uType;\n"
+        "uniform float uSize;\n"
+        "uniform float uDepth;\n"
+        "void main() {\n"
+        "   vec2 px = vUv / uTexelSize; float s = max(uSize, 2.0);\n"
+        "   vec2 cell = floor(px / s), p = (px - (cell + 0.5) * s) / (0.5 * s);\n"
+        "   vec4 c = ImgSrc(clamp((floor((cell + 0.5) * s) + 0.5) * uTexelSize, vec2(0.0), vec2(1.0)));\n"
+        "   float shade = 1.0;\n"
+        "   bool side = uType == 1 || max(abs(p.x), abs(p.y)) > 1.0 - uDepth;\n"
+        "   if (side) {\n"
+        "      if (abs(p.x) > abs(p.y)) shade = p.x < 0.0 ? 1.25 : 0.7;\n"
+        "      else shade = p.y > 0.0 ? 1.15 : 0.55;\n"
+        "   }\n"
+        "   fragColor = vec4(c.rgb * shade, c.a);\n"
+        "}\n",
+        { E("Type", "uType", { "Blocks", "Pyramids" }, 0), N("%.0f px", P("Size", "uSize", T::Float, 2.0f, 255.0f, 30.0f)), P("Depth", "uDepth", T::Float, 0.05f, 0.9f, 0.3f), LIN() } },
+
+      // Filter > Stylize > Oil Paint: flat brush patches (Kuwahara, Stylization the radius) with Shine lighting the strokes' relief.
+      { "oil paint", "Effects",
+        "float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
+        "vec4 Kuwahara(int r) {\n"
+        "   vec4 m[4]; float v[4];\n"
+        "   for (int q = 0; q < 4; q++) {\n"
+        "      vec2 sg = vec2((q == 1 || q == 3) ? -1.0 : 1.0, q >= 2 ? -1.0 : 1.0);\n"
+        "      vec4 s = vec4(0.0); float s2 = 0.0, n = 0.0;\n"
+        "      for (int j = 0; j <= 8; j++) {\n"
+        "         if (j > r) break;\n"
+        "         for (int i = 0; i <= 8; i++) {\n"
+        "            if (i > r) break;\n"
+        "            vec4 c = ImgPre(vUv + sg * vec2(float(i), float(j)) * uTexelSize);\n"
+        "            float l = clamp(Luma(c.rgb), -4.0, 4.0);\n"
+        "            s += c; s2 += l * l; n += 1.0;\n"
+        "         }\n"
+        "      }\n"
+        "      m[q] = s / n;\n"
+        "      float ml = clamp(Luma(m[q].rgb), -4.0, 4.0);\n"
+        "      v[q] = s2 / n - ml * ml;\n"
+        "   }\n"
+        "   int b = 0;\n"
+        "   for (int q = 1; q < 4; q++) if (v[q] < v[b]) b = q;\n"
+        "   return m[b];\n"
+        "}\n"
+        "uniform float uStyle;\n"
+        "uniform float uShine;\n"
+        "uniform float uAngle;\n"
+        "void main() {\n"
+        "   vec4 k = ImgUnpremul(Kuwahara(int(clamp(uStyle, 1.0, 8.0) + 0.5)));\n"
+        "   vec2 t = uTexelSize * 2.0;\n"
+        "   float gx = Luma(ImgPre(vUv + vec2(t.x, 0.0)).rgb) - Luma(ImgPre(vUv - vec2(t.x, 0.0)).rgb);\n"
+        "   float gy = Luma(ImgPre(vUv + vec2(0.0, t.y)).rgb) - Luma(ImgPre(vUv - vec2(0.0, t.y)).rgb);\n"
+        "   float lit = clamp(dot(vec2(gx, gy), vec2(cos(uAngle), sin(uAngle))), -1.0, 1.0);\n"
+        "   fragColor = vec4(max(k.rgb * (1.0 + lit * uShine * 2.0), vec3(0.0)), k.a);\n"
+        "}\n",
+        { N("%.0f px", P("Stylization", "uStyle", T::Float, 1.0f, 8.0f, 4.0f)), P("Shine", "uShine", T::Float, 0.0f, 1.0f, 0.3f), P("Angle", "uAngle", T::Float, -180.0f, 180.0f, 135.0f, 0.0f, 0.0f, true), LIN() } },
+
+      // Filter > Stylize > Tiles: the picture cut into square tiles, each nudged a random way; the gaps take the fill.
+      { "tiles", "Effects",
+        "float H21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n"
+        "vec2 H22(vec2 p) { float n = H21(p); return vec2(n, H21(p + n + 17.0)); }\n"
+        "uniform float uCount;\n"
+        "uniform float uOffset;\n"
+        "uniform int uFill;\n"
+        "uniform vec3 uBack;\n"
+        "void main() {\n"
+        "   vec2 px = vUv / uTexelSize; float s = max(1.0 / (uTexelSize.x * max(uCount, 1.0)), 2.0);\n"
+        "   vec2 g = floor(px / s), src = vec2(-1.0); bool hit = false;\n"
+        "   for (int j = -1; j <= 1; j++)\n"
+        "      for (int i = -1; i <= 1; i++) {\n"
+        "         vec2 c = g + vec2(float(i), float(j));\n"
+        "         vec2 off = (H22(c) * 2.0 - 1.0) * uOffset * s;\n"
+        "         vec2 q = px - off;\n"
+        "         if (all(greaterThanEqual(q, c * s)) && all(lessThan(q, (c + 1.0) * s))) { src = q; hit = true; }\n"
+        "      }\n"
+        "   vec4 here = ImgSrc(vUv);\n"
+        "   if (hit) fragColor = ImgSrc(clamp((floor(src) + 0.5) * uTexelSize, vec2(0.0), vec2(1.0)));\n"
+        "   else if (uFill == 0) fragColor = vec4(ImgDecode(uBack), 1.0);\n"
+        "   else if (uFill == 1) fragColor = vec4(ImgDecode(1.0 - ImgEncode(clamp(here.rgb, 0.0, 1.0))), here.a);\n"
+        "   else if (uFill == 2) fragColor = here;\n"
+        "   else fragColor = vec4(0.0);\n"
+        "}\n",
+        { N("%.0f", P("Tiles", "uCount", T::Float, 1.0f, 99.0f, 10.0f)), P("Offset", "uOffset", T::Float, 0.0f, 0.5f, 0.1f), E("Fill", "uFill", { "Background Colour", "Inverse", "Unaltered", "Transparent" }, 0), P("Background", "uBack", T::Color, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f), LIN() } },
+
+      // Filter > Stylize > Trace Contour: thin lines, per channel, where the brightness crosses Level (white elsewhere).
+      { "trace contour", "Effects",
+        "uniform float uLevel;\n"
+        "uniform int uEdge;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   vec4 cr = texture(uSrc, vUv + vec2(uTexelSize.x, 0.0)), cd = texture(uSrc, vUv - vec2(0.0, uTexelSize.y));\n"
+        "   vec3 a = clamp(c.rgb * c.a, 0.0, 1.0) * 255.0;\n"
+        "   vec3 r = clamp(cr.rgb * cr.a, 0.0, 1.0) * 255.0;\n"
+        "   vec3 d = clamp(cd.rgb * cd.a, 0.0, 1.0) * 255.0;\n"
+        "   vec3 o;\n"
+        "   for (int k = 0; k < 3; k++) {\n"
+        "      bool lo = a[k] < uLevel;\n"
+        "      bool cross = lo != (r[k] < uLevel) || lo != (d[k] < uLevel);\n"
+        "      bool mine = uEdge == 0 ? lo : !lo;\n"
+        "      o[k] = cross && mine ? 0.0 : 1.0;\n"
+        "   }\n"
+        "   fragColor = vec4(o, c.a);\n"
+        "}\n",
+        { N("%.0f", P("Level", "uLevel", T::Float, 0.0f, 255.0f, 128.0f)), E("Edge", "uEdge", { "Lower", "Upper" }, 0) } },
+
+      // Filter > Stylize > Wind: bright edges streak along the wind (Blast is longer, Stagger varies each row).
+      { "wind streaks", "Effects",
+        "float H21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n"
+        "vec2 H22(vec2 p) { float n = H21(p); return vec2(n, H21(p + n + 17.0)); }\n"
+        "float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
+        "uniform int uMethod;\n"
+        "uniform int uDir;\n"
+        "void main() {\n"
+        "   float L = uMethod == 1 ? 40.0 : (uMethod == 2 ? 24.0 : 14.0);\n"
+        "   float row = floor(vUv.y / uTexelSize.y);\n"
+        "   if (uMethod == 2) L *= 0.3 + H21(vec2(row, 7.0));\n"
+        "   float dir = uDir == 0 ? 1.0 : -1.0;\n"
+        "   vec4 o = ImgPre(vUv);\n"
+        "   for (int k = 1; k <= 40; k++) {\n"
+        "      float fk = float(k);\n"
+        "      if (fk > L) break;\n"
+        "      vec4 s = ImgPre(vUv + vec2(dir * fk * uTexelSize.x, 0.0));\n"
+        "      float w = 1.0 - fk / L;\n"
+        "      if (Luma(s.rgb) * w > Luma(o.rgb)) o = mix(o, s, w * 0.85);\n"
+        "   }\n"
+        "   fragColor = ImgUnpremul(o);\n"
+        "}\n",
+        { E("Method", "uMethod", { "Wind", "Blast", "Stagger" }, 0), E("Direction", "uDir", { "From the Right", "From the Left" }, 0), LIN() } },
+
+      // Filter > Blur Gallery > Tilt-Shift: a sharp band across the picture, blurring to Blur outside it (a disc lens blur).
+      { "tilt shift", "Effects",
+        "vec4 Disc(vec2 uv, float r) {\n"
+        "   if (r < 0.5) return ImgPre(uv);\n"
+        "   vec4 s = vec4(0.0);\n"
+        "   for (int i = 0; i < 48; i++) {\n"
+        "      float f = (float(i) + 0.5) / 48.0, a = float(i) * 2.39996;\n"
+        "      s += ImgPre(uv + vec2(cos(a), sin(a)) * sqrt(f) * r * uTexelSize);\n"
+        "   }\n"
+        "   return s / 48.0;\n"
+        "}\n"
+        "uniform float uBlur;\n"
+        "uniform float uCenterY;\n"
+        "uniform float uAngle;\n"
+        "uniform float uFocus;\n"
+        "uniform float uTransition;\n"
+        "void main() {\n"
+        "   vec2 size = 1.0 / uTexelSize;\n"
+        "   vec2 p = (vUv - vec2(0.5, uCenterY)) * size;\n"
+        "   vec2 n = vec2(-sin(uAngle), cos(uAngle));\n"
+        "   float d = abs(dot(p, n)) / size.y;\n"
+        "   float m = smoothstep(uFocus, uFocus + max(uTransition, 1e-4), d);\n"
+        "   fragColor = ImgUnpremul(Disc(vUv, uBlur * m));\n"
+        "}\n",
+        { F("%.0f px", P("Blur", "uBlur", T::Float, 0.0f, 60.0f, 15.0f)), P("Center Y", "uCenterY", T::Float, 0.0f, 1.0f, 0.5f), P("Angle", "uAngle", T::Float, -90.0f, 90.0f, 0.0f, 0.0f, 0.0f, true), P("Focus", "uFocus", T::Float, 0.0f, 0.5f, 0.08f), P("Transition", "uTransition", T::Float, 0.0f, 0.5f, 0.15f), LIN() } },
+
+      // Filter > Blur Gallery > Iris Blur: sharp inside an ellipse, blurring to Blur past its edge (Feather sets how soon).
+      { "iris blur", "Effects",
+        "vec4 Disc(vec2 uv, float r) {\n"
+        "   if (r < 0.5) return ImgPre(uv);\n"
+        "   vec4 s = vec4(0.0);\n"
+        "   for (int i = 0; i < 48; i++) {\n"
+        "      float f = (float(i) + 0.5) / 48.0, a = float(i) * 2.39996;\n"
+        "      s += ImgPre(uv + vec2(cos(a), sin(a)) * sqrt(f) * r * uTexelSize);\n"
+        "   }\n"
+        "   return s / 48.0;\n"
+        "}\n"
+        "uniform float uBlur;\n"
+        "uniform float uCenterX;\n"
+        "uniform float uCenterY;\n"
+        "uniform float uRadiusX;\n"
+        "uniform float uRadiusY;\n"
+        "uniform float uFeather;\n"
+        "void main() {\n"
+        "   float e = length((vUv - vec2(uCenterX, uCenterY)) / max(vec2(uRadiusX, uRadiusY), vec2(1e-3)));\n"
+        "   float m = smoothstep(1.0 - uFeather, 1.0, e);\n"
+        "   fragColor = ImgUnpremul(Disc(vUv, uBlur * m));\n"
+        "}\n",
+        { F("%.0f px", P("Blur", "uBlur", T::Float, 0.0f, 60.0f, 15.0f)), P("Center X", "uCenterX", T::Float, 0.0f, 1.0f, 0.5f), P("Center Y", "uCenterY", T::Float, 0.0f, 1.0f, 0.5f), P("Radius X", "uRadiusX", T::Float, 0.02f, 1.0f, 0.3f), P("Radius Y", "uRadiusY", T::Float, 0.02f, 1.0f, 0.25f), P("Feather", "uFeather", T::Float, 0.0f, 1.0f, 0.5f), LIN() } },
+
+      // Filter > Blur Gallery > Spin Blur: the picture inside an ellipse turned through Angle and averaged, like a spinning wheel.
+      { "spin blur", "Effects",
+        "uniform float uAngle;\n"
+        "uniform float uCenterX;\n"
+        "uniform float uCenterY;\n"
+        "uniform float uRadius;\n"
+        "uniform float uFeather;\n"
+        "void main() {\n"
+        "   vec2 size = 1.0 / uTexelSize;\n"
+        "   vec2 c = vec2(uCenterX, uCenterY) * size, p = vUv * size - c;\n"
+        "   float e = length(p) / max(uRadius * size.y, 1.0);\n"
+        "   float m = 1.0 - smoothstep(1.0 - uFeather, 1.0, e);\n"
+        "   float a = uAngle * m;\n"
+        "   vec4 s = vec4(0.0);\n"
+        "   for (int i = 0; i < 32; i++) {\n"
+        "      float t = (float(i) + 0.5) / 32.0 - 0.5, r = a * t;\n"
+        "      vec2 q = vec2(cos(r) * p.x - sin(r) * p.y, sin(r) * p.x + cos(r) * p.y);\n"
+        "      s += ImgPre((c + q) * uTexelSize);\n"
+        "   }\n"
+        "   fragColor = ImgUnpremul(s / 32.0);\n"
+        "}\n",
+        { P("Angle", "uAngle", T::Float, 0.0f, 360.0f, 15.0f, 0.0f, 0.0f, true), P("Center X", "uCenterX", T::Float, 0.0f, 1.0f, 0.5f), P("Center Y", "uCenterY", T::Float, 0.0f, 1.0f, 0.5f), P("Radius", "uRadius", T::Float, 0.02f, 1.5f, 0.35f), P("Feather", "uFeather", T::Float, 0.0f, 1.0f, 0.2f), LIN() } },
+
+      // Filter > Blur Gallery > Field Blur: two pins, each with its own blur; the blur runs between them across the picture.
+      { "field blur", "Effects",
+        "vec4 Disc(vec2 uv, float r) {\n"
+        "   if (r < 0.5) return ImgPre(uv);\n"
+        "   vec4 s = vec4(0.0);\n"
+        "   for (int i = 0; i < 48; i++) {\n"
+        "      float f = (float(i) + 0.5) / 48.0, a = float(i) * 2.39996;\n"
+        "      s += ImgPre(uv + vec2(cos(a), sin(a)) * sqrt(f) * r * uTexelSize);\n"
+        "   }\n"
+        "   return s / 48.0;\n"
+        "}\n"
+        "uniform float uBlurA;\n"
+        "uniform float uAX;\n"
+        "uniform float uAY;\n"
+        "uniform float uBlurB;\n"
+        "uniform float uBX;\n"
+        "uniform float uBY;\n"
+        "void main() {\n"
+        "   vec2 size = 1.0 / uTexelSize;\n"
+        "   vec2 a = vec2(uAX, uAY) * size, b = vec2(uBX, uBY) * size, p = vUv * size;\n"
+        "   vec2 ab = b - a;\n"
+        "   float t = clamp(dot(p - a, ab) / max(dot(ab, ab), 1.0), 0.0, 1.0);\n"
+        "   fragColor = ImgUnpremul(Disc(vUv, mix(uBlurA, uBlurB, t)));\n"
+        "}\n",
+        { F("%.0f px", P("Blur A", "uBlurA", T::Float, 0.0f, 60.0f, 0.0f)), P("A X", "uAX", T::Float, 0.0f, 1.0f, 0.5f), P("A Y", "uAY", T::Float, 0.0f, 1.0f, 0.3f), F("%.0f px", P("Blur B", "uBlurB", T::Float, 0.0f, 60.0f, 20.0f)), P("B X", "uBX", T::Float, 0.0f, 1.0f, 0.5f), P("B Y", "uBY", T::Float, 0.0f, 1.0f, 0.8f), LIN() } },
+
+      // Filter > Blur Gallery > Path Blur: motion blur along a curved path (Bend bows it, Angle points it).
+      { "path blur", "Effects",
+        "uniform float uLength;\n"
+        "uniform float uAngle;\n"
+        "uniform float uBend;\n"
+        "void main() {\n"
+        "   vec2 d = vec2(cos(uAngle), sin(uAngle)), n = vec2(-d.y, d.x);\n"
+        "   vec4 s = vec4(0.0);\n"
+        "   for (int i = 0; i < 32; i++) {\n"
+        "      float t = (float(i) + 0.5) / 32.0 - 0.5;\n"
+        "      vec2 o = d * uLength * t + n * uBend * uLength * (t * t - 1.0 / 12.0);\n"
+        "      s += ImgPre(vUv + o * uTexelSize);\n"
+        "   }\n"
+        "   fragColor = ImgUnpremul(s / 32.0);\n"
+        "}\n",
+        { F("%.0f px", P("Length", "uLength", T::Float, 0.0f, 200.0f, 40.0f)), P("Angle", "uAngle", T::Float, -180.0f, 180.0f, 0.0f, 0.0f, 0.0f, true), P("Bend", "uBend", T::Float, -1.0f, 1.0f, 0.3f), LIN() } },
+
+      // Filter > Blur > Smart Blur: blurs only neighbours within Threshold of the pixel, so edges stay; Edge Only / Overlay draw the edges.
+      { "smart blur", "Effects",
+        "float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
+        "uniform float uRadius;\n"
+        "uniform float uThreshold;\n"
+        "uniform int uMode;\n"
+        "void main() {\n"
+        "   vec4 c = ImgPre(vUv);\n"
+        "   float lc = Luma(c.rgb), st = max(uRadius / 3.0, 1.0);\n"
+        "   vec4 s = vec4(0.0); float n = 0.0;\n"
+        "   for (int j = -3; j <= 3; j++)\n"
+        "      for (int i = -3; i <= 3; i++) {\n"
+        "         vec4 t = ImgPre(vUv + vec2(float(i), float(j)) * st * uTexelSize);\n"
+        "         if (abs(Luma(t.rgb) - lc) <= uThreshold) { s += t; n += 1.0; }\n"
+        "      }\n"
+        "   vec4 o = ImgUnpremul(s / max(n, 1.0));\n"
+        "   if (uMode > 0) {\n"
+        "      vec2 t = uTexelSize;\n"
+        "      float gx = Luma(ImgPre(vUv + vec2(t.x, 0.0)).rgb) - Luma(ImgPre(vUv - vec2(t.x, 0.0)).rgb);\n"
+        "      float gy = Luma(ImgPre(vUv + vec2(0.0, t.y)).rgb) - Luma(ImgPre(vUv - vec2(0.0, t.y)).rgb);\n"
+        "      float edge = step(uThreshold, length(vec2(gx, gy)));\n"
+        "      o = uMode == 1 ? vec4(vec3(edge), c.a > 0.0 ? 1.0 : 0.0) : vec4(mix(o.rgb, vec3(1.0), edge), o.a);\n"
+        "   }\n"
+        "   fragColor = o;\n"
+        "}\n",
+        { F("%.1f px", P("Radius", "uRadius", T::Float, 1.0f, 24.0f, 3.0f)), P("Threshold", "uThreshold", T::Float, 0.0f, 1.0f, 0.1f), E("Mode", "uMode", { "Normal", "Edge Only", "Edge Overlay" }, 0), LIN() } },
+
+      // Filter > Blur > Shape Blur: a blur whose kernel is a shape (circle, hexagon, star, heart, square), like a lens's bokeh.
+      { "shape blur", "Effects",
+        "uniform float uRadius;\n"
+        "uniform int uShape;\n"
+        "bool Inside(vec2 p) {\n"
+        "   if (dot(p, p) < 1e-6) return true;\n"
+        "   if (uShape == 0) return dot(p, p) <= 1.0;\n"
+        "   if (uShape == 1) { vec2 q = abs(p); return max(q.x * 0.866025 + q.y * 0.5, q.y) <= 1.0; }\n"
+        "   if (uShape == 2) { float a = atan(p.y, p.x); float lim = 0.42 + 0.58 * pow(0.5 + 0.5 * cos(5.0 * (a - 1.5708)), 3.0); return length(p) <= lim; }\n"
+        "   if (uShape == 3) { vec2 q = p * 1.25; q.y = q.y + 0.25; float k = q.x * q.x + q.y * q.y - 1.0; return k * k * k - q.x * q.x * q.y * q.y * q.y <= 0.0; }\n"
+        "   return true;\n"
+        "}\n"
+        "void main() {\n"
+        "   vec4 s = vec4(0.0); float n = 0.0;\n"
+        "   for (int j = 0; j < 9; j++)\n"
+        "      for (int i = 0; i < 9; i++) {\n"
+        "         vec2 p = vec2(float(i), float(j)) / 4.0 - 1.0;\n"
+        "         if (Inside(p)) { s += ImgPre(vUv + p * uRadius * uTexelSize); n += 1.0; }\n"
+        "      }\n"
+        "   fragColor = ImgUnpremul(s / max(n, 1.0));\n"
+        "}\n",
+        { F("%.0f px", P("Radius", "uRadius", T::Float, 1.0f, 100.0f, 10.0f)), E("Shape", "uShape", { "Circle", "Hexagon", "Star", "Heart", "Square" }, 0), LIN() } },
+
+      // Filter > Distort > ZigZag: ridges rippling out from the centre, turning pixels around it, pushing them out, or both (pond ripples).
+      { "zigzag", "Effects",
+        "uniform float uAmount;\n"
+        "uniform float uRidges;\n"
+        "uniform int uStyle;\n"
+        "uniform float uCenterX;\n"
+        "uniform float uCenterY;\n"
+        "void main() {\n"
+        "   vec2 size = 1.0 / uTexelSize;\n"
+        "   vec2 c = vec2(uCenterX, uCenterY) * size, d = vUv * size - c;\n"
+        "   float r = length(d), rn = r / (0.5 * min(size.x, size.y));\n"
+        "   float w = sin(rn * uRidges * 6.28318) * uAmount * max(1.0 - rn, 0.0);\n"
+        "   vec2 u = r > 1e-3 ? d / r : vec2(0.0), t = vec2(-u.y, u.x);\n"
+        "   vec2 o = uStyle == 0 ? t * w : (uStyle == 1 ? u * w : (u + t) * 0.7071 * w);\n"
+        "   fragColor = ImgSample((c + d + o) * uTexelSize);\n"
+        "}\n",
+        { F("%.0f px", P("Amount", "uAmount", T::Float, -100.0f, 100.0f, 10.0f)), N("%.0f", P("Ridges", "uRidges", T::Float, 1.0f, 20.0f, 5.0f)), E("Style", "uStyle", { "Around Centre", "Out From Centre", "Pond Ripples" }, 2), P("Center X", "uCenterX", T::Float, 0.0f, 1.0f, 0.5f), P("Center Y", "uCenterY", T::Float, 0.0f, 1.0f, 0.5f), LIN() } },
+
+      // Filter > Noise > Reduce Noise: brightness smoothed only between like pixels (Preserve Details), colour noise averaged away, then a light sharpen.
+      { "reduce noise", "Effects",
+        "float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
+        "uniform float uStrength;\n"
+        "uniform float uPreserve;\n"
+        "uniform float uColour;\n"
+        "uniform float uSharpen;\n"
+        "void main() {\n"
+        "   vec4 c = ImgPre(vUv);\n"
+        "   float yc = Luma(c.rgb);\n"
+        "   float sig = max(mix(0.25, 0.02, uPreserve) * uStrength / 10.0, 1e-4);\n"
+        "   float ys = 0.0, ws = 0.0, yb = 0.0; vec3 cs = vec3(0.0); float as = 0.0;\n"
+        "   for (int j = -2; j <= 2; j++)\n"
+        "      for (int i = -2; i <= 2; i++) {\n"
+        "         vec4 t = ImgPre(vUv + vec2(float(i), float(j)) * uTexelSize);\n"
+        "         float yt = Luma(t.rgb), dy = clamp((yt - yc) / sig, -20.0, 20.0);\n"
+        "         float w = exp(-0.5 * dy * dy) * exp(-float(i * i + j * j) / 8.0);\n"
+        "         ys += yt * w; ws += w; yb += yt; cs += t.rgb - yt; as += t.a;\n"
+        "      }\n"
+        "   float yd = mix(yc, ys / max(ws, 1e-6), clamp(uStrength / 10.0, 0.0, 1.0));\n"
+        "   yd += uSharpen * (yd - yb / 25.0);\n"
+        "   vec3 chroma = mix(c.rgb - yc, cs / 25.0, uColour);\n"
+        "   fragColor = ImgUnpremul(vec4(vec3(yd) + chroma, c.a));\n"
+        "}\n",
+        { P("Strength", "uStrength", T::Float, 0.0f, 10.0f, 6.0f), P("Preserve Details", "uPreserve", T::Float, 0.0f, 1.0f, 0.6f), P("Reduce Colour Noise", "uColour", T::Float, 0.0f, 1.0f, 0.45f), P("Sharpen Details", "uSharpen", T::Float, 0.0f, 1.0f, 0.25f), LIN() } },
+
+      // Filter > Other > HSB/HSL: the picture's RGB written as hue, saturation and brightness (or lightness) channels, or read back from them.
+      { "hsb hsl", "Effects",
+        "uniform int uMode;\n"
+        "vec3 ToHsb(vec3 c) {\n"
+        "   float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), d = mx - mn, h = 0.0;\n"
+        "   if (d > 1e-6) {\n"
+        "      if (mx == c.r) h = mod((c.g - c.b) / d, 6.0);\n"
+        "      else if (mx == c.g) h = (c.b - c.r) / d + 2.0;\n"
+        "      else h = (c.r - c.g) / d + 4.0;\n"
+        "   }\n"
+        "   return vec3(h / 6.0, mx > 1e-6 ? d / mx : 0.0, mx);\n"
+        "}\n"
+        "vec3 FromHsb(vec3 c) {\n"
+        "   vec3 k = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);\n"
+        "   return c.z * mix(vec3(1.0), k, c.y);\n"
+        "}\n"
+        "vec3 ToHsl(vec3 c) {\n"
+        "   vec3 h = ToHsb(c); float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), l = 0.5 * (mx + mn);\n"
+        "   float s = (mx - mn) / max(1.0 - abs(2.0 * l - 1.0), 1e-6);\n"
+        "   return vec3(h.x, mx - mn > 1e-6 ? clamp(s, 0.0, 1.0) : 0.0, l);\n"
+        "}\n"
+        "vec3 FromHsl(vec3 c) {\n"
+        "   vec3 k = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);\n"
+        "   float ch = (1.0 - abs(2.0 * c.z - 1.0)) * c.y;\n"
+        "   return c.z + ch * (k - 0.5);\n"
+        "}\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   vec3 v = clamp(c.rgb, 0.0, 1.0), o;\n"
+        "   if (uMode == 0) o = ToHsb(v);\n"
+        "   else if (uMode == 1) o = ToHsl(v);\n"
+        "   else if (uMode == 2) o = FromHsb(v);\n"
+        "   else o = FromHsl(v);\n"
+        "   fragColor = vec4(o, c.a);\n"
+        "}\n",
+        { E("Mode", "uMode", { "RGB to HSB", "RGB to HSL", "HSB to RGB", "HSL to RGB" }, 0) } },
+
+      // Filter > Render > Fibers: woven fibres from the foreground to the background colour (Variance their spread, Strength their length).
+      { "fibers", "Effects",
+        "float H21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n"
+        "vec2 H22(vec2 p) { float n = H21(p); return vec2(n, H21(p + n + 17.0)); }\n"
+        "uniform float uVariance;\n"
+        "uniform float uStrength;\n"
+        "uniform float uSeed;\n"
+        "uniform vec3 uFore;\n"
+        "uniform vec3 uBack;\n"
+        "float VNoise(vec2 p) {\n"
+        "   vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n"
+        "   return mix(mix(H21(i), H21(i + vec2(1.0, 0.0)), f.x), mix(H21(i + vec2(0.0, 1.0)), H21(i + vec2(1.0, 1.0)), f.x), f.y);\n"
+        "}\n"
+        "void main() {\n"
+        "   vec2 px = vUv / uTexelSize + uSeed * 37.0;\n"
+        "   vec2 p = vec2(px.x * 0.05 * uVariance / 16.0, px.y * 0.05 / max(uStrength, 1.0));\n"
+        "   float v = 0.0, a = 0.5;\n"
+        "   for (int k = 0; k < 5; k++) { v += a * VNoise(p); p = p * 2.03 + 11.7; a *= 0.5; }\n"
+        "   v = clamp((v - 0.5) * 1.6 + 0.5, 0.0, 1.0);\n"
+        "   fragColor = vec4(mix(ImgDecode(uFore), ImgDecode(uBack), v), 1.0);\n"
+        "}\n",
+        { P("Variance", "uVariance", T::Float, 1.0f, 64.0f, 16.0f), P("Strength", "uStrength", T::Float, 1.0f, 64.0f, 4.0f), N("%.0f", P("Seed", "uSeed", T::Float, 0.0f, 999.0f, 0.0f)), P("Foreground", "uFore", T::Color, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f), P("Background", "uBack", T::Color, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f), LIN() } },
+
+      // Filter > Render > Lens Flare: light added as a camera flare at a point: a hot core, rays, a halo and ghosts toward the centre.
+      { "lens flare", "Effects",
+        "uniform float uX;\n"
+        "uniform float uY;\n"
+        "uniform float uBright;\n"
+        "uniform int uLens;\n"
+        "void main() {\n"
+        "   vec2 size = 1.0 / uTexelSize; float asp = size.x / size.y;\n"
+        "   vec2 p = vec2(vUv.x * asp, vUv.y), f = vec2(uX * asp, uY), ctr = vec2(0.5 * asp, 0.5);\n"
+        "   vec2 d = p - f; float r = length(d);\n"
+        "   float core = exp(-r * r * 900.0) * 3.0 + exp(-r * 18.0) * 0.6;\n"
+        "   float ang = atan(d.y, d.x + 1e-6);\n"
+        "   float rays = pow(abs(cos(ang * (uLens == 3 ? 3.0 : 6.0))), 24.0) * exp(-r * 6.0) * 0.8;\n"
+        "   float halo = exp(-pow((r - (uLens == 1 ? 0.16 : 0.12)) * 60.0, 2.0)) * 0.25;\n"
+        "   vec3 o = vec3(1.0, 0.92, 0.8) * (core + rays) + vec3(0.6, 0.8, 1.0) * halo;\n"
+        "   int ng = uLens == 0 ? 6 : (uLens == 1 ? 4 : (uLens == 2 ? 5 : 3));\n"
+        "   for (int k = 0; k < 6; k++) {\n"
+        "      if (k >= ng) break;\n"
+        "      float t = 0.35 + 0.33 * float(k), s = 0.015 + 0.02 * float((k * 7) % 4);\n"
+        "      vec2 g = mix(f, ctr * 2.0 - f, t);\n"
+        "      float gd = length(p - g);\n"
+        "      vec3 gc = k % 2 == 0 ? vec3(0.4, 0.9, 0.5) : vec3(0.9, 0.5, 0.3);\n"
+        "      o += gc * smoothstep(s, s * 0.6, gd) * 0.12;\n"
+        "   }\n"
+        "   o *= uBright;\n"
+        "   vec4 c = ImgSrc(vUv);\n"
+        "   float a = clamp(c.a + dot(o, vec3(0.333)), 0.0, 1.0);\n"
+        "   vec3 pre = c.rgb * c.a + o;\n"
+        "   fragColor = vec4(a > 0.0 ? pre / a : vec3(0.0), a);\n"
+        "}\n",
+        { P("Center X", "uX", T::Float, 0.0f, 1.0f, 0.3f), P("Center Y", "uY", T::Float, 0.0f, 1.0f, 0.3f), F("%.2f", P("Brightness", "uBright", T::Float, 0.1f, 3.0f, 1.0f)), E("Lens", "uLens", { "50-300mm Zoom", "35mm Prime", "105mm Prime", "Movie Prime" }, 0), LIN() } },
+
+      // Filter > Render > Lighting Effects: a point, spot or infinite light over the picture, its brightness read as bumps.
+      { "lighting effects", "Effects",
+        "float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
+        "uniform int uType;\n"
+        "uniform float uX;\n"
+        "uniform float uY;\n"
+        "uniform float uHeight;\n"
+        "uniform float uAngle;\n"
+        "uniform float uIntensity;\n"
+        "uniform vec3 uColor;\n"
+        "uniform float uAmbient;\n"
+        "uniform float uGloss;\n"
+        "uniform float uBump;\n"
+        "uniform float uSpot;\n"
+        "float Ht(vec2 uv) { vec4 c = ImgSrc(uv); return clamp(Luma(c.rgb), 0.0, 1.0) * c.a; }\n"
+        "void main() {\n"
+        "   vec2 size = 1.0 / uTexelSize; float asp = size.x / size.y;\n"
+        "   vec2 t = uTexelSize;\n"
+        "   float gx = Ht(vUv + vec2(t.x, 0.0)) - Ht(vUv - vec2(t.x, 0.0));\n"
+        "   float gy = Ht(vUv + vec2(0.0, t.y)) - Ht(vUv - vec2(0.0, t.y));\n"
+        "   vec3 N = normalize(vec3(-gx * uBump, -gy * uBump, 1.0));\n"
+        "   vec2 p = vec2(vUv.x * asp, vUv.y), lp = vec2(uX * asp, uY);\n"
+        "   vec3 L; float att = 1.0;\n"
+        "   if (uType == 2) L = normalize(vec3(cos(uAngle), sin(uAngle), max(uHeight, 0.02) * 2.0));\n"
+        "   else {\n"
+        "      vec3 v = vec3(lp - p, max(uHeight, 0.02));\n"
+        "      float dd = dot(v.xy, v.xy);\n"
+        "      L = normalize(v);\n"
+        "      att = 1.0 / (1.0 + dd * 4.0);\n"
+        "      if (uType == 1) att *= smoothstep(uSpot, uSpot * 0.6, sqrt(dd));\n"
+        "   }\n"
+        "   float diff = max(dot(N, L), 0.0);\n"
+        "   vec3 Hh = normalize(L + vec3(0.0, 0.0, 1.0));\n"
+        "   float spec = pow(max(dot(N, Hh), 0.0), mix(4.0, 64.0, uGloss)) * uGloss;\n"
+        "   vec3 lc = ImgDecode(uColor) * uIntensity * att;\n"
+        "   vec4 c = ImgSrc(vUv);\n"
+        "   fragColor = vec4(max(c.rgb * (uAmbient + diff * lc) + spec * lc, vec3(0.0)), c.a);\n"
+        "}\n",
+        { E("Light", "uType", { "Point", "Spot", "Infinite" }, 1), P("Light X", "uX", T::Float, 0.0f, 1.0f, 0.35f), P("Light Y", "uY", T::Float, 0.0f, 1.0f, 0.65f), P("Height", "uHeight", T::Float, 0.0f, 1.0f, 0.3f), P("Angle", "uAngle", T::Float, -180.0f, 180.0f, -45.0f, 0.0f, 0.0f, true), F("%.2f", P("Intensity", "uIntensity", T::Float, 0.0f, 3.0f, 1.2f)), P("Color", "uColor", T::Color, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f), P("Ambience", "uAmbient", T::Float, 0.0f, 1.0f, 0.2f), P("Gloss", "uGloss", T::Float, 0.0f, 1.0f, 0.4f), P("Bumps", "uBump", T::Float, 0.0f, 20.0f, 4.0f), P("Spot Size", "uSpot", T::Float, 0.05f, 1.5f, 0.6f), LIN() } },
    };
 
    return kDefs;
+}
+
+// View > Proof Colours / Gamut Warning (the 2D View's soft proof). Not a node: the View2D panel runs it on the canvas
+// texture for display only, so saved and exported pixels never change. uTarget: 0 sRGB, 1 Print (CMYK), 2 Grayscale.
+// Print is a simulation, not an ICC transform: paper white and ink black squeeze lightness into 0.22..0.98 OKLab L and
+// chroma is held under a coated-stock envelope (widest near mid lightness, more room for yellow, less for deep blue).
+const FilterDef& GetProofDef()
+{
+   static const FilterDef kDef = { "proof colours", "View",
+      "uniform int uTarget;\n"
+      "uniform int uProof;\n"
+      "uniform int uWarn;\n"
+      "vec3 ToLab(vec3 c) {\n"
+      "   vec3 lms = vec3(dot(c, vec3(0.4122214708, 0.5363325363, 0.0514459929)),\n"
+      "                   dot(c, vec3(0.2119034982, 0.6806995451, 0.1073969566)),\n"
+      "                   dot(c, vec3(0.0883024619, 0.2817188376, 0.6299787005)));\n"
+      "   lms = sign(lms) * pow(abs(lms), vec3(1.0 / 3.0));\n"
+      "   return vec3(dot(lms, vec3(0.2104542553, 0.7936177850, -0.0040720468)),\n"
+      "               dot(lms, vec3(1.9779984951, -2.4285922050, 0.4505937099)),\n"
+      "               dot(lms, vec3(0.0259040371, 0.7827717662, -0.8086757660)));\n"
+      "}\n"
+      "vec3 FromLab(vec3 l) {\n"
+      "   vec3 lms = vec3(l.x + 0.3963377774 * l.y + 0.2158037573 * l.z,\n"
+      "                   l.x - 0.1055613458 * l.y - 0.0638541728 * l.z,\n"
+      "                   l.x - 0.0894841775 * l.y - 1.2914855480 * l.z);\n"
+      "   lms = lms * lms * lms;\n"
+      "   return vec3(dot(lms, vec3(4.0767416621, -3.3077115913, 0.2309699292)),\n"
+      "               dot(lms, vec3(-1.2684380046, 2.6097574011, -0.3413193965)),\n"
+      "               dot(lms, vec3(-0.0041960771, -0.7034186147, 1.7076949383)));\n"
+      "}\n"
+      "float PrintCmax(float L, float h) {\n"
+      "   float t = clamp(L, 0.0, 1.0);\n"
+      "   float c = 0.15 * sin(3.14159265 * pow(t, 1.45));\n"
+      "   c += 0.06 * t * max(cos(h - 1.92), 0.0);\n"
+      "   c -= 0.04 * max(cos(h - 4.6), 0.0);\n"
+      "   return max(c, 0.0);\n"
+      "}\n"
+      "void main() {\n"
+      "   vec4 src = texture(uSrc, vUv);\n"
+      "   vec3 lin = SrgbDecode(max(src.rgb, vec3(0.0)));\n"
+      "   vec3 lab = ToLab(lin);\n"
+      "   float C = length(lab.yz), h = atan(lab.z, lab.y);\n"
+      "   if (h < 0.0) h += 6.28318531;\n"
+      "   bool outside = any(lessThan(src.rgb, vec3(-0.002))) || any(greaterThan(src.rgb, vec3(1.002)));\n"
+      "   vec3 proof = clamp(lin, 0.0, 1.0);\n"
+      "   if (uTarget == 1) {\n"
+      "      float L = mix(0.22, 0.98, clamp(lab.x, 0.0, 1.0));\n"
+      "      float cm = PrintCmax(L, h);\n"
+      "      outside = outside || C > PrintCmax(lab.x, h) + 0.002;\n"
+      "      vec2 ab = C > cm ? lab.yz * (cm / C) : lab.yz;\n"
+      "      proof = clamp(FromLab(vec3(L, ab)), 0.0, 1.0);\n"
+      "   } else if (uTarget == 2) {\n"
+      "      outside = outside || C > 0.02;\n"
+      "      proof = vec3(clamp(dot(lin, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0));\n"
+      "   }\n"
+      "   vec3 rgb = uProof == 1 ? SrgbEncode(proof) : src.rgb;\n"
+      "   if (uWarn == 1 && outside && src.a > 0.0) rgb = vec3(0.5);\n"
+      "   fragColor = vec4(rgb, src.a);\n"
+      "}\n",
+      { E("Target", "uTarget", { "sRGB", "Print (CMYK)", "Grayscale" }, 1),
+        P("Proof", "uProof", T::Bool, 0.0f, 1.0f, 1.0f),
+        P("Warn", "uWarn", T::Bool, 0.0f, 1.0f, 0.0f) } };
+   return kDef;
 }

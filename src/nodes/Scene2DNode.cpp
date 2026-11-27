@@ -1702,6 +1702,25 @@ void Scene2DNode::RemoveLayer(int id, bool settleClips)
    Commit();
 }
 
+bool Scene2DNode::ReverseLayers(const std::vector<int>& ids)
+{
+   Layers();
+   const Layer* first = ids.empty() ? nullptr : FindConst(ids[0]);
+   if (first == nullptr)
+      return false;
+   const int parent = first->parent;
+   std::vector<size_t> at;
+   for (size_t i = 0; i < mLayers.size(); i++)
+      if (mLayers[i].parent == parent && std::find(ids.begin(), ids.end(), mLayers[i].id) != ids.end())
+         at.push_back(i);
+   if (at.size() < 2)
+      return false;
+   for (size_t i = 0, j = at.size() - 1; i < j; i++, j--)
+      std::swap(mLayers[at[i]], mLayers[at[j]]);
+   Commit();
+   return true;
+}
+
 std::vector<int> Scene2DNode::ChildrenOf(int parent)
 {
    std::vector<int> out;
@@ -2551,6 +2570,100 @@ void Scene2DNode::CropRotated(float cx, float cy, float w, float h, float deg, b
    CropTo(cx - w * 0.5f, cy - h * 0.5f, cx + w * 0.5f, cy + h * 0.5f, deletePixels);
 }
 
+void Scene2DNode::RotateCanvas(float degCw)
+{
+   Layers();
+   const float d = std::remainder(degCw, 360.0f);
+   if (std::fabs(d) < 1e-4f)
+      return;
+   const float r = d * 3.14159265358979f / 180.0f;
+   const float W = (float)mDoc.w, H = (float)mDoc.h;
+   const float nw = std::fabs(W * std::cos(r)) + std::fabs(H * std::sin(r));
+   const float nh = std::fabs(W * std::sin(r)) + std::fabs(H * std::cos(r));
+   // Right angles carry the guides: (x, y) about the centre turned clockwise on screen (y down).
+   const std::vector<float> gx = mDoc.guidesX, gy = mDoc.guidesY;
+   const int quarter = (int)std::lround(d / 90.0f);
+   const bool right = std::fabs(d - quarter * 90.0f) < 1e-3f;
+   CropRotated(W * 0.5f, H * 0.5f, std::round(nw), std::round(nh), -d);
+   if (!right)
+      return;
+   std::vector<float> ox, oy;
+   switch ((quarter % 4 + 4) % 4)
+   {
+      case 1:   // 90 clockwise: x' = H - y, y' = x
+         for (float g : gx) oy.push_back(g);
+         for (float g : gy) ox.push_back(H - g);
+         break;
+      case 2:   // 180
+         for (float g : gx) ox.push_back(W - g);
+         for (float g : gy) oy.push_back(H - g);
+         break;
+      case 3:   // 90 counter clockwise: x' = y, y' = W - x
+         for (float g : gx) oy.push_back(W - g);
+         for (float g : gy) ox.push_back(g);
+         break;
+      default: ox = gx; oy = gy; break;
+   }
+   mDoc.guidesX = ox;
+   mDoc.guidesY = oy;
+   Commit();
+}
+
+void Scene2DNode::FlipCanvas(bool vertical)
+{
+   Layers();
+   const float W = (float)mDoc.w, H = (float)mDoc.h;
+   for (Layer& l : mLayers)
+   {
+      if (l.kind == Kind::Fill || l.kind == Kind::Group || l.kind == Kind::Adjust)
+         continue;
+      BakeFit(*this, l);
+      float bw = 1, bh = 1, m[6];
+      LayerBox(l, bw, bh);
+      LayerMatrix(l, m);
+      const float cx = m[0] * bw * 0.5f + m[1] * bh * 0.5f + m[2], cy = m[3] * bw * 0.5f + m[4] * bh * 0.5f + m[5];
+      if (vertical)
+         l.flipY = !l.flipY;
+      else
+         l.flipX = !l.flipX;
+      l.angle = l.angle == 0.0f ? 0.0f : -l.angle;
+      if (l.warpOn)
+         for (int k = 0; k < 4; k++)
+            l.warp[k * 2 + (vertical ? 1 : 0)] = -l.warp[k * 2 + (vertical ? 1 : 0)];
+      float m1[6];
+      LayerMatrix(l, m1);
+      const float nx = m1[0] * bw * 0.5f + m1[1] * bh * 0.5f + m1[2], ny = m1[3] * bw * 0.5f + m1[4] * bh * 0.5f + m1[5];
+      l.x += (vertical ? cx : W - cx) - nx;
+      l.y += (vertical ? H - cy : cy) - ny;
+   }
+   for (float& g : vertical ? mDoc.guidesY : mDoc.guidesX)
+      g = (vertical ? H : W) - g;
+   ReframeSelection(0, 0, 0, 0);   // the outline no longer matches the picture: it goes, as after a crop
+   StoreSelection();               // commits
+}
+
+bool Scene2DNode::RevealAll()
+{
+   Layers();
+   float lo[2] = { 0.0f, 0.0f }, hi[2] = { (float)mDoc.w, (float)mDoc.h };
+   for (const Layer& l : mLayers)
+   {
+      if (l.kind == Kind::Fill || l.kind == Kind::Group || l.kind == Kind::Adjust || !Shown(l))
+         continue;
+      float a[2], b[2];
+      if (!Bounds(l.id, a, b))
+         continue;
+      lo[0] = std::min(lo[0], std::floor(a[0]));
+      lo[1] = std::min(lo[1], std::floor(a[1]));
+      hi[0] = std::max(hi[0], std::ceil(b[0]));
+      hi[1] = std::max(hi[1], std::ceil(b[1]));
+   }
+   if (lo[0] >= 0.0f && lo[1] >= 0.0f && hi[0] <= (float)mDoc.w && hi[1] <= (float)mDoc.h)
+      return false;
+   CropTo(lo[0], lo[1], hi[0], hi[1], false);
+   return true;
+}
+
 namespace
 {
    // Row-major 3x3 homographies in double: the quad maths needs more than float near a steep horizon.
@@ -2883,6 +2996,8 @@ void Scene2DNode::Serialize()
      << +d.linear << " " << +d.headroom << "\n";
    if (d.dpi != 72.0f)
       o << "dpi " << d.dpi << "\n";
+   if (d.guidesLocked)
+      o << "guideslock 1\n";
    if (!d.guidesX.empty())
    {
       o << "guidesx";
@@ -2957,6 +3072,8 @@ void Scene2DNode::Serialize()
         << " " << l.ay << " " << +l.flipX << " " << +l.flipY << " " << l.fit << " " << +l.nearest << "\n";
       if (l.shear != 0.0f || l.blendGamma != 2.2f || l.aaMode != 0 || l.noExport)
          o << "lx " << l.id << " " << l.shear << " " << l.blendGamma << " " << l.aaMode << " " << +l.noExport << "\n";
+      if (l.typeAA != 0)
+         o << "taa " << l.id << " " << l.typeAA << "\n";
       if (!l.name.empty())
          o << "name " << l.id << " " << l.name << "\n";
       if (l.cropOn || l.crop[0] != 0 || l.crop[1] != 0 || l.crop[2] != 0 || l.crop[3] != 0)
@@ -3265,6 +3382,12 @@ void Scene2DNode::Parse()
          if (s >> name)
             mClipPath = UnescapeToken(name);
       }
+      else if (key == "guideslock")
+      {
+         int v = 0;
+         s >> v;
+         mDoc.guidesLocked = v != 0;
+      }
       else if (key == "dpi")
       {
          float v = 72.0f;
@@ -3402,6 +3525,11 @@ void Scene2DNode::Parse()
             l->blendGamma = std::isfinite(l->blendGamma) ? std::clamp(l->blendGamma, 0.1f, 10.0f) : 2.2f;
             l->aaMode = std::clamp(l->aaMode, 0, 2);
             l->noExport = ne != 0;
+         }
+         else if (key == "taa")
+         {
+            s >> l->typeAA;
+            l->typeAA = std::clamp(l->typeAA, 0, (int)kTypeAACount - 1);
          }
          else if (key == "fillx")
          {

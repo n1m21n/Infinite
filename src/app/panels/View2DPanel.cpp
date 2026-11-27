@@ -56,6 +56,7 @@
 #include "nodes/ArtHistory.h"
 #include "nodes/SketchNode.h"
 #include "nodes/TextNode.h"
+#include "nodes/FilterNode.h"
 #include "nodes/ModelSourceNode.h"
 #include "nodes/VideoSourceNode.h"
 #include "audio/MediaExtensions.h"
@@ -108,6 +109,13 @@ namespace
    bool OpenLayeredFile(const std::string& path, ImVec2 at);   // PSD or ORA as a new document
    void ExportLayered(Scene2DNode* doc, const char* ext);
    void ExportLayerMenu(Scene2DNode* doc, int id);
+   void PhotoMenus(Scene2DNode* doc);   // Edit / Image / Layer / Filter / View in the canvas menu
+   void AskDialog(Scene2DNode* doc);
+   void ExportSubMenu(Scene2DNode* doc);
+   void PlaceEmbedded(Scene2DNode* doc);
+   void QuickExportPng();
+   void RecordTransform(int kind, float deg, bool vertical);
+   void ToggleQuickMask(Scene2DNode* doc);
 
    constexpr float kSideW = UiDensity::kInspectorW + tok::control_h + tok::space_3;   // tab rail + one compact strip
    constexpr float kIconW = tok::control_h;   // icon chips are square, one panel chip
@@ -374,9 +382,54 @@ namespace
    float sZoomVel = 0.0f;                   // smoothed wheel zoom: log-zoom still to apply
    ImVec2 sZoomAt(0, 0);
 
+   int sLastXf = 0;                 // Edit > Transform > Again: 0 none, 1 turn by sLastXfDeg, 2 flip
+   float sLastXfDeg = 0.0f;
+   bool sLastXfVert = false;
+   int sLastFilter = -1;            // Filter > Last Filter: the kNodeEffects entry last added
+   int sGuideSel = -1, sGuideSelAxis = 0;   // the guide last dragged (View > Guides > Clear / Edit Selected Guides)
+   bool sExtras = true;             // View > Extras: guides, grid and selection edges drawn
+   bool sShowTargetPath = true;     // View > Show > Target Path: the Work Path's outline drawn
+   bool sProof = false;             // View > Proof Colours: the canvas shown as sProofTarget would print it (display only)
+   bool sGamut = false;             // View > Gamut Warning: grey over pixels sProofTarget can't reproduce (display only)
+   int sProofTarget = 1;            // View > Proof Setup: 0 Monitor RGB (sRGB), 1 Working CMYK (print), 2 Working Gray (GetProofDef's uTarget)
+
+   // The document's picture as it is, for the proof pass: cooking it never re-cooks the document.
+   class ProofInput : public INode
+   {
+   public:
+      INode* doc = nullptr;
+      unsigned int GetOutputTexture() override { return doc ? doc->GetOutputTexture() : 0; }
+      int GetOutputWidth() const override { return doc ? doc->GetOutputWidth() : 0; }
+      int GetOutputHeight() const override { return doc ? doc->GetOutputHeight() : 0; }
+      void CookIfNeeded(int) override {}
+      unsigned long long TextureRevision() const override { return doc ? doc->TextureRevision() : 0; }
+   };
+
+   // The texture the canvas shows: the document's own, or (Proof Colours / Gamut Warning on) a display-only copy run
+   // through GetProofDef. Saved and exported pixels never pass through here.
+   unsigned ProofTexture(INode* doc, bool proof, bool warn, int target)
+   {
+      const unsigned tex = doc ? doc->GetOutputTexture() : 0;
+      if (tex == 0 || (!proof && !warn))
+         return tex;
+      static ProofInput* in = new ProofInput();
+      static FilterNode* node = [] { FilterNode* n = new FilterNode(GetProofDef()); n->Input().Connect(in); return n; }();
+      static int frame = 0;
+      in->doc = doc;
+      node->SetParamValue(0, 0, (float)std::clamp(target, 0, 2));
+      node->SetParamValue(1, 0, proof ? 1.0f : 0.0f);
+      node->SetParamValue(2, 0, warn ? 1.0f : 0.0f);
+      node->CookIfNeeded(++frame);
+      const unsigned out = node->GetOutputTexture();
+      return out != 0 ? out : tex;
+   }
+   char sLayerFind[64] = {};        // Select > Find Layers: the Layers list shows names holding this
+   bool sLayerFindOn = false;
+   std::vector<int> sIsolated;      // Select > Isolate Layers: the Layers list shows only these (and their groups)
+
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, MaskFromAlpha, HideSel, MaskObjects, RemoveMask, ApplyMask, InvertMask, AddFxMask, RemoveFxMask, BlurFxMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown, LinkLayers, SelectLinked };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, MaskFromAlpha, HideSel, MaskObjects, RemoveMask, ApplyMask, InvertMask, AddFxMask, RemoveFxMask, BlurFxMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown, LinkLayers, SelectLinked, NewFromClip };
       What what = None;
       int arg = 0;         // AddAdjust: the type
       uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
@@ -3818,6 +3871,10 @@ namespace
          o << "captures " << (int)u.capSize << " " << (int)u.capTool << " " << (int)u.capColour << "\n";
          if (u.capColour)
             o << "colour " << u.brush.color[0] << " " << u.brush.color[1] << " " << u.brush.color[2] << "\n";   // the captured foreground
+         std::vector<uint8_t> mask;
+         int side = 0;
+         if (u.brush.sampledTip > 0 && BrushEngine::SampledTipPixels(u.brush.sampledTip, mask, side))
+            o << "tip " << side << " " << Base64::Encode(mask.data(), mask.size()) << "\n";   // Define Brush Preset's picture
          BrushFields(u.brush, [&](const char* n, float* v, int c)
          {
             o << n;
@@ -3851,11 +3908,27 @@ namespace
             u.name = name;
             u.erase = who == 'e';
             u.brush = u.erase ? sEraser : sBrush;
+            u.brush.sampledTip = 0;
             sUserPresets.push_back(u);
             continue;
          }
          if (sUserPresets.empty())
             continue;
+         if (field == "tip")
+         {
+            int side = 0;
+            std::string b64;
+            std::vector<uint8_t> mask;
+            if (ls >> side >> b64 && side > 0 && Base64::Decode(b64, mask) && mask.size() == (size_t)side * side)
+            {
+               // Back to a picture AddSampledTip reads: black, the mask as alpha.
+               std::vector<uint8_t> rgba((size_t)side * side * 4, 0);
+               for (size_t i = 0; i < mask.size(); i++)
+                  rgba[i * 4 + 3] = mask[i];
+               sUserPresets.back().brush.sampledTip = BrushEngine::AddSampledTip(rgba, side, side);
+            }
+            continue;
+         }
          std::vector<float> vals;
          for (float v; ls >> v;)
             vals.push_back(v);
@@ -4023,6 +4096,42 @@ namespace
       t.key = ++sPatternKeys;
       sPatterns.push_back(std::move(t));
       sPatternPick = (int)sPatterns.size() - 1;
+      return true;
+   }
+   // Edit > Define Brush Preset: the selection (or the whole picture) becomes a brush tip, saved as a preset and picked.
+   // Dark, opaque pixels paint most, as Photoshop's; the brush takes the sample's size and 25% spacing.
+   bool DefineBrushPreset(Scene2DNode* doc)
+   {
+      const int W = doc->Doc().w, H = doc->Doc().h;
+      int x0 = 0, y0 = 0, x1 = W, y1 = H;
+      float lo[2], hi[2];
+      if (doc->HasSelection() && doc->SelectionBounds(lo, hi))
+      {
+         x0 = std::max(0, (int)std::floor(lo[0]));
+         y0 = std::max(0, (int)std::floor(lo[1]));
+         x1 = std::min(W, (int)std::ceil(hi[0]));
+         y1 = std::min(H, (int)std::ceil(hi[1]));
+      }
+      if (x1 <= x0 || y1 <= y0)
+         return false;
+      static int frame = (1 << 26) + (1 << 24);
+      std::vector<uint8_t> img;
+      int w = 0, h = 0;
+      float k = 1.0f;
+      if (!doc->AgentLook(0, x0, y0, x1, y1, params::view2d::kTipSampleMax, ++frame, img, w, h, k))
+         return false;
+      const int tip = BrushEngine::AddSampledTip(img, w, h);
+      if (tip <= 0)
+         return false;
+      BrushEngine::Brush b = sBrush;
+      b.sampledTip = tip;
+      b.size = std::clamp((float)std::max(x1 - x0, y1 - y0), 1.0f, params::view2d::kTipSizeMax);
+      b.spacing = params::view2d::kTipSpacing;
+      b.angle = 0.0f;
+      b.roundness = 1.0f;
+      b.mode = BrushEngine::kNormal;
+      sBrush = b;
+      sUserPick = SaveUserPreset(b, false);
       return true;
    }
    void UsePattern(Scene2DNode* doc)
@@ -4710,6 +4819,27 @@ namespace
    {
       if (!MenuParts::SubMenu(T("Selection")))
          return;
+      if (MenuParts::Item(T("Reselect"), nullptr, false, !doc->HasSelection()))
+      {
+         SelStep("Reselect");
+         doc->Reselect();
+      }
+      if (MenuParts::Item(T("Edit in Quick Mask Mode"), "Q", doc->quickMask)) ToggleQuickMask(doc);
+      if (MenuParts::Item(T("Deselect Layers"), nullptr, false, !sSel.empty())) sSel.clear();
+      if (MenuParts::Item(T("Find Layers"), nullptr, sLayerFindOn))
+      {
+         sLayerFindOn = !sLayerFindOn;
+         sLayerFind[0] = 0;
+         sTab = 0;
+         sSideOpen = true;
+      }
+      if (MenuParts::Item(T("Isolate Layers"), nullptr, !sIsolated.empty(), !sSel.empty() || !sIsolated.empty()))
+      {
+         sIsolated = sIsolated.empty() ? sSel : std::vector<int>();
+         sTab = 0;
+         sSideOpen = true;
+      }
+      MenuParts::Separator();
       if (MenuParts::Item(T("Save Selection"), nullptr, false, doc->HasSelection()))
       {
          const std::vector<std::string> have = doc->SavedSelections();
@@ -7125,7 +7255,7 @@ namespace
    int HoverGuide(Scene2DNode* doc, ImVec2 mouse, int& axis)
    {
       const Scene2DNode::Document& d = doc->Doc();
-      if (!d.guidesOn)
+      if (!d.guidesOn || d.guidesLocked || !sExtras)
          return -1;
       const ImVec2 md = ToDoc(doc, mouse);
       for (int i = 0; i < (int)d.guidesX.size(); i++)
@@ -7456,6 +7586,89 @@ namespace
    int sShapeKind = 0;             // 0 rectangle, 1 rounded, 2 ellipse, 3 polygon, 4 star, 5 line, 6 triangle
    const char* const kKinds[] = { "Rectangle", "Rounded", "Ellipse", "Polygon", "Star", "Line", "Triangle" };
    constexpr int kShapeKinds = (int)std::size(kKinds);
+   // Edit > Define Custom Shape (Photoshop's custom shapes): a picked path kept, fitted to its box (pts 0..1), between
+   // runs in the support folder; the Shape tool lists them after the built-in kinds (sShapeKind = kShapeKinds + i).
+   struct CustomShape { std::string name; std::vector<float> pts; bool closed = true; };
+   std::vector<CustomShape> sCustomShapes;
+   bool sCustomLoaded = false;
+   std::string CustomShapeFile() { return AppPaths::AppSupportDir() + "/2dview-custom-shapes.txt"; }
+   std::vector<CustomShape>& CustomShapes()
+   {
+      if (sCustomLoaded)
+         return sCustomShapes;
+      sCustomLoaded = true;
+      if (std::getenv("INFINITE_VIEW2DTEST") != nullptr)
+         return sCustomShapes;   // the self-test keeps the user's shapes untouched
+      std::ifstream in(AppPaths::FsPath(CustomShapeFile()));
+      std::string line;
+      while (std::getline(in, line))
+      {
+         std::istringstream ls(line);
+         std::string field;
+         ls >> field;
+         if (field == "shape")
+         {
+            CustomShape c;
+            int closed = 1;
+            ls >> closed;
+            std::getline(ls >> std::ws, c.name);
+            c.closed = closed != 0;
+            sCustomShapes.push_back(c);
+         }
+         else if (field == "pts" && !sCustomShapes.empty())
+            for (float v; ls >> v;)
+               sCustomShapes.back().pts.push_back(v);
+      }
+      sCustomShapes.erase(std::remove_if(sCustomShapes.begin(), sCustomShapes.end(), [](const CustomShape& c)
+                                         { return c.pts.size() < (size_t)(params::view2d::kShapeMinAnchors * params::view2d::kShapeAnchorFloats) || c.pts.size() % params::view2d::kShapeAnchorFloats != 0; }),
+                          sCustomShapes.end());
+      return sCustomShapes;
+   }
+   void SaveCustomShapes()
+   {
+      if (std::getenv("INFINITE_VIEW2DTEST") != nullptr)
+         return;
+      std::error_code ec;
+      std::filesystem::create_directories(AppPaths::AppSupportDir(), ec);
+      std::ofstream out(AppPaths::FsPath(CustomShapeFile()));
+      for (const CustomShape& c : sCustomShapes)
+      {
+         out << "shape " << (c.closed ? 1 : 0) << " " << c.name << "\npts";
+         for (float v : c.pts)
+            out << " " << v;
+         out << "\n";
+      }
+   }
+   // A path item into the library, fitted to its box (anchors and handles); its index, -1 when it is no path.
+   int DefineCustomShape(const Scene2DNode::Shape& s)
+   {
+      if (s.type != Scene2DNode::Shape::kPath || s.Anchors() < 2)
+         return -1;
+      float lo[2] = { FLT_MAX, FLT_MAX }, hi[2] = { -FLT_MAX, -FLT_MAX };
+      for (size_t i = 0; i < s.pts.size(); i++)
+      {
+         lo[i % 2] = std::min(lo[i % 2], s.pts[i]);
+         hi[i % 2] = std::max(hi[i % 2], s.pts[i]);
+      }
+      const float w = std::max(hi[0] - lo[0], params::view2d::kShapeMinSpan), h = std::max(hi[1] - lo[1], params::view2d::kShapeMinSpan);
+      CustomShape c;
+      c.closed = s.closed;
+      for (size_t i = 0; i < s.pts.size(); i++)
+         c.pts.push_back((s.pts[i] - lo[i % 2]) / (i % 2 == 0 ? w : h));
+      std::vector<CustomShape>& lib = CustomShapes();
+      c.name = std::string(T("Shape")) + " " + std::to_string(lib.size() + 1);
+      lib.push_back(std::move(c));
+      SaveCustomShapes();
+      return (int)lib.size() - 1;
+   }
+   // A custom shape drawn into the box (x0, y0) .. (x1, y1).
+   void FitCustomShape(const CustomShape& c, Scene2DNode::Shape& s)
+   {
+      s.pts.resize(c.pts.size());
+      for (size_t i = 0; i < c.pts.size(); i++)
+         s.pts[i] = i % 2 == 0 ? s.x0 + c.pts[i] * (s.x1 - s.x0) : s.y0 + c.pts[i] * (s.y1 - s.y0);
+   }
+   int CustomKind() { const int i = sShapeKind - kShapeKinds; return i >= 0 && i < (int)CustomShapes().size() ? i : -1; }
    int sVecTarget = 0;             // 0 the layer's items, 1 its vector mask
    int sItem = -1, sItemLayer = 0; // the picked item and the layer it is in
    int sPenItem = -1;              // the open path the pen adds to
@@ -7628,13 +7841,15 @@ namespace
                                                   Shape::kTriangle };
          TakeForeground();
          Shape s = sStyle;
-         s.type = kTypes[std::clamp(sShapeKind, 0, kShapeKinds - 1)];
+         s.type = CustomKind() >= 0 ? Shape::kPath : kTypes[std::clamp(sShapeKind, 0, kShapeKinds - 1)];
          // Rounded always rounds; polygon, star and triangle take the bar's Radius; the rest have none.
          s.radius = sShapeKind == 1 ? std::max(1.0f, sStyle.radius) : s.type == Shape::kPolygon || s.type == Shape::kStar || s.type == Shape::kTriangle
                                                                        ? sStyle.radius : 0.0f;
          s.pts.clear();
          s.svg.clear();
-         s.closed = false;
+         s.closed = CustomKind() >= 0 && CustomShapes()[(size_t)CustomKind()].closed;
+         if (CustomKind() >= 0)
+            s.radius = 0.0f;
          items->push_back(s);
          sItem = (int)items->size() - 1;
          sItemLayer = l->id;
@@ -7666,6 +7881,8 @@ namespace
       s->y0 = centre ? a.y - dy : a.y;
       s->x1 = a.x + dx;
       s->y1 = a.y + dy;
+      if (CustomKind() >= 0 && s->type == Shape::kPath)
+         FitCustomShape(CustomShapes()[(size_t)CustomKind()], *s);
       Touch();
    }
 
@@ -8354,7 +8571,7 @@ namespace
    }
    // The Type menu's submenus and their parents (Photoshop Type > OpenType > Numerals / Stylistic Sets): the menu is
    // drawn from these names, and the self-test reads the paths back.
-   const char* const kTypeSubs[][2] = { { "Type", "" }, { "OpenType", "Type" }, { "Numerals", "OpenType" }, { "Stylistic Sets", "OpenType" } };
+   const char* const kTypeSubs[][2] = { { "Type", "" }, { "OpenType", "Type" }, { "Numerals", "OpenType" }, { "Stylistic Sets", "OpenType" }, { "Anti-Alias", "Type" } };
    std::string TypeMenuPath(const char* leaf)
    {
       std::string path;
@@ -8393,11 +8610,36 @@ namespace
          const std::vector<SN::TextRun> runs = SN::CharRuns(*a);
          first = runs[SN::RunAt(runs, ra == std::string::npos ? 0 : ra)].st;
       }
+      // Warp Text: the warp style and its bend live with the type settings on the Layer tab.
+      if (MenuParts::Item(T("Warp Text..."), nullptr, false, text))
+      {
+         sSel = { a->id };
+         sTab = 1;
+         sSideOpen = true;
+      }
+      // Anti-Alias: how the selected type layers' letter edges are shaded (one setting per layer).
+      if (MenuParts::SubMenu(T(kTypeSubs[4][0]), !ids.empty()))
+      {
+         static const char* const kTypeAA[] = { "None", "Sharp", "Crisp", "Strong", "Smooth" };
+         static const int kTypeAAMode[] = { SN::kTypeAANone, SN::kTypeAASharp, SN::kTypeAACrisp, SN::kTypeAAStrong, SN::kTypeAASmooth };
+         const int now = text ? a->typeAA : -1;
+         for (int i = 0; i < SN::kTypeAACount; i++)
+            if (MenuParts::Choice(T(kTypeAA[i]), now == kTypeAAMode[i]))
+            {
+               PushUndoCheckpoint(T("Anti-Alias"));
+               for (int id : ids)
+                  if (Layer* l = doc->FindLayer(id))
+                     l->typeAA = kTypeAAMode[i];
+               Touch();
+            }
+         ImGui::EndMenu();
+      }
       if (MenuParts::SubMenu(T(kTypeSubs[1][0]), !ids.empty()))
       {
-         static const char* kTags[7][2] = { { "liga", "Standard Ligatures" }, { "dlig", "Discretionary Ligatures" },
-                                            { "frac", "Fractions" }, { "swsh", "Swash" }, { "salt", "Stylistic Alternates" },
-                                            { "ordn", "Ordinals" }, { "titl", "Titling Alternates" } };
+         static const char* kTags[9][2] = { { "liga", "Standard Ligatures" }, { "dlig", "Discretionary Ligatures" },
+                                            { "calt", "Contextual Alternates" }, { "frac", "Fractions" }, { "swsh", "Swash" },
+                                            { "salt", "Stylistic Alternates" }, { "ordn", "Ordinals" }, { "titl", "Titling Alternates" },
+                                            { "ornm", "Ornaments" } };
          for (const auto& t : kTags)
             if (MenuParts::Item(T(t[1]), nullptr, SN::FeatureOn(first, t[0])))
             {
@@ -8865,6 +9107,14 @@ namespace
                if (MenuParts::Item(T("Bring Forward"), Sc("Ctrl+]"))) Restack(doc, 1);
                if (MenuParts::Item(T("Send Backward"), Sc("Ctrl+["))) Restack(doc, 0);
                if (MenuParts::Item(T("Send to Back"), Sc("Shift+Ctrl+["))) Restack(doc, 2);
+               if (MenuParts::Item(T("Reverse"), nullptr, false, sSel.size() > 1))
+               {
+                  const size_t undo0 = gUndoStack.size();
+                  PushUndoCheckpoint("Reverse layers");
+                  if (!doc->ReverseLayers(sSel))
+                     RollbackUndoTo(undo0);
+                  Touch();
+               }
                ImGui::EndMenu();
             }
             MenuParts::Separator();
@@ -8872,6 +9122,7 @@ namespace
             PathsMenu(doc);
             TypeMenu(doc);
             SnapshotsMenu(doc);
+            PhotoMenus(doc);
             if (MenuParts::Item(T("Select All Layers"), Sc("Ctrl+A")))
             {
                sSel.clear();
@@ -8912,6 +9163,7 @@ namespace
          }
       }
       SnapshotNameDialog(doc);   // outside the menu, which has closed by the time it shows
+      AskDialog(doc);
       GroupOptionsDialog(doc);
       const ImVec2 mp = ImGui::GetIO().MousePos;
       const bool inEditor = sTextEdit != 0 && mp.x >= sEditMn.x && mp.x <= sEditMx.x && mp.y >= sEditMn.y && mp.y <= sEditMx.y;
@@ -8951,7 +9203,7 @@ namespace
             DrawChecker(dl, a, b);
       }
       const ImVec2 uv[4] = { ImVec2(0, 1), ImVec2(1, 1), ImVec2(1, 0), ImVec2(0, 0) };
-      if (const unsigned tex = doc->GetOutputTexture())
+      if (const unsigned tex = ProofTexture(doc, sProof, sGamut, sProofTarget))
       {
          // Magnified past 2x the picture shows its pixels as squares (nearest), then the sampler goes back to smooth
          // for every other user of the texture.
@@ -8989,7 +9241,7 @@ namespace
       if (MaskViewLayer(doc) != 0)
          if (const unsigned mv = doc->MaskViewTexture(sMaskView))
             Thumb::AddQuad(dl, (ImTextureID)(intptr_t)mv, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
-      if ((doc->HasSelection() || doc->quickMask) && !(doc->HasSelection() && DrawScreenAnts(dl, doc)))
+      if (sExtras && (doc->HasSelection() || doc->quickMask) && !(doc->HasSelection() && DrawScreenAnts(dl, doc)))
          if (const unsigned ants = doc->SelectionOverlay((float)AnimNow(), doc->quickMask))
             Thumb::AddQuad(dl, (ImTextureID)(intptr_t)ants, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
       if (ViewTurned())
@@ -8997,7 +9249,7 @@ namespace
       else
          dl->AddRect(ImVec2(a.x - tok::space_0_25, a.y - tok::space_0_25), ImVec2(b.x + tok::space_0_25, b.y + tok::space_0_25), tok::U32(tok::canvas_shade, tok::view2d_canvas_shade_alpha));
 
-      if (d.grid && d.gridSize > 0.0f)
+      if (sExtras && d.grid && d.gridSize > 0.0f)
       {
          const float sub = d.gridSize / (float)std::max(1, d.gridSubdiv);
          if (sub * sZoom >= 4.0f)
@@ -9010,12 +9262,24 @@ namespace
                dl->AddLine(ToScreen(doc, 0, y), ToScreen(doc, (float)d.w, y), Hex(kGrid, n % std::max(tok::view2d_grid_shade, d.gridSubdiv) == 0 ? tok::view2d_canvas_line_alpha_lg : tok::view2d_canvas_line_alpha_sm));
          }
       }
-      if (d.guidesOn)
+      if (sExtras && d.guidesOn)
       {
-         for (float g : d.guidesX)
-            dl->AddLine(ToScreen(doc, g, -tok::view2d_to_screen_y), ToScreen(doc, g, tok::view2d_to_screen_y), Hex(kGuide));
-         for (float g : d.guidesY)
-            dl->AddLine(ToScreen(doc, -tok::view2d_to_screen_y, g), ToScreen(doc, tok::view2d_to_screen_y, g), Hex(kGuide));
+         // The selected guide (View > Guides > Edit Selected Guides) draws heavier.
+         auto guideW = [&](bool rowY, int i) { return sGuideSelAxis == (int)rowY && sGuideSel == i ? tok::stroke_scale_2 : tok::stroke_scale_1; };
+         for (int i = 0; i < (int)d.guidesX.size(); i++)
+            dl->AddLine(ToScreen(doc, d.guidesX[i], -tok::view2d_to_screen_y), ToScreen(doc, d.guidesX[i], tok::view2d_to_screen_y), Hex(kGuide), guideW(false, i));
+         for (int i = 0; i < (int)d.guidesY.size(); i++)
+            dl->AddLine(ToScreen(doc, -tok::view2d_to_screen_y, d.guidesY[i]), ToScreen(doc, tok::view2d_to_screen_y, d.guidesY[i]), Hex(kGuide), guideW(true, i));
+      }
+      // View > Show > Target Path: the Work Path's outline.
+      if (const Scene2DNode::DocPath* wp = sExtras && sShowTargetPath ? doc->FindPath(Scene2DNode::kWorkPath) : nullptr)
+      {
+         std::vector<std::vector<float>> lines;
+         std::vector<int> ops;
+         Scene2DNode::PathPolylines(*wp, lines, ops);
+         for (const std::vector<float>& ln : lines)
+            for (size_t k = 0; k + 3 < ln.size(); k += 2)
+               dl->AddLine(ToScreen(doc, ln[k], ln[k + 1]), ToScreen(doc, ln[k + 2], ln[k + 3]), Hex(kGuide));
       }
 
       // Symmetry guides while a painting tool is up: the mirror axes, or the radial spokes, through the centre.
@@ -9726,6 +9990,8 @@ namespace
                BeginOp(doc, 6, mouse, "Move guide");
                sOp.guideAxis = guideAxis;
                sOp.guideIndex = hoverGuide;
+               sGuideSel = hoverGuide;
+               sGuideSelAxis = guideAxis;
             }
             else if (!(io.KeyCtrl || io.KeySuper) && !FreeTransformOn(doc) && doc->HasSelection() &&
                      doc->SelectionAt((int)std::floor(sMouseDoc.x), (int)std::floor(sMouseDoc.y)) > 0.0f && CanLift(doc))
@@ -11659,11 +11925,23 @@ namespace
       if (sTool == kShape)
       {
          ImGui::SetNextItemWidth(kWellL);
-         if (MenuParts::BeginCombo("##v2dshapekind", T(kKinds[std::clamp(sShapeKind, 0, kShapeKinds - 1)])))
+         const int custom = CustomKind();
+         if (custom < 0)
+            sShapeKind = std::clamp(sShapeKind, 0, kShapeKinds - 1);
+         if (MenuParts::BeginCombo("##v2dshapekind", custom >= 0 ? CustomShapes()[(size_t)custom].name.c_str() : T(kKinds[sShapeKind])))
          {
             for (int i = 0; i < kShapeKinds; i++)
                if (MenuParts::Choice(T(kKinds[i]), sShapeKind == i))
                   sShapeKind = i;
+            if (!CustomShapes().empty())
+               MenuParts::Separator();
+            for (int i = 0; i < (int)CustomShapes().size(); i++)
+            {
+               ImGui::PushID(i);
+               if (MenuParts::Choice(CustomShapes()[(size_t)i].name.c_str(), sShapeKind == kShapeKinds + i))
+                  sShapeKind = kShapeKinds + i;
+               ImGui::PopID();
+            }
             MenuParts::EndCombo();
          }
          gap();
@@ -12936,13 +13214,25 @@ namespace
       if (!MenuParts::SubMenu(T("Transform"), can))
          return;
       if (MenuParts::Item(T("Free Transform"), Sc("Ctrl+T"))) BeginFreeTransform(doc);
+      // Again repeats the last turn or flip made from this menu on what is selected now.
+      if (MenuParts::Item(T("Again"), nullptr, false, sLastXf != 0))
+         sLastXf == 1 ? TurnSelection(doc, sLastXfDeg) : FlipSelection(doc, sLastXfVert);
       MenuParts::Separator();
-      if (MenuParts::Item(T("Rotate 90° Clockwise"))) TurnSelection(doc, 90.0f);
-      if (MenuParts::Item(T("Rotate 90° Counter Clockwise"))) TurnSelection(doc, -90.0f);
-      if (MenuParts::Item(T("Rotate 180°"))) TurnSelection(doc, 180.0f);
+      static const char* const kTurn[3] = { "Rotate 90° Clockwise", "Rotate 90° Counter Clockwise", "Rotate 180°" };
+      static const float kTurnDeg[3] = { 90.0f, -90.0f, 180.0f };
+      for (int i = 0; i < 3; i++)
+         if (MenuParts::Item(T(kTurn[i])))
+         {
+            TurnSelection(doc, kTurnDeg[i]);
+            RecordTransform(1, kTurnDeg[i], false);
+         }
       MenuParts::Separator();
-      if (MenuParts::Item(T("Flip Horizontal"))) FlipSelection(doc, false);
-      if (MenuParts::Item(T("Flip Vertical"))) FlipSelection(doc, true);
+      for (int v = 0; v < 2; v++)
+         if (MenuParts::Item(T(v == 0 ? "Flip Horizontal" : "Flip Vertical")))
+         {
+            FlipSelection(doc, v == 1);
+            RecordTransform(2, 0.0f, v == 1);
+         }
       ImGui::EndMenu();
    }
 
@@ -13673,6 +13963,29 @@ namespace
    void CopyLayerEffects(const Layer& l);
    void PasteLayerEffects(Scene2DNode* doc, int id);
 
+   // Select > Find Layers / Isolate Layers: a row shows when it matches (its name holds the find text, it is one of
+   // the isolated layers), or when a layer inside it does.
+   bool RowShown(Scene2DNode* doc, const Layer& l)
+   {
+      const bool finding = sLayerFindOn && sLayerFind[0] != 0;
+      if (sIsolated.empty() && !finding)
+         return true;
+      bool self = sIsolated.empty() || std::find(sIsolated.begin(), sIsolated.end(), l.id) != sIsolated.end();
+      if (self && finding)
+      {
+         std::string name = LayerName(l), want = sLayerFind;
+         for (char& ch : name) ch = (char)std::tolower((unsigned char)ch);
+         for (char& ch : want) ch = (char)std::tolower((unsigned char)ch);
+         self = name.find(want) != std::string::npos;
+      }
+      if (self)
+         return true;
+      for (int kid : doc->ChildrenOf(l.id))
+         if (const Layer* k = doc->FindLayer(kid); k != nullptr && RowShown(doc, *k))
+            return true;
+      return false;
+   }
+
    void DrawLayerRows(Scene2DNode* doc, int parent, int depth, float w)
    {
       if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
@@ -13682,7 +13995,7 @@ namespace
       for (int k = (int)kids.size() - 1; k >= 0; k--)
       {
          Layer* l = doc->FindLayer(kids[k]);
-         if (l == nullptr)
+         if (l == nullptr || !RowShown(doc, *l))
             continue;
          const int id = l->id;
          ImGui::PushID(id);
@@ -14355,6 +14668,21 @@ namespace
       const float rowsW = Ui::AvailW();
       if (doc->Layers().empty())
          CentredText(ImGui::GetCursorScreenPos().y, T("No layers"));
+      if (sLayerFindOn || !sIsolated.empty())
+      {
+         if (sLayerFindOn)
+         {
+            ImGui::SetNextItemWidth(rowsW - ImGui::CalcTextSize(T("Done")).x - tok::space_4);
+            FieldWell::InputText("##v2dlayerfind", sLayerFind, sizeof sLayerFind, 0);
+            FormParts::Inline(0.0f, tok::space_1);
+         }
+         if (TextChip(L("Done##v2dlayerfinddone"), false, T("Show every layer again")))
+         {
+            sLayerFindOn = false;
+            sLayerFind[0] = 0;
+            sIsolated.clear();
+         }
+      }
       DrawLayerRows(doc, 0, 0, rowsW);
       // Dropping below the last row puts a layer at the bottom of the document.
       Ui::Claim(ImVec2(rowsW, std::max(tok::view2d_layers_card_min, Ui::AvailH())));
@@ -15091,8 +15419,33 @@ namespace
       { "Remove Background", "Mask", "Remove Background", "Compositing", false, true },
       { "Chroma Key", "Mask", "chroma key", "Compositing", false, false },
       { "Luma Key", "Mask", "luma key", "Compositing", false, false },
+      // PhotoCraft Filter menu (owner yes 2026-11-27)
+      { "Crystallize", "Pixelate", "crystallize", "Effects", false, false },
+      { "Facet", "Pixelate", "facet", "Effects", false, false },
+      { "Fragment", "Pixelate", "fragment", "Effects", false, false },
+      { "Mezzotint", "Pixelate", "mezzotint", "Effects", false, false },
+      { "Pointillize", "Pixelate", "pointillize", "Effects", false, false },
+      { "Diffuse", "Stylize", "diffuse", "Effects", false, false },
+      { "Extrude", "Stylize", "extrude", "Effects", false, false },
+      { "Oil Paint", "Stylize", "oil paint", "Effects", false, false },
+      { "Tiles", "Stylize", "tiles", "Effects", false, false },
+      { "Trace Contour", "Stylize", "trace contour", "Effects", false, false },
+      { "Wind", "Stylize", "wind streaks", "Effects", false, false },
+      { "Tilt-Shift", "Blur", "tilt shift", "Effects", false, false },
+      { "Iris Blur", "Blur", "iris blur", "Effects", false, false },
+      { "Spin Blur", "Blur", "spin blur", "Effects", false, false },
+      { "Field Blur", "Blur", "field blur", "Effects", false, false },
+      { "Path Blur", "Blur", "path blur", "Effects", false, false },
+      { "Smart Blur", "Blur", "smart blur", "Effects", false, false },
+      { "Shape Blur", "Blur", "shape blur", "Effects", false, false },
+      { "ZigZag", "Distort", "zigzag", "Effects", false, false },
+      { "Reduce Noise", "Noise", "reduce noise", "Effects", false, false },
+      { "HSB/HSL", "Colour", "hsb hsl", "Effects", false, false },
+      { "Fibers", "Render", "fibers", "Effects", false, false },
+      { "Lens Flare", "Render", "lens flare", "Effects", false, false },
+      { "Lighting Effects", "Render", "lighting effects", "Effects", false, false },
    };
-   const char* const kEffGroups[] = { "Adjust", "Blur", "Distort", "Stylize", "Colour", "Time", "Sim", "Code", "Mask" };
+   const char* const kEffGroups[] = { "Adjust", "Blur", "Distort", "Pixelate", "Stylize", "Noise", "Colour", "Render", "Time", "Sim", "Code", "Mask" };
 
    struct EffAdd { int layer = 0; int native = -1; int node = -1; uint64_t doc = 0; } sEffAdd;
    // 1 up, 2 down, 3 delete, 4 move to `to`, 5 duplicate (native), 6 reset (native)
@@ -16237,6 +16590,7 @@ namespace
       if (nodeIdx < 0 || nodeIdx >= (int)(sizeof(kNodeEffects) / sizeof(kNodeEffects[0])))
          return;
       const NodeEffectEntry& ne = kNodeEffects[nodeIdx];
+      sLastFilter = nodeIdx;
       GraphNode* host = nullptr;
       for (GraphNode& gn : gNodes)
          if (gn.node.get() == doc)
@@ -17053,7 +17407,10 @@ namespace
          if (MenuParts::Item(T("New Document"))) sPending.what = Pending::NewDoc;
          if (MenuParts::Item(T("Duplicate Document"))) sPending.what = Pending::DuplicateDoc;
          if (MenuParts::Item(T("Open PSD or ORA..."))) sPending.what = Pending::OpenFile;
+         if (MenuParts::Item(T("New from Clipboard"))) sPending.what = Pending::NewFromClip;
+         if (MenuParts::Item(T("Place Embedded..."), nullptr, false, doc != nullptr)) PlaceEmbedded(doc);
          MenuParts::Separator();
+         ExportSubMenu(doc);
          if (MenuParts::Item(T("Export PSD..."), nullptr, false, doc != nullptr)) sPending.what = Pending::ExportPsd;
          if (MenuParts::Item(T("Export ORA..."), nullptr, false, doc != nullptr)) sPending.what = Pending::ExportOra;
          MenuParts::Separator();
@@ -17320,6 +17677,39 @@ namespace
       const ImVec2 at = self != nullptr ? NodePos(*self) : ImVec2(0, 0);
       switch (todo.what)
       {
+      case Pending::NewFromClip:
+      {
+         // File > New from Clipboard: a document the clipboard picture's size, with the picture as its one layer.
+         std::vector<unsigned char> png, rgba;
+         int w = 0, h = 0;
+         if (std::getenv("INFINITE_VIEW2DTEST") != nullptr || !Platform::ClipboardImage(png, rgba, w, h))
+            break;
+         if (!png.empty())
+         {
+            int ch = 0;
+            constexpr size_t kPx = params::view2d::kRgba;
+            unsigned char* img = stbi_load_from_memory(png.data(), (int)png.size(), &w, &h, &ch, (int)kPx);
+            if (img == nullptr)
+               break;
+            rgba.assign(img, img + (size_t)w * h * kPx);
+            stbi_image_free(img);
+         }
+         if (w <= 0 || h <= 0 || rgba.size() < (size_t)w * h * params::view2d::kRgba)
+            break;
+         PushUndoCheckpoint("New from clipboard");
+         if (Scene2DNode* nd = MakeDoc(at.x, at.y + tok::view2d_run_pending_span, ""))
+         {
+            nd->CanvasSize(w, h, 0);
+            nd->AddFileLayer(0, "Pasted", 0, 0, w, h, rgba);
+            nd->Commit();
+            for (GraphNode& gn : gNodes)
+               if (gn.node.get() == nd)
+                  sDocUid = gn.uid;
+            sSel.clear();
+            sNeedFit = true;
+         }
+         break;
+      }
       case Pending::NewDoc:
          PushUndoCheckpoint("New document");
          MakeDoc(at.x, at.y + tok::view2d_run_pending_span, "");
@@ -17830,6 +18220,19 @@ namespace
       static const int kScales[] = { 50, 100, 200, 400 };
       if (!MenuParts::SubMenu(T("Export Layer")))
          return;
+      // Export As / Quick Export as PNG: the layer at full size, the resampling below.
+      static const char* const kExportAs[] = { "Export As...", "Quick Export as PNG" };
+      for (int quick = 0; quick < 2; quick++)
+         if (MenuParts::Item(T(kExportAs[quick])) && !AuditNoDialog())
+         {
+            const std::string path = Platform::SaveLayeredDialog("layer.png", "png");
+            std::string err;
+            if (!path.empty() && !doc->ExportLayerPng(id, path, 100, kMethods[sExportLayerMethod], &err))
+               fprintf(stderr, "[2D View] could not export the layer (%s)\n", err.c_str());
+            else if (!path.empty())
+               sLastRender = path;
+         }
+      MenuParts::Separator();
       for (int m = 0; m < 3; m++)
          if (MenuParts::Item(T(kMethodNames[m]), nullptr, sExportLayerMethod == m))
             sExportLayerMethod = m;
@@ -17958,6 +18361,644 @@ namespace
       if (added > 0)
          gPatchDirty = true;
       return added;
+   }
+
+   // ---- Photoshop's menu names for commands the 2D View has (ux-map, 2026-11-27) -------------------------------
+   // The canvas menu's Edit / Image / Layer / Filter / View submenus: each item calls what the panel or the node
+   // already does, under the name a Photoshop user looks for. Number prompts share one small dialog (AskDialog).
+   enum AskWhat { kAskNone, kAskArbitrary, kAskGuide, kAskLayout, kAskEditGuide, kAskDefringe, kAskDecon, kAskScaleFx, kAskLight, kAskFind, kAskCaScale };
+   struct Ask
+   {
+      int what = kAskNone;
+      bool open = false, b = false;
+      float v[3] = { 0.0f, 0.0f, 0.0f };
+      char a[128] = {}, c[128] = {};
+   } sAsk;
+
+   void OpenAsk(int what, float v0 = 0.0f, float v1 = 0.0f, float v2 = 0.0f, bool b = false)
+   {
+      sAsk = Ask();
+      sAsk.what = what;
+      sAsk.v[0] = v0, sAsk.v[1] = v1, sAsk.v[2] = v2;
+      sAsk.b = b;
+      sAsk.open = true;
+   }
+
+   bool GuideSelValid(Scene2DNode* doc)
+   {
+      const Scene2DNode::Document& d = doc->Doc();
+      return sGuideSel >= 0 && sGuideSel < (int)(sGuideSelAxis == 0 ? d.guidesX.size() : d.guidesY.size());
+   }
+
+   void RunAsk(Scene2DNode* doc)
+   {
+      namespace pv = params::view2d;
+      Scene2DNode::Document& d = doc->Doc();
+      Layer* a = Active(doc);
+      const size_t undo0 = gUndoStack.size();
+      std::string err;
+      switch (sAsk.what)
+      {
+         case kAskArbitrary:
+            PushUndoCheckpoint("Rotate canvas");
+            doc->RotateCanvas(sAsk.b ? -sAsk.v[0] : sAsk.v[0]);
+            break;
+         case kAskGuide:
+            PushUndoCheckpoint("New guide");
+            d.guidesOn = true;
+            (sAsk.b ? d.guidesX : d.guidesY).push_back(sAsk.v[0]);
+            doc->Commit();
+            break;
+         case kAskLayout:
+         {
+            PushUndoCheckpoint("New guide layout");
+            d.guidesOn = true;
+            const float m = std::max(0.0f, sAsk.v[2]);
+            const int cols = (int)std::lround(sAsk.v[0]), rows = (int)std::lround(sAsk.v[1]);
+            auto add = [](std::vector<float>& to, float g)
+            {
+               for (float h : to)
+                  if (std::fabs(h - g) < pv::kGuideSame)
+                     return;
+               to.push_back(g);
+            };
+            for (int i = 0; cols > 0 && i <= cols; i++)
+               add(d.guidesX, m + (d.w - m - m) * (float)i / (float)cols);
+            for (int i = 0; rows > 0 && i <= rows; i++)
+               add(d.guidesY, m + (d.h - m - m) * (float)i / (float)rows);
+            doc->Commit();
+            break;
+         }
+         case kAskEditGuide:
+            if (!GuideSelValid(doc))
+               break;
+            PushUndoCheckpoint("Edit guide");
+            {
+               std::vector<float>& from = sGuideSelAxis == 0 ? d.guidesX : d.guidesY;
+               from.erase(from.begin() + sGuideSel);
+               std::vector<float>& to = sAsk.b ? d.guidesX : d.guidesY;
+               to.push_back(sAsk.v[0]);
+               sGuideSelAxis = sAsk.b ? 0 : 1;
+               sGuideSel = (int)to.size() - 1;
+            }
+            doc->Commit();
+            break;
+         case kAskDefringe:
+         case kAskDecon:
+            if (a == nullptr)
+               break;
+            PushUndoCheckpoint(sAsk.what == kAskDefringe ? "Defringe" : "Color decontaminate");
+            if (!doc->Matting(a->id, sAsk.what == kAskDefringe ? 0 : 3, (int)std::lround(sAsk.v[0]), &err))
+               RollbackUndoTo(undo0);
+            break;
+         case kAskScaleFx:
+         {
+            PushUndoCheckpoint("Scale effects");
+            bool any = false;
+            for (int id : sSel)
+               any = doc->ScaleEffects(id, sAsk.v[0]) || any;
+            if (!any)
+               RollbackUndoTo(undo0);
+            break;
+         }
+         case kAskCaScale:
+         {
+            if (a == nullptr || a->kind != Kind::Paint || a->pw <= 0 || a->ph <= 0)
+               break;
+            const int w = a->pw, h = a->ph;
+            PushUndoCheckpoint("Content-aware scale");
+            const int nw = std::max(1, (int)std::lround(w * sAsk.v[0] / pv::kAskScalePct));
+            const int nh = std::max(1, (int)std::lround(h * sAsk.v[1] / pv::kAskScalePct));
+            if (!doc->ContentAwareScale(a->id, nw, nh))
+               RollbackUndoTo(undo0);
+            break;
+         }
+         case kAskLight:
+            PushUndoCheckpoint("Global light");
+            doc->SetGlobalLight(sAsk.v[0]);
+            break;
+         case kAskFind:
+            PushUndoCheckpoint("Find and replace text");
+            if (doc->FindReplaceText(sAsk.a, sAsk.c, sAsk.b) == 0)
+               RollbackUndoTo(undo0);
+            break;
+         default: break;
+      }
+      if (!err.empty())
+         fprintf(stderr, "[2D View] %s\n", err.c_str());
+      Touch();
+   }
+
+   void AskDialog(Scene2DNode* doc)
+   {
+      namespace pv = params::view2d;
+      if (sAsk.open)
+      {
+         ImGui::OpenPopup("##v2dask");
+         sAsk.open = false;
+      }
+      if (!MenuParts::BeginPopup("##v2dask"))
+         return;
+      static const char* const kTitles[] = { "", "Arbitrary Rotation", "New Guide", "New Guide Layout", "Edit Guide", "Defringe",
+                                             "Color Decontaminate", "Scale Effects", "Global Light", "Find and Replace Text",
+                                             "Content-Aware Scale" };
+      ImGui::TextUnformatted(T(kTitles[std::clamp(sAsk.what, 0, (int)(sizeof kTitles / sizeof kTitles[0]) - 1)]));
+      bool enter = false;
+      switch (sAsk.what)
+      {
+         case kAskArbitrary:
+            DragRow(T("Angle"), &sAsk.v[0], 1.0f, "%.1f°", pv::kAskDegLo, pv::kAskDegHi);
+            MenuParts::Check(T("Counter clockwise"), &sAsk.b);
+            break;
+         case kAskGuide:
+         case kAskEditGuide:
+            MenuParts::Check(T("Vertical"), &sAsk.b);
+            DragRow(T("Position"), &sAsk.v[0], 1.0f, "%.0f px", pv::kAskPosLo, pv::kAskPosHi);
+            break;
+         case kAskLayout:
+            DragRow(T("Columns"), &sAsk.v[0], 1.0f, "%.0f", 0.0f, pv::kAskCountHi);
+            DragRow(T("Rows"), &sAsk.v[1], 1.0f, "%.0f", 0.0f, pv::kAskCountHi);
+            DragRow(T("Margin"), &sAsk.v[2], 1.0f, "%.0f px", 0.0f, pv::kAskPosHi);
+            break;
+         case kAskDefringe:
+            DragRow(T("Width"), &sAsk.v[0], 1.0f, "%.0f px", 1.0f, pv::kAskDefringeHi);
+            break;
+         case kAskDecon:
+            DragRow(T("Amount"), &sAsk.v[0], 1.0f, "%.0f%%", pv::loc_lo, pv::loc_hi);
+            break;
+         case kAskScaleFx:
+            DragRow(T("Scale"), &sAsk.v[0], 1.0f, "%.0f%%", 1.0f, pv::kAskScaleHi);
+            break;
+         case kAskCaScale:
+            DragRow(T("Width"), &sAsk.v[0], 1.0f, "%.0f%%", pv::kAskCaScaleLo, pv::kAskCaScaleHi);
+            DragRow(T("Height"), &sAsk.v[1], 1.0f, "%.0f%%", pv::kAskCaScaleLo, pv::kAskCaScaleHi);
+            break;
+         case kAskLight:
+            DragRow(T("Angle"), &sAsk.v[0], 1.0f, "%.0f°", pv::kAskLightLo, pv::kAskLightHi);
+            break;
+         case kAskFind:
+            if (ImGui::IsWindowAppearing())
+               UiInteract::FocusHere();
+            FieldLabel(T("Find"));
+            enter = FieldWell::InputText("##v2dfindtext", sAsk.a, sizeof sAsk.a, ImGuiInputTextFlags_EnterReturnsTrue) || enter;
+            FieldLabel(T("Change to"));
+            enter = FieldWell::InputText("##v2dchangeto", sAsk.c, sizeof sAsk.c, ImGuiInputTextFlags_EnterReturnsTrue) || enter;
+            MenuParts::Check(T("Case sensitive"), &sAsk.b);
+            break;
+         default: break;
+      }
+      const bool ok = ActionButton::Draw(T("OK"), ImVec2(0.0f, 0.0f), ActionButton::Kind::Plain);
+      if ((ok || enter) && doc != nullptr)
+      {
+         RunAsk(doc);
+         ImGui::CloseCurrentPopup();
+      }
+      MenuParts::EndPopup();
+   }
+
+   // Edit > Content-Aware Fill: the selection rebuilt from around it (the Remove fill, limited to the selection).
+   void ContentAwareFill(Scene2DNode* doc)
+   {
+      Layer* a = Active(doc);
+      float lo[2], hi[2];
+      if (a == nullptr || !doc->SelectionBounds(lo, hi))
+         return;
+      Scene2DNode::RemoveStroke st;
+      st.size = params::view2d::kAskFillRing;
+      st.xy = { lo[0] - 1.0f, lo[1] - 1.0f, hi[0] + 1.0f, lo[1] - 1.0f, hi[0] + 1.0f, hi[1] + 1.0f, lo[0] - 1.0f, hi[1] + 1.0f, lo[0] - 1.0f, lo[1] - 1.0f };
+      const size_t undo0 = gUndoStack.size();
+      PushUndoCheckpoint("Content-aware fill");
+      if (doc->Remove(a->id, { st }, false, false) == 0)
+         RollbackUndoTo(undo0);
+      Touch();
+   }
+
+   // Edit > Paste Special > Paste Into / Paste Outside: the paste, masked to the selection (or to what is outside it).
+   void PasteMasked(Scene2DNode* doc, bool outside)
+   {
+      if (!doc->HasSelection())
+         return;
+      const std::vector<int> before = sSel;
+      if (!PasteFromOs(doc))
+      {
+         if (sClip.empty())
+            return;
+         PushUndoCheckpoint("Paste layer");
+         Layer* a = Active(doc);
+         sSel = doc->PasteLayers(sClip, a != nullptr ? a->id : 0, 0.0f, 0.0f);
+      }
+      if (sSel == before || sSel.empty())
+         return;
+      for (int id : sSel)
+      {
+         doc->MaskFromSelection(id);
+         if (outside)
+            doc->InvertPixelMask(id);
+      }
+      doc->Deselect();
+      Touch();
+   }
+
+   void SetLayersLocked(Scene2DNode* doc, bool on)
+   {
+      PushUndoCheckpoint(on ? "Lock layers" : "Unlock layers");
+      for (int id : sSel)
+         if (Layer* l = doc->FindLayer(id))
+            l->lock = on ? (l->lock | Scene2DNode::kLockAll) : (l->lock & ~(unsigned)Scene2DNode::kLockAll);
+      doc->Commit();
+      Touch();
+   }
+
+   void ClearFx(Scene2DNode* doc, bool hideOnly)
+   {
+      const size_t undo0 = gUndoStack.size();
+      PushUndoCheckpoint(hideOnly ? "Hide all effects" : "Clear layer style");
+      bool any = false;
+      for (int id : sSel)
+         if (Layer* l = doc->FindLayer(id))
+         {
+            any = any || l->AnyFx() || (!hideOnly && !l->fxMore.empty());
+            for (int i = 0; i < Scene2DNode::kFxCount; i++)
+            {
+               if (!hideOnly)
+                  l->fx[i] = Scene2DNode::FxDefault(i);
+               l->fx[i].on = false;
+            }
+            if (hideOnly)
+               for (auto& m : l->fxMore)
+                  m.second.on = false;
+            else
+               l->fxMore.clear();
+         }
+      if (!any)
+      {
+         RollbackUndoTo(undo0);
+         return;
+      }
+      doc->Commit();
+      Touch();
+   }
+
+   std::string SafeFileName(std::string s)
+   {
+      for (char& ch : s)
+         if (!std::isalnum((unsigned char)ch) && ch != '-' && ch != '_' && ch != ' ')
+            ch = '_';
+      return s.empty() ? std::string("layer") : s;
+   }
+
+   // File > Export > Layers to Files: each picture layer as its own PNG, in the folder of the name picked.
+   void LayersToFiles(Scene2DNode* doc)
+   {
+      if (AuditNoDialog())
+         return;
+      const std::string pick = Platform::SaveLayeredDialog("layer.png", "png");
+      if (pick.empty())
+         return;
+      const std::filesystem::path dir = std::filesystem::u8path(pick).parent_path();
+      int n = 0;
+      for (const Layer& l : doc->Layers())
+      {
+         if (l.kind == Kind::Group || l.kind == Kind::Adjust)
+            continue;
+         const std::string file = (dir / std::filesystem::u8path(std::to_string(++n) + " " + SafeFileName(LayerName(l)) + ".png")).u8string();
+         std::string err;
+         if (!doc->ExportLayerPng(l.id, file, 100, "bilinear", &err))
+            fprintf(stderr, "[2D View] could not export layer %d (%s)\n", l.id, err.c_str());
+         else
+            sLastRender = file;
+      }
+   }
+
+   // File > Export > Paths to Illustrator: the document's paths as an SVG file.
+   void PathsToIllustrator(Scene2DNode* doc)
+   {
+      if (AuditNoDialog())
+         return;
+      const std::string svg = doc->PathsSvg();
+      const std::string path = svg.empty() ? std::string() : Platform::SaveLayeredDialog("paths.svg", "svg");
+      if (path.empty())
+         return;
+      std::ofstream out(std::filesystem::u8path(path), std::ios::binary);
+      if (!out.write(svg.data(), (std::streamsize)svg.size()))
+         fprintf(stderr, "[2D View] could not write %s\n", path.c_str());
+   }
+
+   void QuickExportPng()
+   {
+      const int keep = sImageFormat;
+      sImageFormat = 0;
+      RenderImage();
+      sImageFormat = keep;
+   }
+
+   void PlaceEmbedded(Scene2DNode* doc)
+   {
+      if (AuditNoDialog())
+         return;
+      const std::string path = Platform::OpenImageDialog();
+      if (!path.empty())
+         DropFiles(doc, { path }, ImVec2(doc->Doc().w * 0.5f, doc->Doc().h * 0.5f));
+   }
+
+   void ExportSubMenu(Scene2DNode* doc)
+   {
+      if (!MenuParts::SubMenu(T("Export"), doc != nullptr))
+         return;
+      if (MenuParts::Item(T("Export As..."))) sPending.what = Pending::RenderImage;
+      if (MenuParts::Item(T("Quick Export as PNG"))) QuickExportPng();
+      if (MenuParts::Item(T("Layers to Files..."))) LayersToFiles(doc);
+      if (MenuParts::Item(T("Paths to Illustrator..."), nullptr, false, !doc->Paths().empty())) PathsToIllustrator(doc);
+      ImGui::EndMenu();
+   }
+
+   void RecordTransform(int kind, float deg, bool vertical)
+   {
+      sLastXf = kind;
+      sLastXfDeg = deg;
+      sLastXfVert = vertical;
+   }
+
+   void PhotoMenus(Scene2DNode* doc)
+   {
+      Layer* a = Active(doc);
+      const bool any = !sSel.empty();
+      const bool paint = a != nullptr && a->kind == Kind::Paint;
+      const size_t undo0 = gUndoStack.size();
+      if (MenuParts::SubMenu(T("Edit")))
+      {
+         if (MenuParts::Item(T("Content-Aware Fill..."), nullptr, false, paint && doc->HasSelection())) ContentAwareFill(doc);
+         if (MenuParts::Item(T("Content-Aware Scale..."), nullptr, false, paint))
+            OpenAsk(kAskCaScale, params::view2d::kAskScalePct, params::view2d::kAskScalePct);
+         if (MenuParts::Item(T("Define Brush Preset..."))) DefineBrushPreset(doc);
+         const Shape* pickedPath = PickedItem(doc);
+         if (MenuParts::Item(T("Define Custom Shape..."), nullptr, false, pickedPath != nullptr && pickedPath->type == Shape::kPath && pickedPath->Anchors() >= 2))
+         {
+            const int made = DefineCustomShape(*pickedPath);
+            if (made >= 0)
+               sShapeKind = kShapeKinds + made;
+         }
+         if (MenuParts::Item(T("Find and Replace Text..."), nullptr, false, doc->HasTextLayer())) OpenAsk(kAskFind);
+         if (MenuParts::SubMenu(T("Paste Special"), doc->HasSelection()))
+         {
+            if (MenuParts::Item(T("Paste Into"))) PasteMasked(doc, false);
+            if (MenuParts::Item(T("Paste Outside"))) PasteMasked(doc, true);
+            ImGui::EndMenu();
+         }
+         ImGui::EndMenu();
+      }
+      if (MenuParts::SubMenu(T("Image")))
+      {
+         if (MenuParts::Item(T("Reveal All")))
+         {
+            PushUndoCheckpoint("Reveal all");
+            if (!doc->RevealAll())
+               RollbackUndoTo(undo0);
+            Touch();
+         }
+         static const char* const kTone[3] = { "Auto Tone", "Auto Contrast", "Auto Colour" };
+         for (int m = 0; m < 3; m++)
+            if (MenuParts::Item(T(kTone[m]), nullptr, false, paint))
+            {
+               PushUndoCheckpoint(kTone[m]);
+               if (!doc->AutoTone(a->id, m + 1))
+                  RollbackUndoTo(undo0);
+               Touch();
+            }
+         if (MenuParts::SubMenu(T("Adjustments"), paint))
+         {
+            if (MenuParts::Item(T("Equalize")))
+            {
+               PushUndoCheckpoint("Equalize");
+               if (!doc->AutoTone(a->id, 0))
+                  RollbackUndoTo(undo0);
+               Touch();
+            }
+            ImGui::EndMenu();
+         }
+         if (MenuParts::SubMenu(T("Image Rotation")))
+         {
+            static const char* const kTurn[3] = { "180°", "90° Clockwise", "90° Counter Clockwise" };
+            static const float kTurnDeg[3] = { 180.0f, 90.0f, -90.0f };
+            for (int i = 0; i < 3; i++)
+               if (MenuParts::Item(T(kTurn[i])))
+               {
+                  PushUndoCheckpoint("Rotate canvas");
+                  doc->RotateCanvas(kTurnDeg[i]);
+                  Touch();
+               }
+            if (MenuParts::Item(T("Arbitrary..."))) OpenAsk(kAskArbitrary, params::view2d::kAskArbitraryDeg);
+            MenuParts::Separator();
+            if (MenuParts::Item(T("Flip Canvas Horizontal"))) { PushUndoCheckpoint("Flip canvas horizontal"); doc->FlipCanvas(false); Touch(); }
+            if (MenuParts::Item(T("Flip Canvas Vertical"))) { PushUndoCheckpoint("Flip canvas vertical"); doc->FlipCanvas(true); Touch(); }
+            ImGui::EndMenu();
+         }
+         ImGui::EndMenu();
+      }
+      if (MenuParts::SubMenu(T("Layer")))
+      {
+         if (MenuParts::SubMenu(T("New")))
+         {
+            if (MenuParts::Item(T("New Type Layer")))
+            {
+               PushUndoCheckpoint(Scene2DNode::NewTypeLayerName(false, false));
+               const int id = PlaceNew(doc, doc->AddTextLayer("", doc->Doc().w * 0.5f, doc->Doc().h * 0.5f, 0.0f, NewAbove(doc))).id;
+               SelectOnly(id);
+               sTool = kText;
+               BeginTextEdit(doc, id);
+            }
+            if (MenuParts::Item(T("New Shape Layer")))
+            {
+               sTool = kShape;
+               sPending.what = Pending::AddVector;
+            }
+            ImGui::EndMenu();
+         }
+         if (MenuParts::SubMenu(T("New Fill Layer")))
+         {
+            if (MenuParts::Item(T("Solid Colour..."))) sPending.what = Pending::AddFill;
+            ImGui::EndMenu();
+         }
+         if (MenuParts::SubMenu(T("Layer Style"), any))
+         {
+            if (MenuParts::Item(T("Blending Options...")))
+            {
+               sTab = 1;
+               sSideOpen = true;
+            }
+            if (MenuParts::Item(T("Copy Layer Style"), nullptr, false, a != nullptr)) CopyLayerEffects(*a);
+            if (MenuParts::Item(T("Paste Layer Style"), nullptr, false, HasCopiedEffects()))
+               for (int id : std::vector<int>(sSel))
+                  PasteLayerEffects(doc, id);
+            if (MenuParts::Item(T("Clear Layer Style"))) ClearFx(doc, false);
+            MenuParts::Separator();
+            if (MenuParts::Item(T("Create Layer"), nullptr, false, a != nullptr && a->AnyFx()))
+            {
+               static int sFxFrame = 1 << 21;
+               PushUndoCheckpoint("Create layers from style");
+               if (doc->FxToLayers(a->id, ++sFxFrame).empty())
+                  RollbackUndoTo(undo0);
+               Touch();
+            }
+            if (MenuParts::Item(T("Hide All Effects"))) ClearFx(doc, true);
+            if (MenuParts::Item(T("Scale Effects..."))) OpenAsk(kAskScaleFx, params::view2d::kAskScalePct);
+            if (MenuParts::Item(T("Global Light..."))) OpenAsk(kAskLight, params::view2d::kAskLightDeg);
+            ImGui::EndMenu();
+         }
+         if (MenuParts::SubMenu(T("Layer Mask"), a != nullptr && a->kind != Kind::Group && !a->HasPixelMask()))
+         {
+            if (MenuParts::Item(T("Reveal All"))) sPending.what = Pending::AddMask;
+            if (MenuParts::Item(T("Hide All")))
+            {
+               PushUndoCheckpoint("Add layer mask");
+               if (doc->AddPixelMask(a->id))
+                  doc->InvertPixelMask(a->id);
+               sEditMask = true;
+               sEditFxMask = false;
+               Touch();
+            }
+            ImGui::EndMenu();
+         }
+         if (MenuParts::SubMenu(T("Vector Mask"), a != nullptr))
+         {
+            if (MenuParts::Item(T("Vector Mask from Current Path"), nullptr, false, doc->FindPath(Scene2DNode::kWorkPath) != nullptr))
+            {
+               PushUndoCheckpoint("Vector mask from path");
+               if (!doc->VectorMaskFromPath(a->id))
+                  RollbackUndoTo(undo0);
+               Touch();
+            }
+            ImGui::EndMenu();
+         }
+         if (MenuParts::SubMenu(T("Matting"), paint))
+         {
+            if (MenuParts::Item(T("Colour Decontaminate..."))) OpenAsk(kAskDecon, params::view2d::loc_hi);
+            if (MenuParts::Item(T("Defringe..."))) OpenAsk(kAskDefringe, 1.0f);
+            static const char* const kMattes[] = { "Remove Black Matte", "Remove White Matte" };
+            for (int m = 1; m <= 2; m++)
+               if (MenuParts::Item(T(kMattes[m - 1])))
+               {
+                  PushUndoCheckpoint(m == 1 ? "Remove black matte" : "Remove white matte");
+                  if (!doc->Matting(a->id, m))
+                     RollbackUndoTo(undo0);
+                  Touch();
+               }
+            ImGui::EndMenu();
+         }
+         if (MenuParts::SubMenu(T("Rasterize"), a != nullptr && a->kind == Kind::Fill))
+         {
+            if (MenuParts::Item(T("Fill Content")))
+            {
+               static int sFillFrame = 1 << 22;
+               PushUndoCheckpoint("Rasterize fill content");
+               if (const int nid = doc->RasterizeFillLayer(a->id, ++sFillFrame))
+                  SelectOnly(nid);
+               else
+                  RollbackUndoTo(undo0);
+               Touch();
+            }
+            ImGui::EndMenu();
+         }
+         if (MenuParts::SubMenu(T("Delete")))
+         {
+            if (MenuParts::Item(T("Hidden Layers")))
+            {
+               std::vector<int> hidden;
+               for (const Layer& l : doc->Layers())
+                  if (!l.visible)
+                     hidden.push_back(l.id);
+               if (!hidden.empty())
+               {
+                  sSel = hidden;
+                  DeleteSelected(doc);
+               }
+            }
+            ImGui::EndMenu();
+         }
+         if (MenuParts::Item(T("Hide Layers"), nullptr, false, any))
+         {
+            const char* label = "Hide layers";
+            for (int id : sSel)
+               if (Layer* l = doc->FindLayer(id); l != nullptr && l->visible)
+               {
+                  SetLayerVisible(doc, l, false, label);
+                  label = nullptr;
+               }
+            Touch();
+         }
+         const bool locked = a != nullptr && (a->lock & Scene2DNode::kLockAll) != 0;
+         if (MenuParts::Item(T("Lock Layers..."), nullptr, locked, any)) SetLayersLocked(doc, !locked);
+         ImGui::EndMenu();
+      }
+      if (MenuParts::SubMenu(T("Filter"), a != nullptr && sLastFilter >= 0))
+      {
+         if (MenuParts::Item(T("Last Filter"))) AddNodeEffect(doc, a->id, sLastFilter);
+         ImGui::EndMenu();
+      }
+      if (MenuParts::SubMenu(T("View")))
+      {
+         const ImVec2 mid((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f);
+         if (MenuParts::Item(T("Rotate Left"))) TurnViewAbout(doc, -params::view2d::kViewTurnStep, mid);
+         if (MenuParts::Item(T("Rotate Right"))) TurnViewAbout(doc, params::view2d::kViewTurnStep, mid);
+         MenuParts::Check(T("Extras"), &sExtras);
+         MenuParts::Check(T("Proof Colours"), &sProof);
+         MenuParts::Check(T("Gamut Warning"), &sGamut);
+         if (MenuParts::SubMenu(T("Proof Setup")))
+         {
+            static const char* const kProofTargets[] = { "Monitor RGB", "Working CMYK", "Working Gray" };
+            for (int i = 0; i < 3; i++)
+               if (MenuParts::Choice(T(kProofTargets[i]), sProofTarget == i))
+                  sProofTarget = i;
+            ImGui::EndMenu();
+         }
+         if (MenuParts::SubMenu(T("Show")))
+         {
+            MenuParts::Check(T("Target Path"), &sShowTargetPath);
+            ImGui::EndMenu();
+         }
+         Scene2DNode::Document& d = doc->Doc();
+         if (MenuParts::Item(T("New Guide..."))) OpenAsk(kAskGuide, d.w * 0.5f, 0.0f, 0.0f, true);
+         if (MenuParts::Item(T("New Guide Layout..."))) OpenAsk(kAskLayout, params::view2d::kAskLayoutCols, 0.0f, 0.0f);
+         if (MenuParts::Item(T("New Guides From Shape"), nullptr, false, a != nullptr))
+         {
+            float lo[2], hi[2];
+            if (doc->Bounds(a->id, lo, hi))
+            {
+               PushUndoCheckpoint("New guides from shape");
+               d.guidesOn = true;
+               for (float g : { lo[0], (lo[0] + hi[0]) * 0.5f, hi[0] })
+                  d.guidesX.push_back(g);
+               for (float g : { lo[1], (lo[1] + hi[1]) * 0.5f, hi[1] })
+                  d.guidesY.push_back(g);
+               doc->Commit();
+               Touch();
+            }
+         }
+         if (MenuParts::SubMenu(T("Guides")))
+         {
+            if (MenuParts::Item(T("Lock Guides"), nullptr, d.guidesLocked))
+            {
+               PushUndoCheckpoint(d.guidesLocked ? "Unlock guides" : "Lock guides");
+               d.guidesLocked = !d.guidesLocked;
+               doc->Commit();
+               Touch();
+            }
+            const bool picked = GuideSelValid(doc);
+            if (MenuParts::Item(T("Clear Selected Guides"), nullptr, false, picked))
+            {
+               PushUndoCheckpoint("Clear selected guides");
+               std::vector<float>& from = sGuideSelAxis == 0 ? d.guidesX : d.guidesY;
+               from.erase(from.begin() + sGuideSel);
+               sGuideSel = -1;
+               doc->Commit();
+               Touch();
+            }
+            if (MenuParts::Item(T("Edit Selected Guides..."), nullptr, false, picked))
+               OpenAsk(kAskEditGuide, (sGuideSelAxis == 0 ? d.guidesX : d.guidesY)[(size_t)sGuideSel], 0.0f, 0.0f, sGuideSelAxis == 0);
+            ImGui::EndMenu();
+         }
+         ImGui::EndMenu();
+      }
    }
 
    void TakeDroppedFiles(Scene2DNode* doc)
@@ -19693,6 +20734,59 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("a document to test on", false);
       return fails;
    }
+   // Edit > Define Custom Shape: a path kept fitted to its box and drawn back into any box.
+   {
+      Shape tri;
+      tri.type = Shape::kPath;
+      tri.closed = true;
+      const float pts[3][2] = { { 10, 10 }, { 30, 10 }, { 20, 40 } };
+      for (const auto& p : pts)
+         for (int r = 0; r < 3; r++)
+         {
+            tri.pts.push_back(p[0]);
+            tri.pts.push_back(p[1]);
+         }
+      const size_t n0 = CustomShapes().size();
+      const int made = DefineCustomShape(tri);
+      Shape out;
+      out.x0 = 100, out.y0 = 100, out.x1 = 200, out.y1 = 300;
+      if (made >= 0)
+         FitCustomShape(CustomShapes()[(size_t)made], out);
+      expect("Define Custom Shape keeps a path and draws it into a new box",
+             made == (int)n0 && CustomShapes().size() == n0 + 1 && CustomShapes().back().closed && out.pts.size() == 18 &&
+             std::fabs(out.pts[12] - 150.0f) < 0.01f && std::fabs(out.pts[13] - 300.0f) < 0.01f && std::fabs(out.pts[6] - 200.0f) < 0.01f);
+      Shape line;
+      line.type = Shape::kRect;
+      expect("Define Custom Shape takes only paths", DefineCustomShape(line) < 0);
+      CustomShapes().resize(n0);
+   }
+   // Edit > Define Brush Preset: the picture becomes a tip, saved and picked.
+   {
+      const BrushEngine::Brush was = sBrush;
+      const int pick0 = sUserPick;
+      LoadUserPresets();
+      const size_t n0 = sUserPresets.size();
+      doc->CookIfNeeded(1 << 27);
+      const bool made = DefineBrushPreset(doc);
+      expect("Define Brush Preset makes a picture tip and a saved preset",
+             made && sBrush.sampledTip > 0 && BrushEngine::SampledTipTexture(sBrush.sampledTip) != 0 && sUserPresets.size() == n0 + 1 &&
+             sUserPresets.back().brush.sampledTip == sBrush.sampledTip && std::fabs(sBrush.spacing - params::view2d::kTipSpacing) < 1e-6f);
+      const std::string text = UserPresetText();
+      ParseUserPresets(text);
+      expect("a saved picture tip comes back from the preset file",
+             sUserPresets.size() == n0 + 1 && sUserPresets.back().brush.sampledTip == sBrush.sampledTip);
+      sUserPresets.resize(n0);
+      sBrush = was;
+      sUserPick = pick0;
+   }
+   // View > Proof Colours / Gamut Warning: the canvas shows a display-only copy; the document's texture stays its own.
+   {
+      doc->CookIfNeeded((1 << 27) + 1);
+      const unsigned own = doc->GetOutputTexture();
+      const unsigned off = ProofTexture(doc, false, false, 1), on = ProofTexture(doc, true, true, 1);
+      expect("Proof Colours draws through its own texture and leaves the document's alone",
+             own != 0 && off == own && on != 0 && on != own && doc->GetOutputTexture() == own);
+   }
    // Canvas rotate: a turned view maps screen to document and back exactly, turning about the pointer keeps the
    // document point under it fixed, and Esc during a turn puts the view back.
    {
@@ -19717,6 +20811,37 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("Esc during a turn puts the view back", std::fabs(sViewAngle - 30.0f * 3.14159265f / 180.0f) < 1e-5f && std::fabs(sPan.x - panTurn.x) < 1e-3f && std::fabs(sPan.y - panTurn.y) < 1e-3f);
       sOp = Op();
       sZoom = zoom0, sPan = pan0, sViewAngle = angle0, sViewMn = mn0, sViewMx = mx0;
+   }
+   // Effect Add sheet: every entry makes its node, every "Effects" entry is a filter of that name, and every
+   // group is a listed tab (catches a key that names another node, as "wind" names the Wind synth).
+   {
+      int badNode = 0, badFilter = 0, badGroup = 0;
+      for (const NodeEffectEntry& ne : kNodeEffects)
+      {
+         bool inGroup = false;
+         for (const char* g : kEffGroups)
+            inGroup = inGroup || std::strcmp(g, ne.group) == 0;
+         badGroup += inGroup ? 0 : 1;
+         std::unique_ptr<INode> made(NodeFactory::Instance().MakeNode(ne.type));
+         if (made == nullptr)
+         {
+            printf("  panel: no node for effect %s (%s)\n", ne.label, ne.type);
+            badNode++;
+            continue;
+         }
+         if (std::strcmp(ne.category, "Effects") == 0)
+         {
+            auto* fn = dynamic_cast<FilterNode*>(made.get());
+            if (fn == nullptr || fn->Def().name != ne.type)
+            {
+               printf("  panel: effect %s (%s) is not that filter\n", ne.label, ne.type);
+               badFilter++;
+            }
+         }
+      }
+      expect("every Add-sheet effect makes its node", badNode == 0);
+      expect("every Add-sheet filter is the filter it names", badFilter == 0);
+      expect("every Add-sheet effect sits in a listed group", badGroup == 0);
    }
    // Swatches round-trip through their saved text; recent colours keep ten, newest first, no repeats.
    {

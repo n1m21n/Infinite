@@ -2027,13 +2027,19 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
 
 void Scene2DNode::ApplyBrushSources(BrushEngine::Brush& brush, bool snapshot)
 {
+   if (snapshot)
+      mStrokeSampledTip = brush.sampledTip;   // the live path's brush is blank: it takes the stroke's picture tip from here
    unsigned* texOf[3] = { &brush.tipTex, &brush.grainTex, &brush.colorTex };
    for (int k = 0; k < 3; k++)
    {
       *texOf[k] = 0;
       INode* n = BrushSource(k);
       if (n == nullptr)
+      {
+         if (k == 0 && mStrokeSampledTip > 0)   // Define Brush Preset's picture, when no node feeds the tip
+            *texOf[k] = BrushEngine::SampledTipTexture(mStrokeSampledTip);
          continue;
+      }
       n->CookIfNeeded(std::max(0, mLastCookFrame));
       unsigned tex = n->GetOutputTexture();
       const int w = n->GetOutputWidth(), h = n->GetOutputHeight();
@@ -3093,10 +3099,25 @@ void Scene2DNode::Deselect()
 {
    Layers();   // a node Undo just rebuilt has not parsed yet; committing unparsed would write an empty document
    mSelApron = SelApron();
+   if (mSelAny && !mSel.empty())
+      mSelLast = mSel;
    mSel.clear();
    mSelAny = false;
    mSelDirty = true;
    StoreSelection();
+}
+
+bool Scene2DNode::Reselect()
+{
+   Layers();
+   if (mSelLast.size() != (size_t)std::max(0, mDoc.w) * std::max(0, mDoc.h))
+      return false;
+   mSelApron = SelApron();
+   mSel = mSelLast;
+   mSelAny = true;
+   mSelDirty = true;
+   StoreSelection();
+   return true;
 }
 
 void Scene2DNode::ReframeSelection(int w, int h, int dx, int dy)
@@ -6485,6 +6506,7 @@ bool Scene2DNode::CopyLayerStyle(int from, int to, int parts)
          b->optical = a->optical;
          b->outline = a->outline;
          b->outlineW = a->outlineW;
+         b->typeAA = a->typeAA;
          std::copy(a->outlineC, a->outlineC + 4, b->outlineC);
          b->offsetX = a->offsetX;
          b->lang = a->lang;
@@ -6502,4 +6524,355 @@ bool Scene2DNode::CopyLayerStyle(int from, int to, int parts)
    }
    Commit();
    return true;
+}
+
+// ---- Layer > Matting, Image > Auto / Equalize ----------------------------------------------------------------------
+
+namespace
+{
+   // The 0.1% clip points of a 256-bin histogram (Photoshop's Auto default): lo, hi as 0..255 values.
+   void ClipRange(const double hist[256], double total, int& lo, int& hi)
+   {
+      const double cut = total * 0.001;
+      double acc = 0.0;
+      for (lo = 0; lo < 255 && acc + hist[lo] <= cut; lo++)
+         acc += hist[lo];
+      acc = 0.0;
+      for (hi = 255; hi > 0 && acc + hist[hi] <= cut; hi--)
+         acc += hist[hi];
+      if (hi <= lo)
+      {
+         lo = 0;
+         hi = 255;
+      }
+   }
+}
+
+bool Scene2DNode::Matting(int layerId, int mode, int width, std::string* err)
+{
+   Layers();
+   auto fail = [&](const char* why) {
+      if (err != nullptr)
+         *err = std::string("matting: ") + why;
+      std::fprintf(stderr, "PROBE matting refused: %s\n", why);
+      return false;
+   };
+   Layer* l = FindLayer(layerId);
+   if (l == nullptr || l->kind != Kind::Paint)
+      return fail("not a paint layer");
+   if ((EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
+      return fail("the layer's pixels are locked");
+   if (mode < 0 || mode > 3)
+      return fail("bad mode");
+   SyncSurfaces();
+   auto it = mSurfaces.find(layerId);
+   if (it == mSurfaces.end() || it->second.fbo.fbo == 0)
+      return fail("no pixels");
+   const int W = l->pw, H = l->ph;
+   std::vector<uint8_t> px;
+   ReadRect(it->second.fbo, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return fail("no pixels");
+   const std::vector<uint8_t> was = px;
+   if (mode == 0)
+   {
+      // Defringe: each soft edge pixel takes the nearest solid pixel's colour, nearest by distance within width.
+      const int r = std::clamp(width, 1, 64);
+      for (int y = 0; y < H; y++)
+         for (int x = 0; x < W; x++)
+         {
+            uint8_t* q = &px[((size_t)y * W + x) * 4];
+            if (q[3] == 0 || q[3] == 255)
+               continue;
+            int best = INT_MAX;
+            const uint8_t* src = nullptr;
+            for (int dy = -r; dy <= r; dy++)
+               for (int dx = -r; dx <= r; dx++)
+               {
+                  const int sx = x + dx, sy = y + dy, d2 = dx * dx + dy * dy;
+                  if (sx < 0 || sy < 0 || sx >= W || sy >= H || d2 >= best || d2 > r * r)
+                     continue;
+                  const uint8_t* s = &was[((size_t)sy * W + sx) * 4];
+                  if (s[3] == 255)
+                  {
+                     best = d2;
+                     src = s;
+                  }
+               }
+            if (src != nullptr)
+               for (int j = 0; j < 3; j++)
+                  q[j] = src[j];
+         }
+   }
+   else if (mode == 1 || mode == 2)
+   {
+      // The colour was mixed with black (or white) by its alpha: c = a * f + (1 - a) * m, so f = (c - (1 - a) m) / a.
+      const float m = mode == 2 ? 1.0f : 0.0f;
+      for (size_t i = 0; i < (size_t)W * H; i++)
+      {
+         uint8_t* q = &px[i * 4];
+         if (q[3] == 0 || q[3] == 255)
+            continue;
+         const float a = q[3] / 255.0f;
+         for (int j = 0; j < 3; j++)
+            q[j] = (uint8_t)std::lround(std::clamp((q[j] / 255.0f - (1.0f - a) * m) / a, 0.0f, 1.0f) * 255.0f);
+      }
+   }
+   else
+   {
+      // Colour Decontaminate: the layer's own alpha is the mask (rows as read; the maths is the same either way up).
+      std::vector<uint8_t> mask((size_t)W * H);
+      for (size_t i = 0; i < mask.size(); i++)
+         mask[i] = px[i * 4 + 3];
+      SelectMaths::Decontaminate(px.data(), mask, W, H, std::clamp(width / 100.0f, 0.0f, 1.0f));
+      for (size_t i = 0; i < mask.size(); i++)
+         px[i * 4 + 3] = mask[i];   // decontamination moves colour, never coverage
+   }
+   size_t n = 0;
+   for (size_t i = 0; i < px.size(); i += 4)
+      n += std::memcmp(&px[i], &was[i], 4) != 0 ? 1 : 0;
+   std::fprintf(stderr, "PROBE matting layer %d mode %d: %zu px changed\n", layerId, mode, n);
+   if (n == 0)
+      return fail("nothing to change");
+   WriteRect(it->second.fbo, 0, 0, W, H, px.data());
+   const int all[4] = { 0, 0, W, H };
+   StoreTiles(it->second, l->tiles, all);
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::AutoTone(int layerId, int mode, std::string* err)
+{
+   Layers();
+   auto fail = [&](const char* why) {
+      if (err != nullptr)
+         *err = std::string("autoTone: ") + why;
+      std::fprintf(stderr, "PROBE auto tone refused: %s\n", why);
+      return false;
+   };
+   Layer* l = FindLayer(layerId);
+   if (l == nullptr || l->kind != Kind::Paint)
+      return fail("not a paint layer");
+   if ((EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
+      return fail("the layer's pixels are locked");
+   if (mode < 0 || mode > 3)
+      return fail("bad mode");
+   SyncSurfaces();
+   auto it = mSurfaces.find(layerId);
+   if (it == mSurfaces.end() || it->second.fbo.fbo == 0)
+      return fail("no pixels");
+   const int W = l->pw, H = l->ph;
+   std::vector<uint8_t> px;
+   ReadRect(it->second.fbo, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return fail("no pixels");
+   const bool plain = l->sx == 1.0f && l->sy == 1.0f && l->angle == 0.0f && l->shear == 0.0f && !l->flipX && !l->flipY && !l->is3d &&
+                      !l->warpOn && W == mDoc.w && H == mDoc.h && std::fabs(l->x - l->ax * W) < 1e-3f && std::fabs(l->y - l->ay * H) < 1e-3f;
+   const bool limit = mSelAny && mSel.size() == (size_t)mDoc.w * mDoc.h;
+   if (limit && !plain)
+      return fail("a selection needs the layer to fill the document, unmoved");
+   // Histograms of the pixels the command works on (the selection's, when there is one).
+   double hist[3][256] = {}, total = 0.0;
+   for (size_t i = 0; i < (size_t)W * H; i++)
+   {
+      const uint8_t* q = &px[i * 4];
+      const double k = limit ? mSel[i] / 255.0 : 1.0;
+      if (q[3] == 0 || k <= 0.0)
+         continue;
+      for (int j = 0; j < 3; j++)
+         hist[j][q[j]] += k;
+      total += k;
+   }
+   if (total <= 0.0)
+      return fail("the layer is empty");
+   uint8_t lut[3][256];
+   if (mode == 0)
+   {
+      // Equalize: one cumulative table from all three channels, so the brightness steps are used evenly.
+      double all[256], acc = 0.0;
+      for (int v = 0; v < 256; v++)
+         all[v] = hist[0][v] + hist[1][v] + hist[2][v];
+      const double sum = total * 3.0;
+      double first = 0.0;
+      for (int v = 0; v < 256 && first == 0.0; v++)
+         first = all[v];
+      for (int v = 0; v < 256; v++)
+      {
+         acc += all[v];
+         const double t = sum - first > 0.0 ? (acc - first) / (sum - first) : 0.0;
+         lut[0][v] = lut[1][v] = lut[2][v] = (uint8_t)std::lround(std::clamp(t, 0.0, 1.0) * 255.0);
+      }
+   }
+   else
+   {
+      int lo[3], hi[3];
+      for (int j = 0; j < 3; j++)
+         ClipRange(hist[j], total, lo[j], hi[j]);
+      if (mode == 2)
+      {
+         // Auto Contrast: one range for all channels, so a colour cast stays.
+         double all[256];
+         for (int v = 0; v < 256; v++)
+            all[v] = hist[0][v] + hist[1][v] + hist[2][v];
+         int a = 0, b = 255;
+         ClipRange(all, total * 3.0, a, b);
+         for (int j = 0; j < 3; j++)
+         {
+            lo[j] = a;
+            hi[j] = b;
+         }
+      }
+      for (int j = 0; j < 3; j++)
+         for (int v = 0; v < 256; v++)
+            lut[j][v] = (uint8_t)std::lround(std::clamp((v - lo[j]) / (double)std::max(1, hi[j] - lo[j]), 0.0, 1.0) * 255.0);
+      if (mode == 3)
+      {
+         // Auto Color: after the stretch, each channel's midtones (pixels near mid grey) meet at neutral grey, by a gamma.
+         double mean[3] = {}, wsum = 0.0;
+         for (size_t i = 0; i < (size_t)W * H; i++)
+         {
+            const uint8_t* q = &px[i * 4];
+            const double k = limit ? mSel[i] / 255.0 : 1.0;
+            if (q[3] == 0 || k <= 0.0)
+               continue;
+            const double luma = (lut[0][q[0]] + lut[1][q[1]] + lut[2][q[2]]) / (3.0 * 255.0);
+            if (luma < 0.25 || luma > 0.75)
+               continue;
+            for (int j = 0; j < 3; j++)
+               mean[j] += lut[j][q[j]] / 255.0 * k;
+            wsum += k;
+         }
+         if (wsum > 0.0)
+         {
+            const double grey = (mean[0] + mean[1] + mean[2]) / (3.0 * wsum);
+            for (int j = 0; j < 3; j++)
+            {
+               const double m = std::clamp(mean[j] / wsum, 0.02, 0.98);
+               const double g = std::clamp(std::log(std::clamp(grey, 0.02, 0.98)) / std::log(m), 0.25, 4.0);
+               for (int v = 0; v < 256; v++)
+                  lut[j][v] = (uint8_t)std::lround(std::pow(lut[j][v] / 255.0, g) * 255.0);
+            }
+         }
+      }
+   }
+   size_t n = 0;
+   for (size_t i = 0; i < (size_t)W * H; i++)
+   {
+      uint8_t* q = &px[i * 4];
+      const float k = limit ? mSel[i] / 255.0f : 1.0f;
+      if (q[3] == 0 || k <= 0.0f)
+         continue;
+      bool any = false;
+      for (int j = 0; j < 3; j++)
+      {
+         const uint8_t b = (uint8_t)std::lround(q[j] + (lut[j][q[j]] - q[j]) * k);
+         any = any || b != q[j];
+         q[j] = b;
+      }
+      n += any ? 1 : 0;
+   }
+   std::fprintf(stderr, "PROBE auto tone layer %d mode %d: %zu px changed\n", layerId, mode, n);
+   WriteRect(it->second.fbo, 0, 0, W, H, px.data());
+   const int all[4] = { 0, 0, W, H };
+   StoreTiles(it->second, l->tiles, all);
+   Commit();
+   return true;
+}
+
+std::vector<int> Scene2DNode::FxToLayers(int id, int frameId)
+{
+   Layers();
+   std::vector<int> out;
+   const Layer* l0 = FindConst(id);
+   if (l0 == nullptr || !l0->AnyFx())
+      return out;
+   const Layer keep = *l0;
+   struct One { bool more; int idx; int type; };
+   std::vector<One> list;
+   for (int k = 0; k < kFxCount; k++)
+      if (keep.fx[k].on)
+         list.push_back({ false, k, k });
+   for (int j = 0; j < (int)keep.fxMore.size(); j++)
+      if (keep.fxMore[(size_t)j].second.on)
+         list.push_back({ true, j, keep.fxMore[(size_t)j].first });
+   for (const One& one : list)
+   {
+      Layer* l = FindLayer(id);
+      if (l == nullptr)
+         break;
+      // The layer with this one fx and no pixels of its own (Fill 0 keeps fx), drawn alone.
+      *l = keep;
+      for (Fx& f : l->fx)
+         f.on = false;
+      for (auto& m : l->fxMore)
+         m.second.on = false;
+      (one.more ? l->fxMore[(size_t)one.idx].second : l->fx[one.idx]).on = true;
+      l->fill = 0.0f;
+      l->effects.clear();
+      Commit();
+      std::vector<uint8_t> rgba;
+      if (!RenderLayerAlone(id, frameId, rgba) || rgba.size() != (size_t)mDoc.w * mDoc.h * 4)
+         continue;
+      const std::string name = keep.name + "'s " + FxName(one.type);
+      const int nid = AddFileLayer(0, name, 0, 0, mDoc.w, mDoc.h, rgba, id);   // x, y: the top left
+      if (nid == 0)
+         continue;
+      // What is drawn under the pixels (drop shadow, outer glow) goes under the layer.
+      if (one.type == kFxShadow || one.type == kFxGlow)
+         MoveLayer(nid, id, true);
+      if (Layer* nl = FindLayer(nid))
+      {
+         nl->clip = keep.clip;
+         nl->opacity = keep.opacity;
+      }
+      out.push_back(nid);
+   }
+   if (Layer* l = FindLayer(id))
+   {
+      *l = keep;
+      for (Fx& f : l->fx)
+         f.on = false;
+      for (auto& m : l->fxMore)
+         m.second.on = false;
+   }
+   Commit();
+   std::fprintf(stderr, "PROBE fx to layers %d: %zu layers\n", id, out.size());
+   return out;
+}
+
+int Scene2DNode::RasterizeFillLayer(int id, int frameId)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Fill)
+      return 0;
+   const Layer keep = *l;
+   l->opacity = 1.0f;
+   l->blend = 0;
+   l->clip = false;
+   l->visible = true;
+   Commit();
+   std::vector<uint8_t> rgba;
+   const bool drawn = RenderLayerAlone(id, frameId, rgba) && rgba.size() == (size_t)mDoc.w * mDoc.h * 4;
+   if (Layer* back = FindLayer(id))
+      *back = keep;
+   if (!drawn)
+   {
+      Commit();
+      return 0;
+   }
+   const int nid = AddFileLayer(keep.parent, keep.name.empty() ? std::string("Fill") : keep.name, 0, 0, mDoc.w, mDoc.h, rgba, id);
+   if (Layer* nl = FindLayer(nid))
+   {
+      nl->opacity = keep.opacity;
+      nl->blend = keep.blend;
+      nl->clip = keep.clip;
+      nl->visible = keep.visible;
+      nl->label = keep.label;
+   }
+   if (nid != 0)
+      RemoveLayer(id);
+   std::fprintf(stderr, "PROBE rasterize fill %d -> %d\n", id, nid);
+   Commit();
+   return nid;
 }

@@ -5,6 +5,7 @@
 #include "app/AppShared.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/Scene2DNode.h"
+#include "nodes/FilterNode.h"
 #include "nodes/SceneNodes.h"
 #include "core/BlendModes.h"
 #include "core/TileStore.h"
@@ -3977,6 +3978,342 @@ void RunView2DTest()
          RunAiEval();
       if (std::getenv("INFINITE_AIEVAL") != nullptr)
          RunS4TraceEval();
+   }
+   // UX map commands (2026-11-27): the engine side of each menu item added for the PhotoCraft command map.
+   {
+      const int W = 64, H = 48;
+      auto make = [&](Scene2DNode& d, uint8_t r, uint8_t g, uint8_t b, uint8_t al) {
+         d.Layers();
+         d.Doc().w = W;
+         d.Doc().h = H;
+         d.Commit();
+         std::vector<uint8_t> px((size_t)W * H * 4);
+         for (size_t i = 0; i < px.size(); i += 4) { px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = al; }
+         return d.AddFileLayer(0, "pic", 0, 0, W, H, px);
+      };
+      auto alone = [&](Scene2DNode& d, int id) {
+         Cook(&d);
+         std::vector<uint8_t> out;
+         d.RenderLayerAlone(id, ++sFrame, out);
+         return out;
+      };
+      {
+         Scene2DNode d;
+         make(d, 200, 10, 10, 255);
+         d.Doc().guidesX = { 10.0f };
+         d.Commit();
+         d.FlipCanvas(false);
+         Check("UX: Flip Canvas Horizontal mirrors the guides", d.Doc().guidesX.size() == 1 && std::fabs(d.Doc().guidesX[0] - (W - 10.0f)) < 0.01f);
+         d.RotateCanvas(90.0f);
+         Check("UX: Image Rotation 90 swaps width and height", d.Doc().w == H && d.Doc().h == W);
+      }
+      {
+         Scene2DNode d;
+         make(d, 200, 10, 10, 255);
+         std::vector<uint8_t> px((size_t)16 * 16 * 4, 255);
+         d.AddFileLayer(0, "out", W - 4, H - 4, 16, 16, px);
+         const bool grew = d.RevealAll();
+         printf("  UX reveal all: %d x %d\n", d.Doc().w, d.Doc().h);
+         Check("UX: Reveal All grows the canvas to a layer past its edge", grew && d.Doc().w >= W + 12 && d.Doc().h >= H + 12);
+      }
+      {
+         Scene2DNode d;
+         const int id = make(d, 64, 0, 0, 128);   // red un-premultiplied over black at half alpha
+         const std::vector<uint8_t> before = alone(d, id);
+         const bool ran = d.Matting(id, 1, 1, nullptr);
+         const std::vector<uint8_t> after = alone(d, id);
+         const int r0 = before.empty() ? -1 : before[((size_t)(H / 2) * W + W / 2) * 4];
+         const int r1 = after.empty() ? -1 : after[((size_t)(H / 2) * W + W / 2) * 4];
+         printf("  UX remove black matte: red %d -> %d\n", r0, r1);
+         Check("UX: Remove Black Matte brightens a half-alpha edge", ran && r1 > r0);
+      }
+      {
+         Scene2DNode d;
+         d.Layers();
+         d.Doc().w = W;
+         d.Doc().h = H;
+         d.Commit();
+         std::vector<uint8_t> px((size_t)W * H * 4);
+         for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+            {
+               uint8_t* q = &px[((size_t)y * W + x) * 4];
+               q[0] = q[1] = q[2] = (uint8_t)(100 + 50 * x / (W - 1));
+               q[3] = 255;
+            }
+         const int id = d.AddFileLayer(0, "flat", 0, 0, W, H, px);
+         const bool ran = d.AutoTone(id, 2, nullptr);
+         const std::vector<uint8_t> out = alone(d, id);
+         int lo = 255, hi = 0;
+         for (size_t i = 0; i + 3 < out.size(); i += 4) { lo = std::min<int>(lo, out[i]); hi = std::max<int>(hi, out[i]); }
+         printf("  UX auto contrast: 100..150 -> %d..%d\n", lo, hi);
+         Check("UX: Auto Contrast stretches a flat picture", ran && lo < 20 && hi > 235);
+      }
+      {
+         Scene2DNode d;
+         make(d, 0, 0, 0, 0);
+         const int t1 = d.AddTextLayer("one two one", 4.0f, 20.0f, 0.0f);
+         const int n = d.FindReplaceText("one", "1", true);
+         const Layer* tl = d.FindLayer(t1);
+         Check("UX: Find and Replace Text replaces every match", n == 2 && tl != nullptr && tl->text == "1 two 1");
+         std::string err;
+         Check("UX: Ornaments is a known OpenType feature", d.SetTypeFeature({ t1 }, "ornm", 1, std::string::npos, std::string::npos, nullptr, &err));
+      }
+      // Type > Anti-Alias: None is in or out, Sharp has fewer part-covered edge pixels than Smooth, Strong more ink;
+      // the setting saves, and a file without it opens as Smooth.
+      {
+         using SN = Scene2DNode;
+         std::vector<uint8_t> ramp(256 * 4, 0);
+         for (int i = 0; i < 256; i++) ramp[i * 4 + 3] = (uint8_t)i;
+         auto shaped = [&](int mode, float op) {
+            std::vector<uint8_t> r = ramp;
+            for (size_t i = 3; i < r.size(); i += 4) r[i] = (uint8_t)std::lround(r[i] * op);
+            SN::ShapeTypeEdges(mode, op, r);
+            int part = 0; long ink = 0;
+            for (size_t i = 3; i < r.size(); i += 4) { part += (r[i] > 0 && r[i] < 255 * op - 0.5f) ? 1 : 0; ink += r[i]; }
+            return std::make_pair(part, ink);
+         };
+         const auto sm = shaped(SN::kTypeAASmooth, 1.0f), no = shaped(SN::kTypeAANone, 1.0f), sh = shaped(SN::kTypeAASharp, 1.0f),
+                    cr = shaped(SN::kTypeAACrisp, 1.0f), st = shaped(SN::kTypeAAStrong, 1.0f), half = shaped(SN::kTypeAANone, 0.5f);
+         printf("  UX anti-alias part/ink: smooth %d/%ld none %d/%ld sharp %d/%ld crisp %d/%ld strong %d/%ld none@50%% %d\n", sm.first,
+                sm.second, no.first, no.second, sh.first, sh.second, cr.first, cr.second, st.first, st.second, half.first);
+         Check("UX: Anti-Alias None leaves no part-covered pixels, at full or half opacity", no.first == 0 && half.first == 0);
+         Check("UX: Anti-Alias Sharp and Crisp steepen the edge (Sharp most)", sh.first < cr.first && cr.first < sm.first);
+         Check("UX: Anti-Alias Strong puts down more ink than Smooth", st.second > sm.second);
+
+         Scene2DNode d;
+         make(d, 0, 0, 0, 0);
+         const int tx = d.AddTextLayer("Ag", 4.0f, 4.0f, 0.0f);
+         d.FindLayer(tx)->fontSize = 30.0f;
+         d.Commit();
+         auto parts = [&](const std::vector<uint8_t>& px) {
+            int n = 0, on = 0;
+            for (size_t i = 3; i < px.size(); i += 4) { n += (px[i] > 0 && px[i] < 255) ? 1 : 0; on += px[i] > 0 ? 1 : 0; }
+            return std::make_pair(n, on);
+         };
+         const auto smooth = parts(alone(d, tx));
+         d.FindLayer(tx)->typeAA = SN::kTypeAANone;
+         d.Commit();
+         const auto none = parts(alone(d, tx));
+         printf("  UX anti-alias text: smooth %d part of %d, none %d part of %d\n", smooth.first, smooth.second, none.first, none.second);
+         Check("UX: Anti-Alias None draws the type with hard edges", smooth.first > 0 && none.first == 0 && none.second > 0);
+         Scene2DNode copy;
+         copy.SetDocText(d.DocText());
+         const Layer* c = copy.FindLayer(tx);
+         std::string old = d.DocText(), tag = "taa " + std::to_string(tx) + " 1\n";
+         const size_t at = old.find(tag);
+         if (at != std::string::npos) old.erase(at, tag.size());
+         Scene2DNode before;
+         before.SetDocText(old);
+         const Layer* b = before.FindLayer(tx);
+         Check("UX: Anti-Alias saves, and a file without it opens as Smooth",
+               c != nullptr && c->typeAA == SN::kTypeAANone && at != std::string::npos && b != nullptr && b->typeAA == SN::kTypeAASmooth);
+      }
+      {
+         // View > Proof Colours / Gamut Warning: GetProofDef run on the document's texture, as the canvas does.
+         struct ProofOut { std::vector<float> doc0, doc1, out; };
+         auto proof = [&](uint8_t r, uint8_t g, uint8_t b, int target, bool on, bool warn) {
+            Scene2DNode d;
+            make(d, r, g, b, 255);
+            Cook(&d);
+            ProofOut o;
+            o.doc0 = Pixel(&d, W / 2, H / 2);
+            FilterNode f(GetProofDef());
+            f.Input().Connect(&d);
+            f.SetParamValue(0, 0, (float)target);
+            f.SetParamValue(1, 0, on ? 1.0f : 0.0f);
+            f.SetParamValue(2, 0, warn ? 1.0f : 0.0f);
+            f.CookIfNeeded(sFrame);
+            const int w = f.GetOutputWidth(), h = f.GetOutputHeight();
+            std::vector<float> px((size_t)std::max(w * h, 1) * 4, -1.0f);
+            if (f.GetOutputTexture() != 0)
+            {
+               glBindTexture(GL_TEXTURE_2D, f.GetOutputTexture());
+               glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+               glBindTexture(GL_TEXTURE_2D, 0);
+            }
+            const size_t at = ((size_t)(h / 2) * w + w / 2) * 4;
+            o.out = { px[at], px[at + 1], px[at + 2], px[at + 3] };
+            o.doc1 = Pixel(&d, W / 2, H / 2);
+            return o;
+         };
+         auto grey = [](const std::vector<float>& c) { return std::fabs(c[0] - 0.5f) < 0.01f && std::fabs(c[1] - 0.5f) < 0.01f && std::fabs(c[2] - 0.5f) < 0.01f; };
+         const ProofOut bluePrint = proof(0, 0, 255, 1, false, true), blueSrgb = proof(0, 0, 255, 0, false, true);
+         const ProofOut light = proof(200, 200, 200, 1, false, true);
+         printf("  UX proof: blue print warn %.3f %.3f %.3f, sRGB warn %.3f %.3f %.3f, light grey %.3f\n", bluePrint.out[0],
+                bluePrint.out[1], bluePrint.out[2], blueSrgb.out[0], blueSrgb.out[1], blueSrgb.out[2], light.out[0]);
+         Check("UX: Gamut Warning greys a saturated blue for print, not for sRGB",
+               grey(bluePrint.out) && blueSrgb.out[2] > 0.99f && blueSrgb.out[0] < 0.01f);
+         Check("UX: Gamut Warning leaves a light grey alone", std::fabs(light.out[0] - 200.0f / 255.0f) < 0.01f);
+         const ProofOut red = proof(255, 0, 0, 2, true, false), white = proof(255, 255, 255, 1, true, false);
+         const ProofOut blue = proof(0, 0, 255, 1, true, false);
+         printf("  UX proof: grayscale red %.3f %.3f %.3f, print white %.3f, print blue %.3f %.3f %.3f\n", red.out[0], red.out[1],
+                red.out[2], white.out[0], blue.out[0], blue.out[1], blue.out[2]);
+         Check("UX: Proof Colours Grayscale shows one grey per pixel",
+               std::fabs(red.out[0] - red.out[1]) < 0.002f && std::fabs(red.out[1] - red.out[2]) < 0.002f && red.out[0] > 0.1f);
+         Check("UX: Proof Colours Print dulls paper white and saturated blue",
+               white.out[0] < 0.995f && white.out[0] > 0.9f && blue.out[2] - blue.out[0] < 0.9f && blue.out[2] > blue.out[0]);
+         Check("UX: Proof Colours never changes the document's pixels",
+               blue.doc0 == blue.doc1 && bluePrint.doc0 == bluePrint.doc1 && std::fabs(blue.doc1[2] - 1.0f) < 0.01f);
+      }
+      {
+         // Edit > Content-Aware Scale: seams go through the flat background, so a busy square keeps its width.
+         const int cw = 64, ch = 32;
+         std::vector<uint8_t> pic((size_t)cw * ch * 4);
+         for (int y = 0; y < ch; y++)
+            for (int x = 0; x < cw; x++)
+            {
+               uint8_t* p = &pic[((size_t)y * cw + x) * 4];
+               const bool sq = x >= 24 && x < 40 && y >= 8 && y < 24;
+               const bool chk = ((x / 2 + y / 2) & 1) != 0;
+               p[0] = sq ? (chk ? 255 : 40) : 200;
+               p[1] = sq ? (chk ? 30 : 220) : 200;
+               p[2] = sq ? 30 : 200;
+               p[3] = 255;
+            }
+         auto squareW = [&](const std::vector<uint8_t>& px, int w, int row) {
+            int n = 0;
+            for (int x = 0; x < w; x++)
+               n += !(px[((size_t)row * w + x) * 4] == 200 && px[((size_t)row * w + x) * 4 + 1] == 200);
+            return n;
+         };
+         std::vector<uint8_t> nar, wid, tall;
+         const bool okN = Scene2DNode::SeamCarve(pic, cw, ch, 44, ch, nar), okW = Scene2DNode::SeamCarve(pic, cw, ch, 90, ch, wid);
+         const bool okH = Scene2DNode::SeamCarve(pic, cw, ch, cw, 20, tall);
+         printf("  UX content-aware scale: square %d px wide; narrowed %d, widened %d; %zu %zu %zu bytes\n", squareW(pic, cw, 16),
+                okN ? squareW(nar, 44, 16) : -1, okW ? squareW(wid, 90, 16) : -1, nar.size(), wid.size(), tall.size());
+         Check("UX: Content-Aware Scale narrows through the background and keeps the busy square",
+               okN && nar.size() == (size_t)44 * ch * 4 && squareW(nar, 44, 16) == 16);
+         Check("UX: Content-Aware Scale widens through the background and keeps the busy square",
+               okW && wid.size() == (size_t)90 * ch * 4 && squareW(wid, 90, 16) == 16);
+         Check("UX: Content-Aware Scale changes height the same way", okH && tall.size() == (size_t)cw * 20 * 4);
+         Scene2DNode d;
+         make(d, 0, 0, 0, 0);
+         const int id = d.AddFileLayer(0, "busy", 0, 0, cw, ch, pic);
+         Cook(&d);
+         const bool did = d.ContentAwareScale(id, 48, 24);
+         std::vector<uint8_t> back;
+         int bw = 0, bh = 0;
+         const bool read = d.ReadPaint(id, back, bw, bh);
+         Check("UX: Content-Aware Scale resizes a paint layer's pixels", did && read && bw == 48 && bh == 24);
+      }
+      {
+         // Edit > Define Brush Preset: a ring picture as the tip paints a ring, not a disc.
+         const int R = 32;
+         std::vector<uint8_t> ring((size_t)R * R * 4, 255);
+         for (int y = 0; y < R; y++)
+            for (int x = 0; x < R; x++)
+            {
+               const float r = std::hypot(x + 0.5f - R * 0.5f, y + 0.5f - R * 0.5f);
+               if (r > 10.0f && r < 15.0f)
+                  ring[((size_t)y * R + x) * 4] = ring[((size_t)y * R + x) * 4 + 1] = ring[((size_t)y * R + x) * 4 + 2] = 0;
+            }
+         const int tip = BrushEngine::AddSampledTip(ring, R, R), again = BrushEngine::AddSampledTip(ring, R, R);
+         std::vector<uint8_t> mask;
+         int side = 0;
+         const bool got = BrushEngine::SampledTipPixels(tip, mask, side);
+         Check("UX: Define Brush Preset keeps one tip per picture, dark pixels as the mask",
+               tip > 0 && again == tip && got && side == R && mask[(size_t)16 * R + 16] == 0 && mask[(size_t)16 * R + 3] > 200);
+         const int S = 96;
+         GLUtil::Fbo surf;
+         GLUtil::EnsureFbo(surf, S, S, GL_RGBA8, "SampledTipTest");
+         GLUtil::ClearFbo(surf);
+         BrushEngine::Brush b;
+         b.size = 64.0f;
+         b.hardness = 1.0f;
+         b.opacity = b.flow = 1.0f;
+         b.pressureOpacity = false;
+         b.tipTex = BrushEngine::SampledTipTexture(tip);
+         BrushEngine::Stroke st;
+         int dirty[4];
+         st.Begin(surf, b, 48, 48, 1.0f);
+         st.Flush();
+         st.End(surf, dirty);
+         std::vector<uint8_t> px((size_t)S * S * 4);
+         GLint prev = 0;
+         glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev);
+         glBindFramebuffer(GL_READ_FRAMEBUFFER, surf.fbo);
+         glReadPixels(0, 0, S, S, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+         glBindFramebuffer(GL_READ_FRAMEBUFFER, prev);
+         const int mid = px[((size_t)48 * S + 48) * 4 + 3], band = px[((size_t)48 * S + 48 + 25) * 4 + 3];
+         printf("  UX sampled tip: centre alpha %d, ring alpha %d\n", mid, band);
+         Check("UX: a Define Brush Preset tip paints its picture (a ring, hollow in the middle)", band > 128 && mid < 64);
+         GLUtil::DestroyFbo(surf);
+      }
+      {
+         Scene2DNode d;
+         std::vector<uint8_t> px((size_t)20 * 20 * 4, 255);
+         make(d, 0, 0, 0, 0);
+         const int id = d.AddFileLayer(0, "dot", 22, 14, 20, 20, px);
+         Layer* l = d.FindLayer(id);
+         l->fx[Scene2DNode::kFxShadow].on = true;
+         l->fx[Scene2DNode::kFxShadow].size = 10.0f;
+         l->fx[Scene2DNode::kFxShadow].dist = 4.0f;
+         d.Commit();
+         d.ScaleEffects(id, 200.0f);
+         l = d.FindLayer(id);
+         Check("UX: Scale Effects 200% doubles size and distance",
+               std::fabs(l->fx[Scene2DNode::kFxShadow].size - 20.0f) < 0.01f && std::fabs(l->fx[Scene2DNode::kFxShadow].dist - 8.0f) < 0.01f);
+         d.SetGlobalLight(45.0f);
+         l = d.FindLayer(id);
+         Check("UX: Global Light sets the shadow angle", std::fabs(l->fx[Scene2DNode::kFxShadow].angle - 45.0f) < 0.01f);
+         Cook(&d);
+         const size_t n0 = d.Layers().size();
+         const std::vector<int> made = d.FxToLayers(id, ++sFrame);
+         l = d.FindLayer(id);
+         Check("UX: Create Layer moves the shadow onto a layer of its own",
+               made.size() == 1 && d.Layers().size() == n0 + 1 && l != nullptr && !l->fx[Scene2DNode::kFxShadow].on);
+      }
+      {
+         Scene2DNode d;
+         make(d, 0, 0, 0, 0);
+         std::vector<uint8_t> px((size_t)4 * 4 * 4, 255);
+         const int a = d.AddFileLayer(0, "a", 0, 0, 4, 4, px), b = d.AddFileLayer(0, "b", 0, 0, 4, 4, px),
+                   c = d.AddFileLayer(0, "c", 0, 0, 4, 4, px);
+         auto slot = [&](int id) {
+            const std::vector<int> kids = d.ChildrenOf(0);
+            return (int)(std::find(kids.begin(), kids.end(), id) - kids.begin());
+         };
+         const int sa = slot(a), sc = slot(c), sb = slot(b);
+         const bool ran = d.ReverseLayers({ a, b, c });
+         Check("UX: Arrange Reverse swaps the stack end for end", ran && slot(a) == sc && slot(c) == sa && slot(b) == sb);
+      }
+      {
+         Scene2DNode d;
+         const int id = make(d, 200, 10, 10, 255);
+         d.Doc().guidesLocked = true;
+         d.Commit();
+         Scene2DNode copy;
+         copy.SetDocText(d.DocText());
+         Check("UX: Lock Guides saves", copy.Doc().guidesLocked);
+         d.SelectRect(10.0f, 10.0f, 30.0f, 30.0f, Scene2DNode::kSelNew, 0.0f, false);
+         d.Deselect();
+         const bool back = d.Reselect();
+         Check("UX: Reselect brings back the dropped selection", back && d.HasSelection() && d.SelectionAt(20, 20) > 0.5f && d.SelectionAt(50, 40) < 0.5f);
+         const bool wp = d.MakeWorkPathFromSelection();
+         const std::string svg = d.PathsSvg();
+         Check("UX: Paths to Illustrator writes the Work Path as SVG", wp && svg.find("<svg") != std::string::npos && svg.find("<path") != std::string::npos);
+         const bool vm = d.VectorMaskFromPath(id);
+         const Layer* l = d.FindLayer(id);
+         Check("UX: Vector Mask from Current Path turns the mask on", vm && l != nullptr && l->hasVMask && l->vmaskOn);
+      }
+      {
+         Scene2DNode d;
+         make(d, 0, 0, 0, 0);
+         Layer& f = d.AddLayer(Kind::Fill, 0);
+         f.colorA[0] = 1.0f; f.colorA[1] = 0.0f; f.colorA[2] = 0.0f; f.colorA[3] = 1.0f;
+         f.opacity = 0.5f;
+         f.name = "wash";
+         const int fid = f.id;
+         d.Commit();
+         Cook(&d);
+         const size_t n0 = d.Layers().size();
+         const int nid = d.RasterizeFillLayer(fid, ++sFrame);
+         const Layer* nl = d.FindLayer(nid);
+         Check("UX: Rasterize Fill Content makes a paint layer in its place",
+               nid != 0 && nl != nullptr && nl->kind == Kind::Paint && d.FindLayer(fid) == nullptr && d.Layers().size() == n0
+                  && std::fabs(nl->opacity - 0.5f) < 1e-5f && nl->name == "wash");
+      }
    }
    if (doc != nullptr && View2DPanelSelfCheck(doc) > 0)
       ok = false;

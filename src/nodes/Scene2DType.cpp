@@ -609,6 +609,39 @@ bool Scene2DNode::TypeGlyphAnchors(const Layer& l, std::vector<std::vector<float
    return true;
 }
 
+const char* Scene2DNode::TypeAALabel(int mode)
+{
+   static const char* const kNames[kTypeAACount] = { "Smooth", "None", "Sharp", "Crisp", "Strong" };
+   return kNames[std::clamp(mode, 0, (int)kTypeAACount - 1)];
+}
+
+// Photoshop's anti-alias methods, on the rasterizer's coverage c (0..1, before the text's own opacity):
+// None is in or out at half coverage; Sharp and Crisp steepen the edge ramp (Sharp most); Strong lifts partial
+// coverage, so letters read heavier. Smooth is the rasterizer's own edge.
+void Scene2DNode::ShapeTypeEdges(int mode, float opacity, std::vector<uint8_t>& rgba)
+{
+   if (mode <= kTypeAASmooth || mode >= kTypeAACount)
+      return;
+   const float op = std::clamp(opacity, 1e-4f, 1.0f);
+   uint8_t lut[256];
+   for (int i = 0; i < 256; i++)
+   {
+      const float c = std::clamp(i / 255.0f / op, 0.0f, 1.0f);
+      float o = c;
+      if (mode == kTypeAANone)
+         o = c >= 0.5f ? 1.0f : 0.0f;
+      else if (mode == kTypeAASharp)
+         o = std::clamp((c - 0.5f) * 3.0f + 0.5f, 0.0f, 1.0f);
+      else if (mode == kTypeAACrisp)
+         o = std::clamp((c - 0.45f) * 1.8f + 0.5f, 0.0f, 1.0f);
+      else if (mode == kTypeAAStrong)
+         o = std::pow(c, 0.55f);
+      lut[i] = (uint8_t)std::lround(std::min(o * op, 1.0f) * 255.0f);
+   }
+   for (size_t i = 3; i < rgba.size(); i += 4)
+      rgba[i] = lut[rgba[i]];
+}
+
 void Scene2DNode::GlyphTypeRaster(const Layer& l, TextBox& tb)
 {
    std::vector<std::vector<float>> glyphs;

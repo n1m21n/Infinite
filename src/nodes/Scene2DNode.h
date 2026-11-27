@@ -427,6 +427,8 @@ public:
       bool ulOwn = false, stOwn = false, noBreak = false, optical = false, outline = false;
       float ulC[4] = { 0.0f, 0.0f, 0.0f, 1.0f }, stC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float offsetX = 0.0f, outlineW = 2.0f;
+      // Type anti-alias (Photoshop's Type > Anti-Alias): how the glyph edges are shaded. See TypeAALabel.
+      int typeAA = 0;
       float outlineC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       std::string lang;
       // Styled runs (see RunStyle): cover the text exactly, in order. runText / runSummary are what the runs were last
@@ -507,6 +509,7 @@ public:
       float gridSize = 100.0f;
       int gridSubdiv = 4;
       std::vector<float> guidesX, guidesY;   // document pixels
+      bool guidesLocked = false;             // View > Guides > Lock Guides: guides cannot be dragged
       float fps = 60.0f, seconds = 10.0f;    // Render Animation
       bool linear = true, headroom = true;   // composite in linear light, light above 1.0 survives
       uint64_t camUid = 0;                   // a Camera node for 3D layers; 0 = the default 50 mm camera
@@ -687,6 +690,52 @@ public:
    // A turned crop (Photoshop's crop at an angle, Straighten): the picture turns by -deg (degrees, the box's turn
    // clockwise on screen) about the box centre (cx, cy), then the document is cropped to the w x h box. One step.
    void CropRotated(float cx, float cy, float w, float h, float deg, bool deletePixels = false);
+   // Image > Image Rotation (PhotoCraft image.imageRotation.*): the whole canvas turned clockwise by deg about its centre
+   // and grown to the turned picture's bounds. Right angles carry the guides across; other angles drop them, as a
+   // turned crop does. Fills, groups and adjustments cover the page and do not turn. One step; commits.
+   void RotateCanvas(float degCw);
+   // Image > Image Rotation > Flip Canvas Horizontal / Vertical: every layer mirrored about the document's middle, the
+   // guides with it. Commits.
+   void FlipCanvas(bool vertical);
+   // Image > Reveal All: the canvas grown to take in every shown layer's bounds (layers stay where they are on the
+   // picture). False when everything already fits.
+   bool RevealAll();
+   // Layer > Matting (PhotoCraft layer.matting.*) on a paint layer's own pixels: mode 0 Defringe (a pixel at the edge,
+   // alpha under 255, takes the colour of the nearest solid pixel within width px), 1 Remove Black Matte and 2 Remove
+   // White Matte (the colour un-mixed from a black or white background by its alpha), 3 Colour Decontaminate (the soft
+   // edge takes the solid inside's colour; width is the amount, 0..100). Unlocked paint layers; false + err otherwise
+   // or when no pixel changed.
+   bool Matting(int layerId, int mode, int width = 1, std::string* err = nullptr);
+   // Image > Adjustments > Equalize and Image > Auto Tone / Auto Contrast / Auto Color, baked into a paint layer's
+   // pixels (inside the selection when there is one, by its share). mode 0 Equalize (one table from the red, green and
+   // blue histogram together, so brightness spreads evenly), 1 Auto Tone (each channel stretched on its own, 0.1% clipped),
+   // 2 Auto Contrast (one stretch for all three, so colours keep their balance), 3 Auto Color (each channel stretched,
+   // then its midtones moved to neutral grey). False + err for a locked, empty or non-paint layer.
+   bool AutoTone(int layerId, int mode, std::string* err = nullptr);
+   // Edit > Find and Replace Text (PhotoCraft edit.findAndReplaceText): every match of `find` in the text layers
+   // (all of them, or just `ids` when given) replaced by `with`, runs kept. Returns how many were replaced.
+   int FindReplaceText(const std::string& find, const std::string& with, bool matchCase, const std::vector<int>& ids = {});
+   // Layer > Layer Style > Create Layer: each fx on the layer drawn alone into a pixel layer of its own above it, and the
+   // fx turned off on the layer, so the picture looks the same. Returns the new layers' ids (none when it has no fx).
+   std::vector<int> FxToLayers(int id, int frameId);
+   // Layer > Rasterize > Fill Content: a fill layer drawn once into a paint layer in its place (name, blend, opacity,
+   // clip and visibility kept). Returns the new layer, 0 for anything but a fill layer.
+   int RasterizeFillLayer(int id, int frameId);
+   // Layer > Layer Style > Scale Effects: every fx size, distance and stroke width on the layer scaled by pct / 100.
+   bool ScaleEffects(int id, float pct);
+   // Layer > Layer Style > Global Light: the light angle of every shadow, bevel and satin in the document.
+   void SetGlobalLight(float angle);
+   // File > Export > Paths to Illustrator: the document's saved paths (and Work Path) as one SVG document; empty when
+   // there are none.
+   std::string PathsSvg();
+   // Layer > Arrange > Reverse: the given layers that share the first one's parent swap stacking slots end for end.
+   // False when fewer than two qualify.
+   bool ReverseLayers(const std::vector<int>& ids);
+   // Select > Reselect: the selection the last Deselect dropped, back (false when there is none or the canvas changed size).
+   bool Reselect();
+   // Layer > Vector Mask > Vector Mask from Current Path: the named path (the Work Path by default) becomes layer id's
+   // vector mask, on. False when there is no such path or no such layer.
+   bool VectorMaskFromPath(int id, const std::string& name = kWorkPath);
    // Image Size with a resolution (PhotoCraft image.imageSize): dpi > 0 sets it. keepPrintSize resamples so the print
    // size stays (a side given still wins, the other keeping the proportions); without it the pixels stay and only the
    // resolution changes unless w / h are given. Type keeps its pixel size, so it scales with the pixels only.
@@ -1127,6 +1176,10 @@ public:
    int SkinSide(int id);
    // The paint surface's texture and size, 0 when not a paint layer (Convert to Draw node).
    bool ReadPaint(int id, std::vector<uint8_t>& rgba, int& w, int& h);
+   // Edit > Content-Aware Scale: a paint layer's pixels to nw x nh through their quietest seams (SeamCarve), so busy
+   // parts keep their shape; false on a locked or non-paint layer. SeamCarve works on any w x h RGBA buffer.
+   bool ContentAwareScale(int id, int nw, int nh);
+   static bool SeamCarve(const std::vector<uint8_t>& rgba, int w, int h, int nw, int nh, std::vector<uint8_t>& out);
    // The composited picture as last cooked (bottom row first); false before the first cook.
    bool ReadOutput(std::vector<uint8_t>& rgba, int& w, int& h);
    // ---- layered files (Block 8) ---------------------------------------------
@@ -1708,6 +1761,12 @@ private:
    struct TextBox { unsigned long long key = 0; int w = 0, h = 0, gw = 0, gh = 0; std::vector<uint8_t> rgba; };
    void GlyphTypeRaster(const Layer& l, TextBox& tb);
    void WarpTypeRaster(const Layer& l, TextBox& tb);
+public:
+   enum TypeAA { kTypeAASmooth = 0, kTypeAANone, kTypeAASharp, kTypeAACrisp, kTypeAAStrong, kTypeAACount };
+   static const char* TypeAALabel(int mode);
+   // Shapes a type raster's edge coverage by the anti-alias mode (straight RGBA; opacity is the text's own alpha).
+   static void ShapeTypeEdges(int mode, float opacity, std::vector<uint8_t>& rgba);
+private:
    int ShapesLayerFromText(int id, int preW, int preH, std::vector<Shape> shapes);
    std::map<int, TextBox> mTextBoxes;
    BrushEngine::Stroke mStroke;
@@ -1746,6 +1805,7 @@ private:
    void SkinDab(const Layer& l, float x, float y, float pressure, bool skipMain = false);
    unsigned long long SkinRevision(const Layer& l) const;
    std::vector<uint8_t> mSel;          // document px, bottom row first, 0..255
+   std::vector<uint8_t> mSelLast;      // what the last Deselect dropped (Reselect)
    std::vector<uint8_t> mLiveSel, mLivePic;   // a live dialog's selection before it and picture (bottom row first)
    bool mLiveSelAny = false;
    std::vector<uint8_t> mLiveZone;    // Refine Edge Brush strokes (bottom row first, 0..255)
@@ -1820,6 +1880,7 @@ private:
    unsigned mSelOverlaySrc = 0;
    bool mSelOverlayQuick = false;
    GLUtil::Fbo mBrushFrozen[3];   // node brush sources as they were when the stroke started
+   int mStrokeSampledTip = 0;     // the stroke's Define Brush Preset tip (BrushEngine::AddSampledTip), 0 none
    GLUtil::Fbo mEff[2];           // effect stack ping-pong, document size
    unsigned mEffMixProgram = 0, mLutTex = 0;
    std::string mLutPath;
