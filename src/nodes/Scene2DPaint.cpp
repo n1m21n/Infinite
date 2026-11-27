@@ -2027,13 +2027,19 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
 
 void Scene2DNode::ApplyBrushSources(BrushEngine::Brush& brush, bool snapshot)
 {
+   if (snapshot)
+      mStrokeSampledTip = brush.sampledTip;   // the live path's brush is blank: it takes the stroke's picture tip from here
    unsigned* texOf[3] = { &brush.tipTex, &brush.grainTex, &brush.colorTex };
    for (int k = 0; k < 3; k++)
    {
       *texOf[k] = 0;
       INode* n = BrushSource(k);
       if (n == nullptr)
+      {
+         if (k == 0 && mStrokeSampledTip > 0)   // Define Brush Preset's picture, when no node feeds the tip
+            *texOf[k] = BrushEngine::SampledTipTexture(mStrokeSampledTip);
          continue;
+      }
       n->CookIfNeeded(std::max(0, mLastCookFrame));
       unsigned tex = n->GetOutputTexture();
       const int w = n->GetOutputWidth(), h = n->GetOutputHeight();

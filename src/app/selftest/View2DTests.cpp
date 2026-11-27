@@ -5,6 +5,7 @@
 #include "app/AppShared.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/Scene2DNode.h"
+#include "nodes/FilterNode.h"
 #include "nodes/SceneNodes.h"
 #include "core/BlendModes.h"
 #include "core/TileStore.h"
@@ -4107,6 +4108,137 @@ void RunView2DTest()
          const Layer* b = before.FindLayer(tx);
          Check("UX: Anti-Alias saves, and a file without it opens as Smooth",
                c != nullptr && c->typeAA == SN::kTypeAANone && at != std::string::npos && b != nullptr && b->typeAA == SN::kTypeAASmooth);
+      }
+      {
+         // View > Proof Colours / Gamut Warning: GetProofDef run on the document's texture, as the canvas does.
+         struct ProofOut { std::vector<float> doc0, doc1, out; };
+         auto proof = [&](uint8_t r, uint8_t g, uint8_t b, int target, bool on, bool warn) {
+            Scene2DNode d;
+            make(d, r, g, b, 255);
+            Cook(&d);
+            ProofOut o;
+            o.doc0 = Pixel(&d, W / 2, H / 2);
+            FilterNode f(GetProofDef());
+            f.Input().Connect(&d);
+            f.SetParamValue(0, 0, (float)target);
+            f.SetParamValue(1, 0, on ? 1.0f : 0.0f);
+            f.SetParamValue(2, 0, warn ? 1.0f : 0.0f);
+            f.CookIfNeeded(sFrame);
+            const int w = f.GetOutputWidth(), h = f.GetOutputHeight();
+            std::vector<float> px((size_t)std::max(w * h, 1) * 4, -1.0f);
+            if (f.GetOutputTexture() != 0)
+            {
+               glBindTexture(GL_TEXTURE_2D, f.GetOutputTexture());
+               glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+               glBindTexture(GL_TEXTURE_2D, 0);
+            }
+            const size_t at = ((size_t)(h / 2) * w + w / 2) * 4;
+            o.out = { px[at], px[at + 1], px[at + 2], px[at + 3] };
+            o.doc1 = Pixel(&d, W / 2, H / 2);
+            return o;
+         };
+         auto grey = [](const std::vector<float>& c) { return std::fabs(c[0] - 0.5f) < 0.01f && std::fabs(c[1] - 0.5f) < 0.01f && std::fabs(c[2] - 0.5f) < 0.01f; };
+         const ProofOut bluePrint = proof(0, 0, 255, 1, false, true), blueSrgb = proof(0, 0, 255, 0, false, true);
+         const ProofOut light = proof(200, 200, 200, 1, false, true);
+         printf("  UX proof: blue print warn %.3f %.3f %.3f, sRGB warn %.3f %.3f %.3f, light grey %.3f\n", bluePrint.out[0],
+                bluePrint.out[1], bluePrint.out[2], blueSrgb.out[0], blueSrgb.out[1], blueSrgb.out[2], light.out[0]);
+         Check("UX: Gamut Warning greys a saturated blue for print, not for sRGB",
+               grey(bluePrint.out) && blueSrgb.out[2] > 0.99f && blueSrgb.out[0] < 0.01f);
+         Check("UX: Gamut Warning leaves a light grey alone", std::fabs(light.out[0] - 200.0f / 255.0f) < 0.01f);
+         const ProofOut red = proof(255, 0, 0, 2, true, false), white = proof(255, 255, 255, 1, true, false);
+         const ProofOut blue = proof(0, 0, 255, 1, true, false);
+         printf("  UX proof: grayscale red %.3f %.3f %.3f, print white %.3f, print blue %.3f %.3f %.3f\n", red.out[0], red.out[1],
+                red.out[2], white.out[0], blue.out[0], blue.out[1], blue.out[2]);
+         Check("UX: Proof Colours Grayscale shows one grey per pixel",
+               std::fabs(red.out[0] - red.out[1]) < 0.002f && std::fabs(red.out[1] - red.out[2]) < 0.002f && red.out[0] > 0.1f);
+         Check("UX: Proof Colours Print dulls paper white and saturated blue",
+               white.out[0] < 0.995f && white.out[0] > 0.9f && blue.out[2] - blue.out[0] < 0.9f && blue.out[2] > blue.out[0]);
+         Check("UX: Proof Colours never changes the document's pixels",
+               blue.doc0 == blue.doc1 && bluePrint.doc0 == bluePrint.doc1 && std::fabs(blue.doc1[2] - 1.0f) < 0.01f);
+      }
+      {
+         // Edit > Content-Aware Scale: seams go through the flat background, so a busy square keeps its width.
+         const int cw = 64, ch = 32;
+         std::vector<uint8_t> pic((size_t)cw * ch * 4);
+         for (int y = 0; y < ch; y++)
+            for (int x = 0; x < cw; x++)
+            {
+               uint8_t* p = &pic[((size_t)y * cw + x) * 4];
+               const bool sq = x >= 24 && x < 40 && y >= 8 && y < 24;
+               const bool chk = ((x / 2 + y / 2) & 1) != 0;
+               p[0] = sq ? (chk ? 255 : 40) : 200;
+               p[1] = sq ? (chk ? 30 : 220) : 200;
+               p[2] = sq ? 30 : 200;
+               p[3] = 255;
+            }
+         auto squareW = [&](const std::vector<uint8_t>& px, int w, int row) {
+            int n = 0;
+            for (int x = 0; x < w; x++)
+               n += !(px[((size_t)row * w + x) * 4] == 200 && px[((size_t)row * w + x) * 4 + 1] == 200);
+            return n;
+         };
+         std::vector<uint8_t> nar, wid, tall;
+         const bool okN = Scene2DNode::SeamCarve(pic, cw, ch, 44, ch, nar), okW = Scene2DNode::SeamCarve(pic, cw, ch, 90, ch, wid);
+         const bool okH = Scene2DNode::SeamCarve(pic, cw, ch, cw, 20, tall);
+         printf("  UX content-aware scale: square %d px wide; narrowed %d, widened %d; %zu %zu %zu bytes\n", squareW(pic, cw, 16),
+                okN ? squareW(nar, 44, 16) : -1, okW ? squareW(wid, 90, 16) : -1, nar.size(), wid.size(), tall.size());
+         Check("UX: Content-Aware Scale narrows through the background and keeps the busy square",
+               okN && nar.size() == (size_t)44 * ch * 4 && squareW(nar, 44, 16) == 16);
+         Check("UX: Content-Aware Scale widens through the background and keeps the busy square",
+               okW && wid.size() == (size_t)90 * ch * 4 && squareW(wid, 90, 16) == 16);
+         Check("UX: Content-Aware Scale changes height the same way", okH && tall.size() == (size_t)cw * 20 * 4);
+         Scene2DNode d;
+         make(d, 0, 0, 0, 0);
+         const int id = d.AddFileLayer(0, "busy", 0, 0, cw, ch, pic);
+         Cook(&d);
+         const bool did = d.ContentAwareScale(id, 48, 24);
+         std::vector<uint8_t> back;
+         int bw = 0, bh = 0;
+         const bool read = d.ReadPaint(id, back, bw, bh);
+         Check("UX: Content-Aware Scale resizes a paint layer's pixels", did && read && bw == 48 && bh == 24);
+      }
+      {
+         // Edit > Define Brush Preset: a ring picture as the tip paints a ring, not a disc.
+         const int R = 32;
+         std::vector<uint8_t> ring((size_t)R * R * 4, 255);
+         for (int y = 0; y < R; y++)
+            for (int x = 0; x < R; x++)
+            {
+               const float r = std::hypot(x + 0.5f - R * 0.5f, y + 0.5f - R * 0.5f);
+               if (r > 10.0f && r < 15.0f)
+                  ring[((size_t)y * R + x) * 4] = ring[((size_t)y * R + x) * 4 + 1] = ring[((size_t)y * R + x) * 4 + 2] = 0;
+            }
+         const int tip = BrushEngine::AddSampledTip(ring, R, R), again = BrushEngine::AddSampledTip(ring, R, R);
+         std::vector<uint8_t> mask;
+         int side = 0;
+         const bool got = BrushEngine::SampledTipPixels(tip, mask, side);
+         Check("UX: Define Brush Preset keeps one tip per picture, dark pixels as the mask",
+               tip > 0 && again == tip && got && side == R && mask[(size_t)16 * R + 16] == 0 && mask[(size_t)16 * R + 3] > 200);
+         const int S = 96;
+         GLUtil::Fbo surf;
+         GLUtil::EnsureFbo(surf, S, S, GL_RGBA8, "SampledTipTest");
+         GLUtil::ClearFbo(surf);
+         BrushEngine::Brush b;
+         b.size = 64.0f;
+         b.hardness = 1.0f;
+         b.opacity = b.flow = 1.0f;
+         b.pressureOpacity = false;
+         b.tipTex = BrushEngine::SampledTipTexture(tip);
+         BrushEngine::Stroke st;
+         int dirty[4];
+         st.Begin(surf, b, 48, 48, 1.0f);
+         st.Flush();
+         st.End(surf, dirty);
+         std::vector<uint8_t> px((size_t)S * S * 4);
+         GLint prev = 0;
+         glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev);
+         glBindFramebuffer(GL_READ_FRAMEBUFFER, surf.fbo);
+         glReadPixels(0, 0, S, S, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+         glBindFramebuffer(GL_READ_FRAMEBUFFER, prev);
+         const int mid = px[((size_t)48 * S + 48) * 4 + 3], band = px[((size_t)48 * S + 48 + 25) * 4 + 3];
+         printf("  UX sampled tip: centre alpha %d, ring alpha %d\n", mid, band);
+         Check("UX: a Define Brush Preset tip paints its picture (a ring, hollow in the middle)", band > 128 && mid < 64);
+         GLUtil::DestroyFbo(surf);
       }
       {
          Scene2DNode d;

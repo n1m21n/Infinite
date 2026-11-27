@@ -1819,3 +1819,72 @@ namespace BrushEngine
       mQueue.clear();
    }
 }
+
+namespace BrushEngine
+{
+   namespace
+   {
+      struct SampledTip { std::vector<uint8_t> mask; int side = 0; unsigned tex = 0; };
+      std::vector<SampledTip>& Tips()
+      {
+         static std::vector<SampledTip>* tips = new std::vector<SampledTip>();
+         return *tips;
+      }
+   }
+
+   int AddSampledTip(const std::vector<uint8_t>& rgba, int w, int h)
+   {
+      if (w <= 0 || h <= 0 || rgba.size() < (size_t)w * h * 4)
+         return 0;
+      // Centred on a square, so the dab's square frame doesn't stretch it; mask = (1 - luma) x alpha.
+      SampledTip t;
+      t.side = std::max(w, h);
+      t.mask.assign((size_t)t.side * t.side, 0);
+      const int ox = (t.side - w) / 2, oy = (t.side - h) / 2;
+      for (int y = 0; y < h; y++)
+         for (int x = 0; x < w; x++)
+         {
+            const uint8_t* p = &rgba[((size_t)y * w + x) * 4];
+            const float luma = (0.2126f * p[0] + 0.7152f * p[1] + 0.0722f * p[2]) / 255.0f;
+            t.mask[(size_t)(oy + y) * t.side + ox + x] = (uint8_t)std::lround((1.0f - luma) * p[3]);
+         }
+      for (SampledTip& o : Tips())   // the same picture twice is one tip
+         if (o.side == t.side && o.mask == t.mask)
+            return (int)(&o - Tips().data()) + 1;
+      Tips().push_back(std::move(t));
+      return (int)Tips().size();
+   }
+
+   bool SampledTipPixels(int id, std::vector<uint8_t>& mask, int& side)
+   {
+      if (id <= 0 || id > (int)Tips().size())
+         return false;
+      mask = Tips()[(size_t)id - 1].mask;
+      side = Tips()[(size_t)id - 1].side;
+      return true;
+   }
+
+   unsigned SampledTipTexture(int id)
+   {
+      if (id <= 0 || id > (int)Tips().size())
+         return 0;
+      SampledTip& t = Tips()[(size_t)id - 1];
+      if (t.tex == 0)
+      {
+         // The dab reads luma x alpha, GL rows bottom first: white, with the mask as alpha.
+         std::vector<uint8_t> px((size_t)t.side * t.side * 4, 255);
+         for (int y = 0; y < t.side; y++)
+            for (int x = 0; x < t.side; x++)
+               px[((size_t)(t.side - 1 - y) * t.side + x) * 4 + 3] = t.mask[(size_t)y * t.side + x];
+         glGenTextures(1, &t.tex);
+         glBindTexture(GL_TEXTURE_2D, t.tex);
+         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, t.side, t.side, 0, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+         glBindTexture(GL_TEXTURE_2D, 0);
+      }
+      return t.tex;
+   }
+}

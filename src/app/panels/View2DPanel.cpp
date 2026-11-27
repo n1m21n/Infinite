@@ -56,6 +56,7 @@
 #include "nodes/ArtHistory.h"
 #include "nodes/SketchNode.h"
 #include "nodes/TextNode.h"
+#include "nodes/FilterNode.h"
 #include "nodes/ModelSourceNode.h"
 #include "nodes/VideoSourceNode.h"
 #include "audio/MediaExtensions.h"
@@ -388,6 +389,40 @@ namespace
    int sGuideSel = -1, sGuideSelAxis = 0;   // the guide last dragged (View > Guides > Clear / Edit Selected Guides)
    bool sExtras = true;             // View > Extras: guides, grid and selection edges drawn
    bool sShowTargetPath = true;     // View > Show > Target Path: the Work Path's outline drawn
+   bool sProof = false;             // View > Proof Colours: the canvas shown as sProofTarget would print it (display only)
+   bool sGamut = false;             // View > Gamut Warning: grey over pixels sProofTarget can't reproduce (display only)
+   int sProofTarget = 1;            // View > Proof Setup: 0 Monitor RGB (sRGB), 1 Working CMYK (print), 2 Working Gray (GetProofDef's uTarget)
+
+   // The document's picture as it is, for the proof pass: cooking it never re-cooks the document.
+   class ProofInput : public INode
+   {
+   public:
+      INode* doc = nullptr;
+      unsigned int GetOutputTexture() override { return doc ? doc->GetOutputTexture() : 0; }
+      int GetOutputWidth() const override { return doc ? doc->GetOutputWidth() : 0; }
+      int GetOutputHeight() const override { return doc ? doc->GetOutputHeight() : 0; }
+      void CookIfNeeded(int) override {}
+      unsigned long long TextureRevision() const override { return doc ? doc->TextureRevision() : 0; }
+   };
+
+   // The texture the canvas shows: the document's own, or (Proof Colours / Gamut Warning on) a display-only copy run
+   // through GetProofDef. Saved and exported pixels never pass through here.
+   unsigned ProofTexture(INode* doc, bool proof, bool warn, int target)
+   {
+      const unsigned tex = doc ? doc->GetOutputTexture() : 0;
+      if (tex == 0 || (!proof && !warn))
+         return tex;
+      static ProofInput* in = new ProofInput();
+      static FilterNode* node = [] { FilterNode* n = new FilterNode(GetProofDef()); n->Input().Connect(in); return n; }();
+      static int frame = 0;
+      in->doc = doc;
+      node->SetParamValue(0, 0, (float)std::clamp(target, 0, 2));
+      node->SetParamValue(1, 0, proof ? 1.0f : 0.0f);
+      node->SetParamValue(2, 0, warn ? 1.0f : 0.0f);
+      node->CookIfNeeded(++frame);
+      const unsigned out = node->GetOutputTexture();
+      return out != 0 ? out : tex;
+   }
    char sLayerFind[64] = {};        // Select > Find Layers: the Layers list shows names holding this
    bool sLayerFindOn = false;
    std::vector<int> sIsolated;      // Select > Isolate Layers: the Layers list shows only these (and their groups)
@@ -3836,6 +3871,10 @@ namespace
          o << "captures " << (int)u.capSize << " " << (int)u.capTool << " " << (int)u.capColour << "\n";
          if (u.capColour)
             o << "colour " << u.brush.color[0] << " " << u.brush.color[1] << " " << u.brush.color[2] << "\n";   // the captured foreground
+         std::vector<uint8_t> mask;
+         int side = 0;
+         if (u.brush.sampledTip > 0 && BrushEngine::SampledTipPixels(u.brush.sampledTip, mask, side))
+            o << "tip " << side << " " << Base64::Encode(mask.data(), mask.size()) << "\n";   // Define Brush Preset's picture
          BrushFields(u.brush, [&](const char* n, float* v, int c)
          {
             o << n;
@@ -3869,11 +3908,27 @@ namespace
             u.name = name;
             u.erase = who == 'e';
             u.brush = u.erase ? sEraser : sBrush;
+            u.brush.sampledTip = 0;
             sUserPresets.push_back(u);
             continue;
          }
          if (sUserPresets.empty())
             continue;
+         if (field == "tip")
+         {
+            int side = 0;
+            std::string b64;
+            std::vector<uint8_t> mask;
+            if (ls >> side >> b64 && side > 0 && Base64::Decode(b64, mask) && mask.size() == (size_t)side * side)
+            {
+               // Back to a picture AddSampledTip reads: black, the mask as alpha.
+               std::vector<uint8_t> rgba((size_t)side * side * 4, 0);
+               for (size_t i = 0; i < mask.size(); i++)
+                  rgba[i * 4 + 3] = mask[i];
+               sUserPresets.back().brush.sampledTip = BrushEngine::AddSampledTip(rgba, side, side);
+            }
+            continue;
+         }
          std::vector<float> vals;
          for (float v; ls >> v;)
             vals.push_back(v);
@@ -4041,6 +4096,42 @@ namespace
       t.key = ++sPatternKeys;
       sPatterns.push_back(std::move(t));
       sPatternPick = (int)sPatterns.size() - 1;
+      return true;
+   }
+   // Edit > Define Brush Preset: the selection (or the whole picture) becomes a brush tip, saved as a preset and picked.
+   // Dark, opaque pixels paint most, as Photoshop's; the brush takes the sample's size and 25% spacing.
+   bool DefineBrushPreset(Scene2DNode* doc)
+   {
+      const int W = doc->Doc().w, H = doc->Doc().h;
+      int x0 = 0, y0 = 0, x1 = W, y1 = H;
+      float lo[2], hi[2];
+      if (doc->HasSelection() && doc->SelectionBounds(lo, hi))
+      {
+         x0 = std::max(0, (int)std::floor(lo[0]));
+         y0 = std::max(0, (int)std::floor(lo[1]));
+         x1 = std::min(W, (int)std::ceil(hi[0]));
+         y1 = std::min(H, (int)std::ceil(hi[1]));
+      }
+      if (x1 <= x0 || y1 <= y0)
+         return false;
+      static int frame = (1 << 26) + (1 << 24);
+      std::vector<uint8_t> img;
+      int w = 0, h = 0;
+      float k = 1.0f;
+      if (!doc->AgentLook(0, x0, y0, x1, y1, params::view2d::kTipSampleMax, ++frame, img, w, h, k))
+         return false;
+      const int tip = BrushEngine::AddSampledTip(img, w, h);
+      if (tip <= 0)
+         return false;
+      BrushEngine::Brush b = sBrush;
+      b.sampledTip = tip;
+      b.size = std::clamp((float)std::max(x1 - x0, y1 - y0), 1.0f, params::view2d::kTipSizeMax);
+      b.spacing = params::view2d::kTipSpacing;
+      b.angle = 0.0f;
+      b.roundness = 1.0f;
+      b.mode = BrushEngine::kNormal;
+      sBrush = b;
+      sUserPick = SaveUserPreset(b, false);
       return true;
    }
    void UsePattern(Scene2DNode* doc)
@@ -7495,6 +7586,89 @@ namespace
    int sShapeKind = 0;             // 0 rectangle, 1 rounded, 2 ellipse, 3 polygon, 4 star, 5 line, 6 triangle
    const char* const kKinds[] = { "Rectangle", "Rounded", "Ellipse", "Polygon", "Star", "Line", "Triangle" };
    constexpr int kShapeKinds = (int)std::size(kKinds);
+   // Edit > Define Custom Shape (Photoshop's custom shapes): a picked path kept, fitted to its box (pts 0..1), between
+   // runs in the support folder; the Shape tool lists them after the built-in kinds (sShapeKind = kShapeKinds + i).
+   struct CustomShape { std::string name; std::vector<float> pts; bool closed = true; };
+   std::vector<CustomShape> sCustomShapes;
+   bool sCustomLoaded = false;
+   std::string CustomShapeFile() { return AppPaths::AppSupportDir() + "/2dview-custom-shapes.txt"; }
+   std::vector<CustomShape>& CustomShapes()
+   {
+      if (sCustomLoaded)
+         return sCustomShapes;
+      sCustomLoaded = true;
+      if (std::getenv("INFINITE_VIEW2DTEST") != nullptr)
+         return sCustomShapes;   // the self-test keeps the user's shapes untouched
+      std::ifstream in(AppPaths::FsPath(CustomShapeFile()));
+      std::string line;
+      while (std::getline(in, line))
+      {
+         std::istringstream ls(line);
+         std::string field;
+         ls >> field;
+         if (field == "shape")
+         {
+            CustomShape c;
+            int closed = 1;
+            ls >> closed;
+            std::getline(ls >> std::ws, c.name);
+            c.closed = closed != 0;
+            sCustomShapes.push_back(c);
+         }
+         else if (field == "pts" && !sCustomShapes.empty())
+            for (float v; ls >> v;)
+               sCustomShapes.back().pts.push_back(v);
+      }
+      sCustomShapes.erase(std::remove_if(sCustomShapes.begin(), sCustomShapes.end(), [](const CustomShape& c)
+                                         { return c.pts.size() < (size_t)(params::view2d::kShapeMinAnchors * params::view2d::kShapeAnchorFloats) || c.pts.size() % params::view2d::kShapeAnchorFloats != 0; }),
+                          sCustomShapes.end());
+      return sCustomShapes;
+   }
+   void SaveCustomShapes()
+   {
+      if (std::getenv("INFINITE_VIEW2DTEST") != nullptr)
+         return;
+      std::error_code ec;
+      std::filesystem::create_directories(AppPaths::AppSupportDir(), ec);
+      std::ofstream out(AppPaths::FsPath(CustomShapeFile()));
+      for (const CustomShape& c : sCustomShapes)
+      {
+         out << "shape " << (c.closed ? 1 : 0) << " " << c.name << "\npts";
+         for (float v : c.pts)
+            out << " " << v;
+         out << "\n";
+      }
+   }
+   // A path item into the library, fitted to its box (anchors and handles); its index, -1 when it is no path.
+   int DefineCustomShape(const Scene2DNode::Shape& s)
+   {
+      if (s.type != Scene2DNode::Shape::kPath || s.Anchors() < 2)
+         return -1;
+      float lo[2] = { FLT_MAX, FLT_MAX }, hi[2] = { -FLT_MAX, -FLT_MAX };
+      for (size_t i = 0; i < s.pts.size(); i++)
+      {
+         lo[i % 2] = std::min(lo[i % 2], s.pts[i]);
+         hi[i % 2] = std::max(hi[i % 2], s.pts[i]);
+      }
+      const float w = std::max(hi[0] - lo[0], params::view2d::kShapeMinSpan), h = std::max(hi[1] - lo[1], params::view2d::kShapeMinSpan);
+      CustomShape c;
+      c.closed = s.closed;
+      for (size_t i = 0; i < s.pts.size(); i++)
+         c.pts.push_back((s.pts[i] - lo[i % 2]) / (i % 2 == 0 ? w : h));
+      std::vector<CustomShape>& lib = CustomShapes();
+      c.name = std::string(T("Shape")) + " " + std::to_string(lib.size() + 1);
+      lib.push_back(std::move(c));
+      SaveCustomShapes();
+      return (int)lib.size() - 1;
+   }
+   // A custom shape drawn into the box (x0, y0) .. (x1, y1).
+   void FitCustomShape(const CustomShape& c, Scene2DNode::Shape& s)
+   {
+      s.pts.resize(c.pts.size());
+      for (size_t i = 0; i < c.pts.size(); i++)
+         s.pts[i] = i % 2 == 0 ? s.x0 + c.pts[i] * (s.x1 - s.x0) : s.y0 + c.pts[i] * (s.y1 - s.y0);
+   }
+   int CustomKind() { const int i = sShapeKind - kShapeKinds; return i >= 0 && i < (int)CustomShapes().size() ? i : -1; }
    int sVecTarget = 0;             // 0 the layer's items, 1 its vector mask
    int sItem = -1, sItemLayer = 0; // the picked item and the layer it is in
    int sPenItem = -1;              // the open path the pen adds to
@@ -7667,13 +7841,15 @@ namespace
                                                   Shape::kTriangle };
          TakeForeground();
          Shape s = sStyle;
-         s.type = kTypes[std::clamp(sShapeKind, 0, kShapeKinds - 1)];
+         s.type = CustomKind() >= 0 ? Shape::kPath : kTypes[std::clamp(sShapeKind, 0, kShapeKinds - 1)];
          // Rounded always rounds; polygon, star and triangle take the bar's Radius; the rest have none.
          s.radius = sShapeKind == 1 ? std::max(1.0f, sStyle.radius) : s.type == Shape::kPolygon || s.type == Shape::kStar || s.type == Shape::kTriangle
                                                                        ? sStyle.radius : 0.0f;
          s.pts.clear();
          s.svg.clear();
-         s.closed = false;
+         s.closed = CustomKind() >= 0 && CustomShapes()[(size_t)CustomKind()].closed;
+         if (CustomKind() >= 0)
+            s.radius = 0.0f;
          items->push_back(s);
          sItem = (int)items->size() - 1;
          sItemLayer = l->id;
@@ -7705,6 +7881,8 @@ namespace
       s->y0 = centre ? a.y - dy : a.y;
       s->x1 = a.x + dx;
       s->y1 = a.y + dy;
+      if (CustomKind() >= 0 && s->type == Shape::kPath)
+         FitCustomShape(CustomShapes()[(size_t)CustomKind()], *s);
       Touch();
    }
 
@@ -9025,7 +9203,7 @@ namespace
             DrawChecker(dl, a, b);
       }
       const ImVec2 uv[4] = { ImVec2(0, 1), ImVec2(1, 1), ImVec2(1, 0), ImVec2(0, 0) };
-      if (const unsigned tex = doc->GetOutputTexture())
+      if (const unsigned tex = ProofTexture(doc, sProof, sGamut, sProofTarget))
       {
          // Magnified past 2x the picture shows its pixels as squares (nearest), then the sampler goes back to smooth
          // for every other user of the texture.
@@ -11747,11 +11925,23 @@ namespace
       if (sTool == kShape)
       {
          ImGui::SetNextItemWidth(kWellL);
-         if (MenuParts::BeginCombo("##v2dshapekind", T(kKinds[std::clamp(sShapeKind, 0, kShapeKinds - 1)])))
+         const int custom = CustomKind();
+         if (custom < 0)
+            sShapeKind = std::clamp(sShapeKind, 0, kShapeKinds - 1);
+         if (MenuParts::BeginCombo("##v2dshapekind", custom >= 0 ? CustomShapes()[(size_t)custom].name.c_str() : T(kKinds[sShapeKind])))
          {
             for (int i = 0; i < kShapeKinds; i++)
                if (MenuParts::Choice(T(kKinds[i]), sShapeKind == i))
                   sShapeKind = i;
+            if (!CustomShapes().empty())
+               MenuParts::Separator();
+            for (int i = 0; i < (int)CustomShapes().size(); i++)
+            {
+               ImGui::PushID(i);
+               if (MenuParts::Choice(CustomShapes()[(size_t)i].name.c_str(), sShapeKind == kShapeKinds + i))
+                  sShapeKind = kShapeKinds + i;
+               ImGui::PopID();
+            }
             MenuParts::EndCombo();
          }
          gap();
@@ -18176,7 +18366,7 @@ namespace
    // ---- Photoshop's menu names for commands the 2D View has (ux-map, 2026-11-27) -------------------------------
    // The canvas menu's Edit / Image / Layer / Filter / View submenus: each item calls what the panel or the node
    // already does, under the name a Photoshop user looks for. Number prompts share one small dialog (AskDialog).
-   enum AskWhat { kAskNone, kAskArbitrary, kAskGuide, kAskLayout, kAskEditGuide, kAskDefringe, kAskDecon, kAskScaleFx, kAskLight, kAskFind };
+   enum AskWhat { kAskNone, kAskArbitrary, kAskGuide, kAskLayout, kAskEditGuide, kAskDefringe, kAskDecon, kAskScaleFx, kAskLight, kAskFind, kAskCaScale };
    struct Ask
    {
       int what = kAskNone;
@@ -18271,6 +18461,18 @@ namespace
                RollbackUndoTo(undo0);
             break;
          }
+         case kAskCaScale:
+         {
+            if (a == nullptr || a->kind != Kind::Paint || a->pw <= 0 || a->ph <= 0)
+               break;
+            const int w = a->pw, h = a->ph;
+            PushUndoCheckpoint("Content-aware scale");
+            const int nw = std::max(1, (int)std::lround(w * sAsk.v[0] / pv::kAskScalePct));
+            const int nh = std::max(1, (int)std::lround(h * sAsk.v[1] / pv::kAskScalePct));
+            if (!doc->ContentAwareScale(a->id, nw, nh))
+               RollbackUndoTo(undo0);
+            break;
+         }
          case kAskLight:
             PushUndoCheckpoint("Global light");
             doc->SetGlobalLight(sAsk.v[0]);
@@ -18298,7 +18500,8 @@ namespace
       if (!MenuParts::BeginPopup("##v2dask"))
          return;
       static const char* const kTitles[] = { "", "Arbitrary Rotation", "New Guide", "New Guide Layout", "Edit Guide", "Defringe",
-                                             "Color Decontaminate", "Scale Effects", "Global Light", "Find and Replace Text" };
+                                             "Color Decontaminate", "Scale Effects", "Global Light", "Find and Replace Text",
+                                             "Content-Aware Scale" };
       ImGui::TextUnformatted(T(kTitles[std::clamp(sAsk.what, 0, (int)(sizeof kTitles / sizeof kTitles[0]) - 1)]));
       bool enter = false;
       switch (sAsk.what)
@@ -18325,6 +18528,10 @@ namespace
             break;
          case kAskScaleFx:
             DragRow(T("Scale"), &sAsk.v[0], 1.0f, "%.0f%%", 1.0f, pv::kAskScaleHi);
+            break;
+         case kAskCaScale:
+            DragRow(T("Width"), &sAsk.v[0], 1.0f, "%.0f%%", pv::kAskCaScaleLo, pv::kAskCaScaleHi);
+            DragRow(T("Height"), &sAsk.v[1], 1.0f, "%.0f%%", pv::kAskCaScaleLo, pv::kAskCaScaleHi);
             break;
          case kAskLight:
             DragRow(T("Angle"), &sAsk.v[0], 1.0f, "%.0f°", pv::kAskLightLo, pv::kAskLightHi);
@@ -18521,6 +18728,16 @@ namespace
       if (MenuParts::SubMenu(T("Edit")))
       {
          if (MenuParts::Item(T("Content-Aware Fill..."), nullptr, false, paint && doc->HasSelection())) ContentAwareFill(doc);
+         if (MenuParts::Item(T("Content-Aware Scale..."), nullptr, false, paint))
+            OpenAsk(kAskCaScale, params::view2d::kAskScalePct, params::view2d::kAskScalePct);
+         if (MenuParts::Item(T("Define Brush Preset..."))) DefineBrushPreset(doc);
+         const Shape* pickedPath = PickedItem(doc);
+         if (MenuParts::Item(T("Define Custom Shape..."), nullptr, false, pickedPath != nullptr && pickedPath->type == Shape::kPath && pickedPath->Anchors() >= 2))
+         {
+            const int made = DefineCustomShape(*pickedPath);
+            if (made >= 0)
+               sShapeKind = kShapeKinds + made;
+         }
          if (MenuParts::Item(T("Find and Replace Text..."), nullptr, false, doc->HasTextLayer())) OpenAsk(kAskFind);
          if (MenuParts::SubMenu(T("Paste Special"), doc->HasSelection()))
          {
@@ -18724,6 +18941,16 @@ namespace
          if (MenuParts::Item(T("Rotate Left"))) TurnViewAbout(doc, -params::view2d::kViewTurnStep, mid);
          if (MenuParts::Item(T("Rotate Right"))) TurnViewAbout(doc, params::view2d::kViewTurnStep, mid);
          MenuParts::Check(T("Extras"), &sExtras);
+         MenuParts::Check(T("Proof Colours"), &sProof);
+         MenuParts::Check(T("Gamut Warning"), &sGamut);
+         if (MenuParts::SubMenu(T("Proof Setup")))
+         {
+            static const char* const kProofTargets[] = { "Monitor RGB", "Working CMYK", "Working Gray" };
+            for (int i = 0; i < 3; i++)
+               if (MenuParts::Choice(T(kProofTargets[i]), sProofTarget == i))
+                  sProofTarget = i;
+            ImGui::EndMenu();
+         }
          if (MenuParts::SubMenu(T("Show")))
          {
             MenuParts::Check(T("Target Path"), &sShowTargetPath);
@@ -20506,6 +20733,59 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
    {
       expect("a document to test on", false);
       return fails;
+   }
+   // Edit > Define Custom Shape: a path kept fitted to its box and drawn back into any box.
+   {
+      Shape tri;
+      tri.type = Shape::kPath;
+      tri.closed = true;
+      const float pts[3][2] = { { 10, 10 }, { 30, 10 }, { 20, 40 } };
+      for (const auto& p : pts)
+         for (int r = 0; r < 3; r++)
+         {
+            tri.pts.push_back(p[0]);
+            tri.pts.push_back(p[1]);
+         }
+      const size_t n0 = CustomShapes().size();
+      const int made = DefineCustomShape(tri);
+      Shape out;
+      out.x0 = 100, out.y0 = 100, out.x1 = 200, out.y1 = 300;
+      if (made >= 0)
+         FitCustomShape(CustomShapes()[(size_t)made], out);
+      expect("Define Custom Shape keeps a path and draws it into a new box",
+             made == (int)n0 && CustomShapes().size() == n0 + 1 && CustomShapes().back().closed && out.pts.size() == 18 &&
+             std::fabs(out.pts[12] - 150.0f) < 0.01f && std::fabs(out.pts[13] - 300.0f) < 0.01f && std::fabs(out.pts[6] - 200.0f) < 0.01f);
+      Shape line;
+      line.type = Shape::kRect;
+      expect("Define Custom Shape takes only paths", DefineCustomShape(line) < 0);
+      CustomShapes().resize(n0);
+   }
+   // Edit > Define Brush Preset: the picture becomes a tip, saved and picked.
+   {
+      const BrushEngine::Brush was = sBrush;
+      const int pick0 = sUserPick;
+      LoadUserPresets();
+      const size_t n0 = sUserPresets.size();
+      doc->CookIfNeeded(1 << 27);
+      const bool made = DefineBrushPreset(doc);
+      expect("Define Brush Preset makes a picture tip and a saved preset",
+             made && sBrush.sampledTip > 0 && BrushEngine::SampledTipTexture(sBrush.sampledTip) != 0 && sUserPresets.size() == n0 + 1 &&
+             sUserPresets.back().brush.sampledTip == sBrush.sampledTip && std::fabs(sBrush.spacing - params::view2d::kTipSpacing) < 1e-6f);
+      const std::string text = UserPresetText();
+      ParseUserPresets(text);
+      expect("a saved picture tip comes back from the preset file",
+             sUserPresets.size() == n0 + 1 && sUserPresets.back().brush.sampledTip == sBrush.sampledTip);
+      sUserPresets.resize(n0);
+      sBrush = was;
+      sUserPick = pick0;
+   }
+   // View > Proof Colours / Gamut Warning: the canvas shows a display-only copy; the document's texture stays its own.
+   {
+      doc->CookIfNeeded((1 << 27) + 1);
+      const unsigned own = doc->GetOutputTexture();
+      const unsigned off = ProofTexture(doc, false, false, 1), on = ProofTexture(doc, true, true, 1);
+      expect("Proof Colours draws through its own texture and leaves the document's alone",
+             own != 0 && off == own && on != 0 && on != own && doc->GetOutputTexture() == own);
    }
    // Canvas rotate: a turned view maps screen to document and back exactly, turning about the pointer keeps the
    // document point under it fixed, and Esc during a turn puts the view back.

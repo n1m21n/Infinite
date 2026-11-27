@@ -1700,3 +1700,185 @@ bool Scene2DNode::ExportLayerPng(int id, const std::string& path, int scalePct, 
    std::fprintf(stderr, "PROBE export layer %d: %dx%d %s\n", id, nw, nh, resample.c_str());
    return true;
 }
+
+// ---- Edit > Content-Aware Scale --------------------------------------------
+// Seam carving (Avidan & Shamir 2007): the picture narrows or widens through its quietest paths, so busy parts keep
+// their shape. Energy is the colour gradient (premultiplied, alpha counted), each seam the cheapest 8-connected path.
+namespace
+{
+   void CarveEnergy(const std::vector<uint8_t>& px, int w, int h, std::vector<float>& e)
+   {
+      e.assign((size_t)w * h, 0.0f);
+      auto v = [&](int x, int y, int c) {
+         x = std::clamp(x, 0, w - 1);
+         y = std::clamp(y, 0, h - 1);
+         const uint8_t* p = &px[((size_t)y * w + x) * 4];
+         return c == 3 ? (float)p[3] : (float)p[c] * (float)p[3] / 255.0f;
+      };
+      for (int y = 0; y < h; y++)
+         for (int x = 0; x < w; x++)
+         {
+            float s = 0.0f;
+            for (int c = 0; c < 4; c++)
+               s += std::fabs(v(x + 1, y, c) - v(x - 1, y, c)) + std::fabs(v(x, y + 1, c) - v(x, y - 1, c));
+            e[(size_t)y * w + x] = s;
+         }
+   }
+
+   // The cheapest top-to-bottom seam: seam[y] = its column in row y.
+   void CarveSeam(const std::vector<float>& e, int w, int h, std::vector<int>& seam)
+   {
+      std::vector<float> m(e);
+      for (int y = 1; y < h; y++)
+         for (int x = 0; x < w; x++)
+         {
+            float best = m[(size_t)(y - 1) * w + x];
+            if (x > 0) best = std::min(best, m[(size_t)(y - 1) * w + x - 1]);
+            if (x + 1 < w) best = std::min(best, m[(size_t)(y - 1) * w + x + 1]);
+            m[(size_t)y * w + x] += best;
+         }
+      seam.assign((size_t)h, 0);
+      int bx = 0;
+      for (int x = 1; x < w; x++)
+         if (m[(size_t)(h - 1) * w + x] < m[(size_t)(h - 1) * w + bx]) bx = x;
+      seam[(size_t)h - 1] = bx;
+      for (int y = h - 2; y >= 0; y--)
+      {
+         int nx = bx;
+         for (int dx = -1; dx <= 1; dx += 2)
+         {
+            const int x = bx + dx;
+            if (x >= 0 && x < w && m[(size_t)y * w + x] < m[(size_t)y * w + nx]) nx = x;
+         }
+         bx = nx;
+         seam[(size_t)y] = bx;
+      }
+   }
+
+   // Width to `target` (top-down or bottom-first rows alike).
+   void CarveWidth(std::vector<uint8_t>& px, int& w, int h, int target)
+   {
+      std::vector<float> e;
+      std::vector<int> seam;
+      while (w > target)
+      {
+         CarveEnergy(px, w, h, e);
+         CarveSeam(e, w, h, seam);
+         std::vector<uint8_t> out((size_t)(w - 1) * h * 4);
+         for (int y = 0; y < h; y++)
+         {
+            const int cut = seam[(size_t)y];
+            const uint8_t* src = &px[(size_t)y * w * 4];
+            uint8_t* dst = &out[(size_t)y * (w - 1) * 4];
+            std::memcpy(dst, src, (size_t)cut * 4);
+            std::memcpy(dst + (size_t)cut * 4, src + (size_t)(cut + 1) * 4, (size_t)(w - 1 - cut) * 4);
+         }
+         px.swap(out);
+         w--;
+      }
+      while (w < target)
+      {
+         // Grow by up to half at a time: find that many seams on a copy (as removal would take them), then double each.
+         const int k = std::min(target - w, std::max(1, w / 2));
+         std::vector<uint8_t> work = px;
+         std::vector<int> idx((size_t)w * h);
+         for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) idx[(size_t)y * w + x] = x;
+         std::vector<int> dup((size_t)w * h, 0);
+         int ww = w;
+         for (int i = 0; i < k; i++)
+         {
+            CarveEnergy(work, ww, h, e);
+            CarveSeam(e, ww, h, seam);
+            std::vector<uint8_t> nw((size_t)(ww - 1) * h * 4);
+            std::vector<int> ni((size_t)(ww - 1) * h);
+            for (int y = 0; y < h; y++)
+            {
+               const int cut = seam[(size_t)y];
+               dup[(size_t)y * w + idx[(size_t)y * ww + cut]]++;
+               for (int x = 0, o = 0; x < ww; x++)
+                  if (x != cut)
+                  {
+                     std::memcpy(&nw[((size_t)y * (ww - 1) + o) * 4], &work[((size_t)y * ww + x) * 4], 4);
+                     ni[(size_t)y * (ww - 1) + o] = idx[(size_t)y * ww + x];
+                     o++;
+                  }
+            }
+            work.swap(nw);
+            idx.swap(ni);
+            ww--;
+         }
+         const int nwid = w + k;
+         std::vector<uint8_t> out((size_t)nwid * h * 4);
+         for (int y = 0; y < h; y++)
+         {
+            int o = 0;
+            for (int x = 0; x < w; x++)
+            {
+               const uint8_t* a = &px[((size_t)y * w + x) * 4];
+               const uint8_t* b = &px[((size_t)y * w + std::min(x + 1, w - 1)) * 4];
+               std::memcpy(&out[((size_t)y * nwid + o++) * 4], a, 4);
+               for (int d = 0; d < dup[(size_t)y * w + x] && o < nwid; d++, o++)
+                  for (int c = 0; c < 4; c++)
+                     out[((size_t)y * nwid + o) * 4 + c] = (uint8_t)((a[c] + b[c] + 1) / 2);
+            }
+         }
+         px.swap(out);
+         w = nwid;
+      }
+   }
+
+   void Transpose(const std::vector<uint8_t>& px, int w, int h, std::vector<uint8_t>& out)
+   {
+      out.resize((size_t)w * h * 4);
+      for (int y = 0; y < h; y++)
+         for (int x = 0; x < w; x++)
+            std::memcpy(&out[((size_t)x * h + y) * 4], &px[((size_t)y * w + x) * 4], 4);
+   }
+}
+
+bool Scene2DNode::SeamCarve(const std::vector<uint8_t>& rgba, int w, int h, int nw, int nh, std::vector<uint8_t>& out)
+{
+   if (w <= 0 || h <= 0 || nw <= 0 || nh <= 0 || rgba.size() < (size_t)w * h * 4)
+      return false;
+   out.assign(rgba.begin(), rgba.begin() + (ptrdiff_t)w * h * 4);
+   CarveWidth(out, w, h, nw);
+   if (nh != h)
+   {
+      std::vector<uint8_t> t;
+      Transpose(out, w, h, t);
+      int th = h;
+      CarveWidth(t, th, w, nh);   // t: th (the new height) wide, w tall
+      std::vector<uint8_t> back;
+      Transpose(t, th, w, back);  // back: w wide, th tall
+      out.swap(back);
+      h = th;
+   }
+   return true;
+}
+
+bool Scene2DNode::ContentAwareScale(int id, int nw, int nh)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Paint || (EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
+      return false;
+   std::vector<uint8_t> px, out;
+   int w = 0, h = 0;
+   if (!ReadPaint(id, px, w, h) || w <= 0 || h <= 0)
+      return false;
+   nw = std::clamp(nw, 1, GLUtil::kMaxTargetSide);
+   nh = std::clamp(nh, 1, GLUtil::kMaxTargetSide);
+   if ((nw == w && nh == h) || !SeamCarve(px, w, h, nw, nh, out))
+      return false;
+   // ReadPaint rows are bottom first; the carve doesn't care, the tiles want top-down.
+   std::vector<uint8_t> top((size_t)nw * nh * 4);
+   for (int y = 0; y < nh; y++)
+      std::memcpy(&top[(size_t)y * nw * 4], &out[(size_t)(nh - 1 - y) * nw * 4], (size_t)nw * 4);
+   l = FindLayer(id);
+   l->pw = nw;
+   l->ph = nh;
+   l->tiles = CutTiles(top, nw, nh, false);
+   Commit();
+   return true;
+}

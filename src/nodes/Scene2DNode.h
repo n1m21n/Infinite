@@ -1176,6 +1176,10 @@ public:
    int SkinSide(int id);
    // The paint surface's texture and size, 0 when not a paint layer (Convert to Draw node).
    bool ReadPaint(int id, std::vector<uint8_t>& rgba, int& w, int& h);
+   // Edit > Content-Aware Scale: a paint layer's pixels to nw x nh through their quietest seams (SeamCarve), so busy
+   // parts keep their shape; false on a locked or non-paint layer. SeamCarve works on any w x h RGBA buffer.
+   bool ContentAwareScale(int id, int nw, int nh);
+   static bool SeamCarve(const std::vector<uint8_t>& rgba, int w, int h, int nw, int nh, std::vector<uint8_t>& out);
    // The composited picture as last cooked (bottom row first); false before the first cook.
    bool ReadOutput(std::vector<uint8_t>& rgba, int& w, int& h);
    // ---- layered files (Block 8) ---------------------------------------------
@@ -1876,6 +1880,7 @@ private:
    unsigned mSelOverlaySrc = 0;
    bool mSelOverlayQuick = false;
    GLUtil::Fbo mBrushFrozen[3];   // node brush sources as they were when the stroke started
+   int mStrokeSampledTip = 0;     // the stroke's Define Brush Preset tip (BrushEngine::AddSampledTip), 0 none
    GLUtil::Fbo mEff[2];           // effect stack ping-pong, document size
    unsigned mEffMixProgram = 0, mLutTex = 0;
    std::string mLutPath;

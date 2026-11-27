@@ -2015,3 +2015,66 @@ const std::vector<FilterDef>& GetFilterDefs()
 
    return kDefs;
 }
+
+// View > Proof Colours / Gamut Warning (the 2D View's soft proof). Not a node: the View2D panel runs it on the canvas
+// texture for display only, so saved and exported pixels never change. uTarget: 0 sRGB, 1 Print (CMYK), 2 Grayscale.
+// Print is a simulation, not an ICC transform: paper white and ink black squeeze lightness into 0.22..0.98 OKLab L and
+// chroma is held under a coated-stock envelope (widest near mid lightness, more room for yellow, less for deep blue).
+const FilterDef& GetProofDef()
+{
+   static const FilterDef kDef = { "proof colours", "View",
+      "uniform int uTarget;\n"
+      "uniform int uProof;\n"
+      "uniform int uWarn;\n"
+      "vec3 ToLab(vec3 c) {\n"
+      "   vec3 lms = vec3(dot(c, vec3(0.4122214708, 0.5363325363, 0.0514459929)),\n"
+      "                   dot(c, vec3(0.2119034982, 0.6806995451, 0.1073969566)),\n"
+      "                   dot(c, vec3(0.0883024619, 0.2817188376, 0.6299787005)));\n"
+      "   lms = sign(lms) * pow(abs(lms), vec3(1.0 / 3.0));\n"
+      "   return vec3(dot(lms, vec3(0.2104542553, 0.7936177850, -0.0040720468)),\n"
+      "               dot(lms, vec3(1.9779984951, -2.4285922050, 0.4505937099)),\n"
+      "               dot(lms, vec3(0.0259040371, 0.7827717662, -0.8086757660)));\n"
+      "}\n"
+      "vec3 FromLab(vec3 l) {\n"
+      "   vec3 lms = vec3(l.x + 0.3963377774 * l.y + 0.2158037573 * l.z,\n"
+      "                   l.x - 0.1055613458 * l.y - 0.0638541728 * l.z,\n"
+      "                   l.x - 0.0894841775 * l.y - 1.2914855480 * l.z);\n"
+      "   lms = lms * lms * lms;\n"
+      "   return vec3(dot(lms, vec3(4.0767416621, -3.3077115913, 0.2309699292)),\n"
+      "               dot(lms, vec3(-1.2684380046, 2.6097574011, -0.3413193965)),\n"
+      "               dot(lms, vec3(-0.0041960771, -0.7034186147, 1.7076949383)));\n"
+      "}\n"
+      "float PrintCmax(float L, float h) {\n"
+      "   float t = clamp(L, 0.0, 1.0);\n"
+      "   float c = 0.15 * sin(3.14159265 * pow(t, 1.45));\n"
+      "   c += 0.06 * t * max(cos(h - 1.92), 0.0);\n"
+      "   c -= 0.04 * max(cos(h - 4.6), 0.0);\n"
+      "   return max(c, 0.0);\n"
+      "}\n"
+      "void main() {\n"
+      "   vec4 src = texture(uSrc, vUv);\n"
+      "   vec3 lin = SrgbDecode(max(src.rgb, vec3(0.0)));\n"
+      "   vec3 lab = ToLab(lin);\n"
+      "   float C = length(lab.yz), h = atan(lab.z, lab.y);\n"
+      "   if (h < 0.0) h += 6.28318531;\n"
+      "   bool outside = any(lessThan(src.rgb, vec3(-0.002))) || any(greaterThan(src.rgb, vec3(1.002)));\n"
+      "   vec3 proof = clamp(lin, 0.0, 1.0);\n"
+      "   if (uTarget == 1) {\n"
+      "      float L = mix(0.22, 0.98, clamp(lab.x, 0.0, 1.0));\n"
+      "      float cm = PrintCmax(L, h);\n"
+      "      outside = outside || C > PrintCmax(lab.x, h) + 0.002;\n"
+      "      vec2 ab = C > cm ? lab.yz * (cm / C) : lab.yz;\n"
+      "      proof = clamp(FromLab(vec3(L, ab)), 0.0, 1.0);\n"
+      "   } else if (uTarget == 2) {\n"
+      "      outside = outside || C > 0.02;\n"
+      "      proof = vec3(clamp(dot(lin, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0));\n"
+      "   }\n"
+      "   vec3 rgb = uProof == 1 ? SrgbEncode(proof) : src.rgb;\n"
+      "   if (uWarn == 1 && outside && src.a > 0.0) rgb = vec3(0.5);\n"
+      "   fragColor = vec4(rgb, src.a);\n"
+      "}\n",
+      { E("Target", "uTarget", { "sRGB", "Print (CMYK)", "Grayscale" }, 1),
+        P("Proof", "uProof", T::Bool, 0.0f, 1.0f, 1.0f),
+        P("Warn", "uWarn", T::Bool, 0.0f, 1.0f, 0.0f) } };
+   return kDef;
+}

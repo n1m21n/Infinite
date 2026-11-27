@@ -83,3 +83,5 @@ struct FilterDef
 };
 
 const std::vector<FilterDef>& GetFilterDefs();
+// The 2D View's soft proof (View > Proof Colours / Gamut Warning): display only, never a node (FilterDefs.cpp).
+const FilterDef& GetProofDef();
