@@ -7,8 +7,10 @@
 #include "nodes/Scene2DNode.h"
 #include "nodes/SceneNodes.h"
 #include "core/BlendModes.h"
+#include "core/Extensions.h"
 #include "core/TileStore.h"
 #include "core/ml/AiSelect.h"
+#include "core/ml/ModelRegistry.h"
 #include "stb_image.h"
 #include "gl3.h"
 #include "stb_image_write.h"
@@ -16,8 +18,11 @@
 extern bool gScene2DBounds;   // Scene2DNode.cpp: bounded layer passes
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <cstdio>
 #include <cstring>
@@ -3737,6 +3742,30 @@ void RunView2DTest()
       pic.CombineSelection(a, Scene2DNode::kSelNew);
       pic.CombineSelection(b, Scene2DNode::kSelIntersect);
       Check("AI1: intersect keeps the overlap", pic.SelectionAt(5, 5) < 0.01f && pic.SelectionAt(30, 5) > 0.99f && pic.SelectionAt(60, 5) < 0.01f);
+      // Phase 2 ModelRegistry checks: builtins, SHA-256 verification, latest-only worker.
+      {
+         Check("ML-REG: builtins registered", Ml::ModelRegistry::Find("modnet") != nullptr &&
+               Ml::ModelRegistry::Find("ppocr_det") != nullptr && Ml::ModelRegistry::Find("dfine_s") != nullptr);
+         Check("ML-REG: unknown model reports missing", !Ml::ModelRegistry::Available("nonexistent_model_xyz"));
+         std::string shaErr;
+         const std::string tmpPath = (std::filesystem::temp_directory_path() / "infinite_ml_reg_sha_test.bin").string();
+         {
+            std::ofstream tf(tmpPath, std::ios::binary);
+            tf << "infinite-ml-test";
+         }
+         const std::string goodSha = Extensions::Sha256Hex("infinite-ml-test", 16);
+         Check("ML-REG: sha256 accepts matching file", Ml::ModelRegistry::VerifyFileSha256(tmpPath, goodSha, shaErr));
+         Check("ML-REG: sha256 rejects mismatched file", !Ml::ModelRegistry::VerifyFileSha256(tmpPath, "0000000000000000000000000000000000000000000000000000000000000000", shaErr));
+         std::error_code ec;
+         std::filesystem::remove(tmpPath, ec);
+         Ml::LatestWorker w;
+         std::atomic<uint64_t> lastRan{ 0 };
+         const uint64_t s1 = w.Submit([&](uint64_t ser) { lastRan.store(ser); });
+         const auto wt0 = std::chrono::steady_clock::now();
+         while (w.CompletedSerial() < s1 && std::chrono::steady_clock::now() - wt0 < std::chrono::seconds(5))
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+         Check("ML-REG: LatestWorker completes monotonic serial", w.CompletedSerial() == s1 && lastRan.load() == s1);
+      }
       if (!AiSelect::Available())
          printf("  [skip] AI1 model checks: %s\n", AiSelect::Missing().c_str());
       else
