@@ -1,0 +1,18 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Prism Internal Refraction",
+    "author": "Infinite",
+    "description": "Equilateral borosilicate glass prism with total-internal-reflection laser beam bounces, chromatic dispersion fringes, and micro-dust specular sparkles.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "# Prism Internal Refraction (Field Pixel)\nparam float beam_angle = 0.35 [0.0, 1.5];\nparam float dispersion = 0.045 [0.01, 0.12];\nparam float glow_gain = 1.25 [0.5, 2.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nq = p + vec2(0.0, 0.04);\n\n# Equilateral triangle SDF (branchless fold)\nk = 1.7320508;\nqx0 = abs(q.x) - 0.34;\nqy0 = q.y + 0.34 / k;\nfold = step(0.0, qx0 + k * qy0);\nqx = mix(qx0, (qx0 - k * qy0) * 0.5, fold);\nqy = mix(qy0, (-k * qx0 - qy0) * 0.5, fold);\nqx = qx - clamp(qx, -0.68, 0.0);\ndPrism = -length(vec2(qx, qy)) * sign(qy);\n\ninside = smoothstep(0.008, -0.008, dPrism);\nedge = smoothstep(0.016, 0.0, abs(dPrism));\n\n# Total-internal-reflection V-bounce rays inside the prism\nang = beam_angle + 0.12 * sin(t * 0.65);\nrayIn = abs((p.y + 0.12) - (p.x + 0.12) * tan(0.72 + ang * 0.25));\nrayBounce1 = abs((p.y + 0.16) + (p.x - 0.02) * 1.15);\nrayBounce2 = abs((p.y + 0.16) - (p.x - 0.02) * 1.15);\n\nbeamGreen = exp(-rayIn * 28.0) + exp(-rayBounce1 * 24.0) * inside;\nbeamRuby = exp(-rayBounce2 * 26.0) * inside;\n\n# Ground table caustic & micro-dust speckles\ntableMask = smoothstep(0.06, -0.22, p.y + 0.16);\ncausticFloor = exp(-abs(p.x) * 2.6) * tableMask * (0.55 + 0.35 * sin(p.x * 16.0 - t * 1.5));\ndust = pow(max(0.0, sin(p.x * 140.0 + sin(p.y * 90.0)) * cos(p.y * 130.0)), 10.0) * inside;\n\ncObsidian = vec3(0.030, 0.045, 0.040);\ncJade = vec3(0.08, 0.94, 0.32);\ncRuby = vec3(0.96, 0.34, 0.18);\ncGlass = vec3(0.16, 0.52, 0.36);\n\nc0 = cObsidian + cGlass * inside * 0.38 + vec3(0.38, 0.98, 0.58) * edge * 0.72;\nc1 = c0 + cJade * (beamGreen * 0.95 + causticFloor * 0.85) * glow_gain;\nc2 = c1 + cRuby * beamRuby * 0.90 * glow_gain + vec3(0.85, 1.0, 0.88) * dust * 0.85;\ncol = clamp(c2, 0.0, 1.0);\n",
+    "params": {
+      "beam_angle": 0.35,
+      "dispersion": 0.045,
+      "glow_gain": 1.15
+    }
+  }
+}

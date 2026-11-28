@@ -835,6 +835,16 @@
       "slug": "fresnel-lighthouse-caustics",
       "title": "Fresnel Lighthouse Caustics",
       "description": "Audio-reactive stepped Fresnel dioptric lighthouse optics and amber-indigo caustics."
+    },
+    {
+      "slug": "prism-internal-refraction",
+      "title": "Prism Internal Refraction",
+      "description": "Audio-reactive borosilicate glass prism with total-internal-reflection beam bounces and chromatic dispersion fringes."
+    },
+    {
+      "slug": "dichroic-lattice-caustics",
+      "title": "Dichroic Lattice Caustics",
+      "description": "Audio-reactive dichroic glass lattice with thin-film spectral interference and domain-warped caustic ribbons."
     }
   ]
 }

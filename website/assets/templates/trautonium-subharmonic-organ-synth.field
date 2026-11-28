@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Trautonium Subharmonic Organ Synth",
+    "author": "Infinite",
+    "description": "Mixtur-Trautonium inspired subharmonic frequency-divider synthesizer generating f0/2, f0/3, and f0/4 sub-octaves with formant bandpass shaping and germanium soft saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float sub2Mix = 0.62 [0.0, 1.0];\nparam float sub3Mix = 0.48 [0.0, 1.0];\nparam float sub4Mix = 0.35 [0.0, 1.0];\nparam float formantHz = 1650.0 [400.0, 5200.0];\nparam float decay = 0.9993 [0.996, 0.9997];\nstate float p0 = 0; state float p2 = 0; state float p3 = 0; state float p4 = 0;\nstate float env = 0; state float lp1 = 0; state float bp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.12, env * decay);\nf0 = clamp(freq, 55.0, 2200.0);\n\n# Mixtur-Trautonium subharmonic frequency dividers (f0, f0/2, f0/3, f0/4)\np0 = (p0 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 0.5) / sr) % 1.0;\np3 = (p3 + (f0 / 3.0) / sr) % 1.0;\np4 = (p4 + (f0 * 0.25) / sr) % 1.0;\n\ns0 = 1.0 - 2.0 * p0;\ns2 = 1.0 - 2.0 * p2;\ns3 = 1.0 - 2.0 * p3;\ns4 = 1.0 - 2.0 * p4;\nraw = (s0 * 0.42 + s2 * sub2Mix * 0.36 + s3 * sub3Mix * 0.28 + s4 * sub4Mix * 0.22) * env;\n\ng = clamp(2.0 * sin(3.14159265 * formantHz / sr), 0.04, 0.86);\nlp1 = lp1 + g * (raw - lp1);\nbp1 = bp1 + g * 0.45 * (lp1 - bp1);\n\ndrv = (lp1 * 0.72 + (lp1 - bp1) * 0.48) * 1.45;\nout = (drv / (1.0 + abs(drv))) * 0.72;\n",
+    "params": {
+      "sub2Mix": 0.62,
+      "sub3Mix": 0.48,
+      "sub4Mix": 0.35,
+      "formantHz": 1650.0,
+      "decay": 0.9993
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

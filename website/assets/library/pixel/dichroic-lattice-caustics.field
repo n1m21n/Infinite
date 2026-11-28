@@ -1,0 +1,18 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dichroic Lattice Caustics",
+    "author": "Infinite",
+    "description": "Multi-plane dichroic glass fins with thin-film spectral interference, domain-warped caustic ribbons, and angle-dependent cyan-magenta-amber transmission.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "# Dichroic Lattice Caustics (Field Pixel)\nparam float fin_count = 7.0 [3.0, 14.0];\nparam float warp = 0.42 [0.1, 1.0];\nparam float phase_shift = 0.5 [0.0, 2.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n\n# Domain-warped caustic coordinates\nwx = p.x + 0.12 * sin(p.y * 6.5 + t * 0.55) * warp;\nwy = p.y + 0.12 * cos(p.x * 6.5 - t * 0.45) * warp;\n\n# Stepped dichroic glass fin lattice\nfin = abs(fract(wx * fin_count + wy * 1.5) - 0.5);\nfinEdge = smoothstep(0.12, 0.01, fin);\n\n# Thin-film optical path difference across fin angles\nopd = (length(vec2(wx, wy)) * 9.0 + wx * 4.5 + t * 0.65 + phase_shift) * 3.14159;\nspec = vec3(0.5 + 0.5 * cos(opd * 1.0 + 0.3), 0.5 + 0.5 * cos(opd * 1.24 + 1.4), 0.5 + 0.5 * cos(opd * 1.48 + 2.5));\n\n# Radial vignette & deep indigo optical chamber\nvign = smoothstep(0.68, 0.12, length(p));\ncChamber = vec3(0.025, 0.032, 0.068);\ncBase = mix(cChamber, spec * (0.45 + 0.65 * finEdge), vign);\ncol = clamp(cBase + vec3(0.95, 0.72, 0.35) * pow(finEdge, 2.2) * vign * 0.55, 0.0, 1.0);\n",
+    "params": {
+      "fin_count": 7.0,
+      "warp": 0.42,
+      "phase_shift": 0.5
+    }
+  }
+}

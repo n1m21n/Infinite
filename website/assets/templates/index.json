@@ -4528,7 +4528,73 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "trautonium-subharmonic-organ-synth",
+      "name": "Trautonium Subharmonic Organ Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Mixtur-Trautonium inspired subharmonic frequency-divider synthesizer generating f0/2, f0/3, and f0/4 sub-octaves with formant bandpass shaping and germanium soft saturation.",
+      "price": 0,
+      "preview": "assets/templates/trautonium-subharmonic-organ-synth.webp",
+      "file": "assets/templates/trautonium-subharmonic-organ-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "koto-harmonic-pluck-synth",
+      "name": "Koto Harmonic Pluck Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Physical-inspired plucked koto string synthesizer with fast bridge-pluck transient, decaying harmonic partials, one-pole string damping, and wooden body resonance.",
+      "price": 0,
+      "preview": "assets/templates/koto-harmonic-pluck-synth.webp",
+      "file": "assets/templates/koto-harmonic-pluck-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "leslie-horn-doppler-fx",
+      "name": "Leslie Horn Doppler FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-rotor rotary speaker simulation splitting signal into treble horn and bass drum rotors with quadrature Doppler phase modulation and tube warmth.",
+      "price": 0,
+      "preview": "assets/templates/leslie-horn-doppler-fx.webp",
+      "file": "assets/templates/leslie-horn-doppler-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "resonant-comb-matrix-fx",
+      "name": "Resonant Comb Matrix FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Four-stage staggered allpass-comb dispersion matrix with prime-ratio damping, slow LFO detune drift, and soft-clipping feedback limiter.",
+      "price": 0,
+      "preview": "assets/templates/resonant-comb-matrix-fx.webp",
+      "file": "assets/templates/resonant-comb-matrix-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
-  "count": 276
+  "count": 280
 }

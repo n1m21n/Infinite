@@ -433,6 +433,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Theremin Heterodyne Ribbon Synth](https://infinitedevices.org/library/theremin-heterodyne-ribbon-synth.html): Continuous glide heterodyne oscillator with slow-attack vocal formant filtering, expressive vibrato, and warm triode saturation. (file: https://infinitedevices.org/assets/templates/theremin-heterodyne-ribbon-synth.inf)
 - [Helical Plate Reverb FX](https://infinitedevices.org/library/helical-plate-reverb-fx.html): Dense metallic plate dispersion effect using cascaded allpass diffusion cells, high-frequency air damping, and gentle transformer warmth. (file: https://infinitedevices.org/assets/templates/helical-plate-reverb-fx.inf)
 - [Shepard Allpass Cascade FX](https://infinitedevices.org/library/shepard-allpass-cascade-fx.html): Continuously rising quadrature allpass phaser network with cross-coupled feedback, silky notch sweep, and warm analog saturation. (file: https://infinitedevices.org/assets/templates/shepard-allpass-cascade-fx.inf)
+- [Trautonium Subharmonic Organ Synth](https://infinitedevices.org/library/trautonium-subharmonic-organ-synth.html): Mixtur-Trautonium inspired subharmonic frequency-divider synthesizer generating f0/2, f0/3, and f0/4 sub-octaves with formant bandpass shaping and germanium soft saturation. (file: https://infinitedevices.org/assets/templates/trautonium-subharmonic-organ-synth.inf)
+- [Koto Harmonic Pluck Synth](https://infinitedevices.org/library/koto-harmonic-pluck-synth.html): Physical-inspired plucked koto string synthesizer with fast bridge-pluck transient, decaying harmonic partials, one-pole string damping, and wooden body resonance. (file: https://infinitedevices.org/assets/templates/koto-harmonic-pluck-synth.inf)
+- [Leslie Horn Doppler FX](https://infinitedevices.org/library/leslie-horn-doppler-fx.html): Dual-rotor rotary speaker simulation splitting signal into treble horn and bass drum rotors with quadrature Doppler phase modulation and tube warmth. (file: https://infinitedevices.org/assets/templates/leslie-horn-doppler-fx.inf)
+- [Resonant Comb Matrix FX](https://infinitedevices.org/library/resonant-comb-matrix-fx.html): Four-stage staggered allpass-comb dispersion matrix with prime-ratio damping, slow LFO detune drift, and soft-clipping feedback limiter. (file: https://infinitedevices.org/assets/templates/resonant-comb-matrix-fx.inf)
 
 ## Library: Community
 
@@ -715,6 +719,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kintsugi Lacquer Fracture](https://infinitedevices.org/library/kintsugi-lacquer-fracture.html): Domain-warped urushi ceramic shard network joined by luminous molten-gold kintsugi seams and warm kiln relief. (file: https://infinitedevices.org/assets/library/pixel/kintsugi-lacquer-fracture.field)
 - [Soap Film Lipid Interference](https://infinitedevices.org/library/soap-film-lipid-interference.html): Thin-film optical wave interference across drifting lipid-island domains on obsidian ground with spectral RGB phase fringes. (file: https://infinitedevices.org/assets/library/pixel/soap-film-lipid-interference.field)
 - [Fresnel Lighthouse Caustics](https://infinitedevices.org/library/fresnel-lighthouse-caustics.html): Stepped concentric Fresnel dioptric glass-prism lens refracting warm amber-gold beams and deep maritime indigo caustics. (file: https://infinitedevices.org/assets/library/pixel/fresnel-lighthouse-caustics.field)
+- [Prism Internal Refraction](https://infinitedevices.org/library/prism-internal-refraction.html): Equilateral borosilicate glass prism with total-internal-reflection laser beam bounces, chromatic dispersion fringes, and micro-dust specular sparkles. (file: https://infinitedevices.org/assets/library/pixel/prism-internal-refraction.field)
+- [Dichroic Lattice Caustics](https://infinitedevices.org/library/dichroic-lattice-caustics.html): Multi-plane dichroic glass fins with thin-film spectral interference, domain-warped caustic ribbons, and angle-dependent cyan-magenta-amber transmission. (file: https://infinitedevices.org/assets/library/pixel/dichroic-lattice-caustics.field)
 
 ## Library: Sketch
 
@@ -866,6 +872,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Raku Glaze Craquelure](https://infinitedevices.org/library/raku-glaze-craquelure.html): Iron-oxide raku glaze pooling inside a raw stoneware rim with carbon-trapped hairline craquelure. (file: https://infinitedevices.org/assets/library/sketch/raku-glaze-craquelure.js)
 - [Girih Darb-i Imam Strapwork](https://infinitedevices.org/library/girih-darb-imam-strapwork.html): Decagonal girih star-polygon tessellation with interlaced charcoal strapwork ribbons, ochre ceramic facets, and lapis-cobalt medallions. (file: https://infinitedevices.org/assets/library/sketch/girih-darb-imam-strapwork.js)
 - [Muqarnas Corbel Projection](https://infinitedevices.org/library/muqarnas-corbel-projection.html): Orthographic geometric plan of a Persian muqarnas stalactite vault with concentric star tiers, sandstone ribs, and lapis-blue spandrels. (file: https://infinitedevices.org/assets/library/sketch/muqarnas-corbel-projection.js)
+- [Albers Gobelin Warp Grid](https://infinitedevices.org/library/albers-gobelin-warp-grid.html): Bauhaus gobelin tapestry grid with interlocking cadmium-yellow, verdigris-pine, and slate-charcoal weft bands on unbleached linen. (file: https://infinitedevices.org/assets/library/sketch/albers-gobelin-warp-grid.js)
+- [Stolzl Twill Wave Tapestry](https://infinitedevices.org/library/stolzl-twill-wave-tapestry.html): Gunta Stolzl inspired Bauhaus tapestry with undulating crimson, cobalt, ochre, and sage wave bands and stepped checkerboard twill. (file: https://infinitedevices.org/assets/library/sketch/stolzl-twill-wave-tapestry.js)
 
 ## Library: Sketch 3D
 
@@ -1012,6 +1020,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Munich Olympic Cable-Net 3D](https://infinitedevices.org/library/munich-olympic-cable-net-3d.html): Anticlastic hyperbolic-paraboloid cable-net canopy suspended from tilted steel compression masts and clevis rings. (file: https://infinitedevices.org/assets/library/sketch/munich-olympic-cable-net-3d.js)
 - [Candela Xochimilco Hypar 3D](https://infinitedevices.org/library/candela-xochimilco-hypar-3d.html): Eight-lobed thin-shell concrete hyperbolic paraboloid vault inspired by Felix Candela's Los Manantiales with ruled saddle ribs. (file: https://infinitedevices.org/assets/library/sketch/candela-xochimilco-hypar-3d.js)
 - [Candela Palmira Saddle 3D](https://infinitedevices.org/library/candela-palmira-saddle-3d.html): Sweeping anticlastic concrete saddle shell with ruled straight-line generators, cantilevered edge beams, and sculptural shadow ribs. (file: https://infinitedevices.org/assets/library/sketch/candela-palmira-saddle-3d.js)
+- [Habitat Cantilever Cluster 3D](https://infinitedevices.org/library/habitat-cantilever-cluster-3d.html): Clustered precast brutalist concrete modules inspired by Moshe Safdie's Habitat 67 with cantilevered terraces and recessed window bays. (file: https://infinitedevices.org/assets/library/sketch/habitat-cantilever-cluster-3d.js)
+- [Safdie Stepped Ziggurat 3D](https://infinitedevices.org/library/safdie-stepped-ziggurat-3d.html): Axonometric stepped brutalist concrete ziggurat with rotated modular bays, cantilevered overhang soffits, and deep shadow pockets. (file: https://infinitedevices.org/assets/library/sketch/safdie-stepped-ziggurat-3d.js)
 
 ## Library: Synths
 
@@ -1158,6 +1168,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Trautonium Subharmonic Synth](https://infinitedevices.org/library/trautonium-subharmonic-synth.html): Mixtur-Trautonium subharmonic frequency-divider oscillator blending /2, /3, and /4 subharmonics through twin resonant formants. (file: https://infinitedevices.org/assets/templates/trautonium-subharmonic-synth.inf)
 - [Casio CZ Phase Distortion Synth](https://infinitedevices.org/library/casio-cz-phase-distortion-synth.html): Dual-line phase-distortion synthesizer inspired by Casio CZ series with dynamic DCW cosine wave-shaping, detuned harmonic twin, and soft saturation. (file: https://infinitedevices.org/assets/templates/casio-cz-phase-distortion-synth.inf)
 - [Theremin Heterodyne Ribbon Synth](https://infinitedevices.org/library/theremin-heterodyne-ribbon-synth.html): Continuous glide heterodyne oscillator with slow-attack vocal formant filtering, expressive vibrato, and warm triode saturation. (file: https://infinitedevices.org/assets/templates/theremin-heterodyne-ribbon-synth.inf)
+- [Trautonium Subharmonic Organ Synth](https://infinitedevices.org/library/trautonium-subharmonic-organ-synth.html): Mixtur-Trautonium inspired subharmonic frequency-divider synthesizer generating f0/2, f0/3, and f0/4 sub-octaves with formant bandpass shaping and germanium soft saturation. (file: https://infinitedevices.org/assets/templates/trautonium-subharmonic-organ-synth.inf)
+- [Koto Harmonic Pluck Synth](https://infinitedevices.org/library/koto-harmonic-pluck-synth.html): Physical-inspired plucked koto string synthesizer with fast bridge-pluck transient, decaying harmonic partials, one-pole string damping, and wooden body resonance. (file: https://infinitedevices.org/assets/templates/koto-harmonic-pluck-synth.inf)
 
 ## Library: Audio Effects
 
@@ -1306,6 +1318,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Karplus Sympathetic Bridge FX](https://infinitedevices.org/library/karplus-sympathetic-bridge-fx.html): Tuned sympathetic string-bridge resonator bank with lowpass bridge damping and nonlinear inter-string feedback. (file: https://infinitedevices.org/assets/templates/karplus-sympathetic-bridge-fx.inf)
 - [Helical Plate Reverb FX](https://infinitedevices.org/library/helical-plate-reverb-fx.html): Dense metallic plate dispersion effect using cascaded allpass diffusion cells, high-frequency air damping, and gentle transformer warmth. (file: https://infinitedevices.org/assets/templates/helical-plate-reverb-fx.inf)
 - [Shepard Allpass Cascade FX](https://infinitedevices.org/library/shepard-allpass-cascade-fx.html): Continuously rising quadrature allpass phaser network with cross-coupled feedback, silky notch sweep, and warm analog saturation. (file: https://infinitedevices.org/assets/templates/shepard-allpass-cascade-fx.inf)
+- [Leslie Horn Doppler FX](https://infinitedevices.org/library/leslie-horn-doppler-fx.html): Dual-rotor rotary speaker simulation splitting signal into treble horn and bass drum rotors with quadrature Doppler phase modulation and tube warmth. (file: https://infinitedevices.org/assets/templates/leslie-horn-doppler-fx.inf)
+- [Resonant Comb Matrix FX](https://infinitedevices.org/library/resonant-comb-matrix-fx.html): Four-stage staggered allpass-comb dispersion matrix with prime-ratio damping, slow LFO detune drift, and soft-clipping feedback limiter. (file: https://infinitedevices.org/assets/templates/resonant-comb-matrix-fx.inf)
 
 ## Nodes
 
@@ -1682,7 +1696,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 167 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 169 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -1850,3 +1864,5 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kintsugi Lacquer Fracture](https://infinitedevices.org/embeds/kintsugi-lacquer-fracture.html): Domain-warped urushi ceramic shard network joined by audio-reactive molten-gold kintsugi seams and warm kiln relief.
 - [Soap Film Lipid Interference](https://infinitedevices.org/embeds/soap-film-lipid-interference.html): Audio-reactive thin-film soap bubble optical interference across drifting lipid islands.
 - [Fresnel Lighthouse Caustics](https://infinitedevices.org/embeds/fresnel-lighthouse-caustics.html): Audio-reactive stepped Fresnel dioptric lighthouse optics and amber-indigo caustics.
+- [Prism Internal Refraction](https://infinitedevices.org/embeds/prism-internal-refraction.html): Audio-reactive borosilicate glass prism with total-internal-reflection beam bounces and chromatic dispersion fringes.
+- [Dichroic Lattice Caustics](https://infinitedevices.org/embeds/dichroic-lattice-caustics.html): Audio-reactive dichroic glass lattice with thin-film spectral interference and domain-warped caustic ribbons.

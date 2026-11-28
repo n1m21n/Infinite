@@ -704,6 +704,14 @@
   "embeds/fresnel-lighthouse-caustics.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/prism-internal-refraction.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/dichroic-lattice-caustics.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

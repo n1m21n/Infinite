@@ -433,6 +433,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Theremin Heterodyne Ribbon Synth](https://infinitedevices.org/library/theremin-heterodyne-ribbon-synth.html): Continuous glide heterodyne oscillator with slow-attack vocal formant filtering, expressive vibrato, and warm triode saturation. (file: https://infinitedevices.org/assets/templates/theremin-heterodyne-ribbon-synth.inf)
 - [Helical Plate Reverb FX](https://infinitedevices.org/library/helical-plate-reverb-fx.html): Dense metallic plate dispersion effect using cascaded allpass diffusion cells, high-frequency air damping, and gentle transformer warmth. (file: https://infinitedevices.org/assets/templates/helical-plate-reverb-fx.inf)
 - [Shepard Allpass Cascade FX](https://infinitedevices.org/library/shepard-allpass-cascade-fx.html): Continuously rising quadrature allpass phaser network with cross-coupled feedback, silky notch sweep, and warm analog saturation. (file: https://infinitedevices.org/assets/templates/shepard-allpass-cascade-fx.inf)
+- [Trautonium Subharmonic Organ Synth](https://infinitedevices.org/library/trautonium-subharmonic-organ-synth.html): Mixtur-Trautonium inspired subharmonic frequency-divider synthesizer generating f0/2, f0/3, and f0/4 sub-octaves with formant bandpass shaping and germanium soft saturation. (file: https://infinitedevices.org/assets/templates/trautonium-subharmonic-organ-synth.inf)
+- [Koto Harmonic Pluck Synth](https://infinitedevices.org/library/koto-harmonic-pluck-synth.html): Physical-inspired plucked koto string synthesizer with fast bridge-pluck transient, decaying harmonic partials, one-pole string damping, and wooden body resonance. (file: https://infinitedevices.org/assets/templates/koto-harmonic-pluck-synth.inf)
+- [Leslie Horn Doppler FX](https://infinitedevices.org/library/leslie-horn-doppler-fx.html): Dual-rotor rotary speaker simulation splitting signal into treble horn and bass drum rotors with quadrature Doppler phase modulation and tube warmth. (file: https://infinitedevices.org/assets/templates/leslie-horn-doppler-fx.inf)
+- [Resonant Comb Matrix FX](https://infinitedevices.org/library/resonant-comb-matrix-fx.html): Four-stage staggered allpass-comb dispersion matrix with prime-ratio damping, slow LFO detune drift, and soft-clipping feedback limiter. (file: https://infinitedevices.org/assets/templates/resonant-comb-matrix-fx.inf)
 
 ## Library: Community
 
@@ -856,7 +860,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 167 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 169 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -873,4 +877,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 152 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 154 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

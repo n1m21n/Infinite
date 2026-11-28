@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Resonant Comb Matrix FX",
+    "author": "Infinite",
+    "description": "Four-stage staggered allpass-comb dispersion matrix with prime-ratio damping, slow LFO detune drift, and soft-clipping feedback limiter.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float res = 0.66 [0.15, 0.86];\nparam float driftHz = 0.42 [0.05, 2.5];\nparam float dampHz = 3100.0 [700.0, 7500.0];\nparam float feedback = 0.58 [0.0, 0.82];\nparam float mix = 0.62 [0.0, 1.0];\nstate float lfo = 0; state float fb = 0; state float lp1 = 0;\nstate float ap1 = 0; state float ap2 = 0; state float ap3 = 0; state float ap4 = 0;\n\nlfo = (lfo + driftHz / sr) % 1.0;\nmod = 0.08 * sin(6.2831853 * lfo);\nsrc = in + fb * feedback;\n\nk1 = clamp(res + mod, 0.1, 0.89);\nk2 = clamp(res * 0.87 - mod, 0.1, 0.89);\nk3 = clamp(res * 0.73 + mod * 0.6, 0.1, 0.89);\nk4 = clamp(res * 0.59 - mod * 0.6, 0.1, 0.89);\n\ny1 = -k1 * src + ap1; ap1 = src + k1 * y1;\ny2 = -k2 * y1 + ap2; ap2 = y1 + k2 * y2;\ny3 = -k3 * y2 + ap3; ap3 = y2 + k3 * y3;\ny4 = -k4 * y3 + ap4; ap4 = y3 + k4 * y4;\n\ng = clamp(2.0 * sin(3.14159265 * dampHz / sr), 0.04, 0.85);\nlp1 = lp1 + g * (y4 - lp1);\n\ndrv = lp1 * 1.35;\nsat = drv / (1.0 + abs(drv));\nfb = sat;\n\nout = (in * (1.0 - mix) + sat * mix) * 0.52;\n",
+    "params": {
+      "res": 0.66,
+      "driftHz": 0.42,
+      "dampHz": 3100.0,
+      "feedback": 0.58,
+      "mix": 0.62
+    }
+  }
+}

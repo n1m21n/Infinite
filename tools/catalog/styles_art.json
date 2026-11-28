@@ -3486,6 +3486,113 @@
         "Peter Zumthor Therme Vals 15 cm modular Valser quartzite masonry & 8 cm clerestory light slits",
         "Micro Grotesk (Uncut), Clash Grotesk (Fontshare) & Steps Mono"
       ]
+    },
+    {
+      "id": "bauhaus_textile_weave",
+      "taxonomy": "spread",
+      "sources": [
+        "Rectangle",
+        "Line",
+        "Ramp"
+      ],
+      "fx": [
+        "halftone",
+        "addnoise"
+      ],
+      "comp": [
+        "Color Ramp",
+        "posterize"
+      ],
+      "ban": [
+        "bloom",
+        "glitch"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "trautonium_subharmonic_organ",
+        "koto_harmonic_pluck",
+        "minimal_techno"
+      ]
+    },
+    {
+      "id": "habitat_cantilever_brutalism",
+      "taxonomy": "spread",
+      "sources": [
+        "Rectangle",
+        "Polygon"
+      ],
+      "fx": [
+        "edge outline",
+        "vignette"
+      ],
+      "comp": [
+        "posterize",
+        "Color Ramp"
+      ],
+      "ban": [
+        "bloom",
+        "kaleidoscope"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "trautonium_subharmonic_organ",
+        "resonant_comb_matrix",
+        "dub_techno"
+      ]
+    },
+    {
+      "id": "prism_internal_refraction",
+      "taxonomy": "spread",
+      "sources": [
+        "Polygon",
+        "Line",
+        "Ramp"
+      ],
+      "fx": [
+        "bloom",
+        "lensdistortion"
+      ],
+      "comp": [
+        "gradientmap",
+        "Color Ramp"
+      ],
+      "ban": [
+        "pixelate",
+        "dither"
+      ],
+      "motion": 0.55,
+      "pairs": [
+        "leslie_horn_doppler",
+        "resonant_comb_matrix",
+        "ambient"
+      ]
+    },
+    {
+      "id": "dichroic_lattice_caustics",
+      "taxonomy": "spread",
+      "sources": [
+        "Ramp",
+        "Ring",
+        "Line"
+      ],
+      "fx": [
+        "bloom",
+        "ripple"
+      ],
+      "comp": [
+        "gradientmap",
+        "Color Ramp"
+      ],
+      "ban": [
+        "threshold",
+        "pixelate"
+      ],
+      "motion": 0.6,
+      "pairs": [
+        "koto_harmonic_pluck",
+        "leslie_horn_doppler",
+        "ambient"
+      ]
     }
   ]
 }

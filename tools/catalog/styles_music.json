@@ -6283,6 +6283,158 @@
         "gain": -8.0
       },
       "groove": 0.4
+    },
+    {
+      "id": "koto_harmonic_pluck",
+      "family": "ambient",
+      "bpm": [
+        84,
+        100
+      ],
+      "swing": 0.06,
+      "scale": [
+        9,
+        10
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0..2..4..7..5...",
+      "fx": [
+        "Field Effect",
+        "Delay",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.35,
+      "refs": [
+        "13-string Hirajoshi koto resonance",
+        "Physical-modeled harmonic string pluck"
+      ],
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "strum": 24,
+        "human": 6
+      },
+      "gain": -11.0,
+      "groove": 0.4
+    },
+    {
+      "id": "leslie_horn_doppler",
+      "family": "experimental",
+      "bpm": [
+        98,
+        114
+      ],
+      "swing": 0.04,
+      "scale": [
+        4,
+        1
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.2.4.5.7.5.4.2.",
+      "fx": [
+        "Field Effect"
+      ],
+      "synth": [
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.55,
+      "refs": [
+        "Leslie 122 dual-rotor horn & drum Doppler speaker"
+      ],
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 12,
+        "human": 4
+      },
+      "gain": -11.0,
+      "groove": 0.4
+    },
+    {
+      "id": "resonant_comb_matrix",
+      "family": "ambient",
+      "bpm": [
+        88,
+        104
+      ],
+      "swing": 0.02,
+      "scale": [
+        6,
+        1
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0...4...7...11..",
+      "fx": [
+        "Field Effect"
+      ],
+      "synth": [
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.5,
+      "refs": [
+        "Prime-ratio resonant allpass/comb dispersion matrix"
+      ],
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 16,
+        "human": 5
+      },
+      "gain": -11.0,
+      "groove": 0.35
     }
   ]
 }

@@ -1,0 +1,68 @@
+infinite-patch 1
+# Koto Harmonic Pluck Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 52
+  i note1 55
+  i note2 57
+  i note3 59
+  i note4 62
+  i note5 59
+  i note6 57
+  i note7 55
+  i note8 52
+  i note9 59
+  i note10 62
+  i note11 64
+  i note12 62
+  i note13 59
+  i note14 57
+  i note15 55
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float pluckBright = 0.78 [0.2, 1.0];\nparam float bridgeRes = 0.42 [0.05, 0.85];\nparam float bodyHz = 920.0 [320.0, 2800.0];\nparam float dampHz = 4200.0 [900.0, 8000.0];\nparam float decay = 0.9991 [0.995, 0.9997];\nstate float p1 = 0; state float env = 0; state float prevGate = 0;\nstate float transient = 0; state float lp1 = 0; state float bp1 = 0;\n\ntrig = if(gate > 0.5, if(prevGate < 0.5, 1.0, 0.0), 0.0);\nprevGate = gate;\ntransient = if(trig > 0.5, 1.0, transient * 0.994);\nenv = if(gate > 0.5, env + (1.0 - env) * 0.24, env * decay);\n\nf0 = clamp(freq, 65.0, 2200.0);\np1 = (p1 + f0 / sr) % 1.0;\nph = 6.2831853 * p1;\n\n# Plucked string harmonic series with transient upper-partial bloom\nh1 = sin(ph);\nh2 = sin(ph * 2.0 + 0.3) * (0.45 + 0.35 * transient * pluckBright);\nh3 = sin(ph * 3.0) * (0.22 + 0.32 * transient * pluckBright);\nh5 = sin(ph * 5.0) * 0.14 * transient * pluckBright;\nraw = (h1 * 0.65 + h2 + h3 + h5) * env;\n\ngDamp = clamp(2.0 * sin(3.14159265 * dampHz / sr), 0.05, 0.88);\nlp1 = lp1 + gDamp * (raw - lp1);\n\ngBody = clamp(2.0 * sin(3.14159265 * bodyHz / sr), 0.04, 0.75);\nbp1 = bp1 + gBody * (lp1 - bp1);\n\ndrv = (lp1 + (lp1 - bp1) * bridgeRes) * 1.35;\nout = (drv / (1.0 + abs(drv))) * 0.74;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.30 0.36
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Koto Harmonic Pluck Synth. Physical-inspired plucked koto string synthesizer with fast bridge-pluck transient, decaying harmonic partials, one-pole string damping, and wooden body resonance.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Leslie Horn Doppler FX",
+    "author": "Infinite",
+    "description": "Dual-rotor rotary speaker simulation splitting signal into treble horn and bass drum rotors with quadrature Doppler phase modulation and tube warmth.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float rotorHz = 3.8 [0.4, 8.5];\nparam float depth = 0.68 [0.1, 0.92];\nparam float crossHz = 820.0 [350.0, 1800.0];\nparam float drive = 1.45 [0.8, 2.8];\nparam float mix = 0.72 [0.0, 1.0];\nstate float lfoH = 0; state float lfoD = 0;\nstate float lpCross = 0; state float ap1 = 0; state float ap2 = 0; state float ap3 = 0;\n\nlfoH = (lfoH + rotorHz / sr) % 1.0;\nlfoD = (lfoD + (rotorHz * 0.76) / sr) % 1.0;\n\ngC = clamp(2.0 * sin(3.14159265 * crossHz / sr), 0.03, 0.72);\nlpCross = lpCross + gC * (in - lpCross);\ndrum = lpCross;\nhorn = in - lpCross;\n\n# Quadrature Doppler allpass dispersion + horn amplitude sweep\ncH = 0.35 + 0.45 * depth * sin(6.2831853 * lfoH);\ny1 = -cH * horn + ap1; ap1 = horn + cH * y1;\ny2 = -cH * y1 + ap2; ap2 = y1 + cH * y2;\nhornMod = y2 * (0.72 + 0.28 * cos(6.2831853 * lfoH));\n\ncD = 0.25 + 0.35 * depth * sin(6.2831853 * lfoD);\ndrumMod = (-cD * drum + ap3) * (0.80 + 0.20 * cos(6.2831853 * lfoD));\nap3 = drum + cD * drumMod;\n\ndrv = (hornMod + drumMod) * drive;\nsat = drv / (1.0 + abs(drv));\nout = (in * (1.0 - mix) + sat * mix) * 0.56;\n",
+    "params": {
+      "rotorHz": 3.8,
+      "depth": 0.68,
+      "crossHz": 820.0,
+      "drive": 1.45,
+      "mix": 0.72
+    }
+  }
+}
