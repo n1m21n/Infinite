@@ -5,8 +5,44 @@
   <link>https://infinitedevices.org/blog/</link>
   <description>Notes on building and using Infinite, the free open-source DAW for visuals, music and code.</description>
   <language>en-gb</language>
-  <lastBuildDate>Fri, 27 Nov 2026 09:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Sat, 28 Nov 2026 09:00:00 +0000</lastBuildDate>
   <atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <item>
+    <title>Stretch any sample into an ambient pad</title>
+    <link>https://infinitedevices.org/blog/stretch-a-sample-into-an-ambient-pad.html</link>
+    <guid isPermaLink="true">https://infinitedevices.org/blog/stretch-a-sample-into-an-ambient-pad.html</guid>
+    <pubDate>Sat, 28 Nov 2026 09:00:00 +0000</pubDate>
+    <dc:creator>Naman Soni</dc:creator>
+    <category>creative</category>
+    <description>Turn any short voice memo, guitar chord, or field recording into a lush ambient pad in Infinite using Paul Stretch, Audio Filter, Chorus, and Reverb.</description>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_stretch-a-sample-into-an-ambient-pad.png" alt="Node patch diagram showing Paul Stretch into Audio Filter, Chorus, Reverb, and Audio Out, with an LFO gently sweeping the filter frequency" /></p>
+<p>One of the quickest ways to build a lush ambient pad is to start with a tiny, everyday sound instead of a complex synth. A single strummed guitar chord, two seconds of a piano note, a hummed vocal, or a rainy street recording can be slowed down into a drifting, cloud-like bed of sound.</p>
+<p>In <a href="https://infinitedevices.org/">Infinite</a>, you can stretch a sample into an ambient pad right on the canvas using the <strong>Paul Stretch</strong> node, then shape and widen it with <strong>Audio Filter</strong>, <strong>Chorus</strong>, <strong>Reverb</strong>, and a slow <strong>LFO</strong>.</p>
+<figure><img src="https://infinitedevices.org/assets/blog_stretch-a-sample-into-an-ambient-pad.png" alt="Node patch diagram showing Paul Stretch into Audio Filter, Chorus, Reverb, and Audio Out, with an LFO gently sweeping the filter frequency" width="1200" height="675" loading="lazy" decoding="async"><figcaption>Node patch diagram showing Paul Stretch into Audio Filter, Chorus, Reverb, and Audio Out, with an LFO gently sweeping the filter frequency</figcaption></figure>
+<h2 id="1-patch-paul-stretch-to-your-speakers">1. Patch Paul Stretch to your speakers</h2>
+<p>Set up a simple left-to-right chain so you can hear your sound immediately as you shape it:</p>
+<ol><li>Drop a <strong>Paul Stretch</strong> node, an <strong>Audio Filter</strong> node, a <strong>Chorus</strong> node, a <strong>Reverb</strong> node, and an <strong>Audio Out</strong> node onto the canvas.</li><li>Connect the output of <strong>Paul Stretch</strong> to the input of <strong>Audio Filter</strong>.</li><li>Connect <strong>Audio Filter</strong> to <strong>Chorus</strong>, <strong>Chorus</strong> to <strong>Reverb</strong>, and <strong>Reverb</strong> to <strong>Audio Out</strong>.</li></ol>
+<p>If you want to layer your pad underneath drums or a melody later, place a <strong>Mixer</strong> node right before <strong>Audio Out</strong> so multiple instruments can share the same output. Our guide on how to <a href="https://infinitedevices.org/blog/make-your-first-beat-and-synth-bassline.html">make your first beat and synth bassline</a> shows how <strong>Mixer</strong> brings tracks together.</p>
+<h2 id="2-load-a-sample-or-record-straight-off-the-canvas">2. Load a sample or record straight off the canvas</h2>
+<p>At the top of <strong>Paul Stretch</strong>, click <strong>Load...</strong> and choose any WAV, AIFF, FLAC, or MP3 file from your computer. Short, tonal clips work wonderfully: a single acoustic chord, a bell hit, or a vocal phrase.</p>
+<p>You can also capture audio live from another node on your canvas:</p>
+<ol><li>Connect any synth or player node into the <strong>record in</strong> pin on <strong>Paul Stretch</strong>.</li><li>Click <strong>Record</strong>, play a note or chord, and click <strong>Stop</strong> when you have a couple of seconds captured.</li></ol>
+<p>Once your clip is loaded, turn on the <strong>loop</strong> toggle at the top right of <strong>Paul Stretch</strong> and click <strong>Audition</strong> to hear it play continuously.</p>
+<h2 id="3-stretch-time-and-thicken-the-texture">3. Stretch time and thicken the texture</h2>
+<p>Unlike normal speed controls that make a sound choppy when slowed down too far, <strong>Paul Stretch</strong> smooths the sound out into a continuous wash. Start with these four controls inside the node:</p>
+<ul><li><strong>Pick your slice with start and end.</strong> Drag <strong>start</strong> and <strong>end</strong> to frame the sweetest part of the waveform, skipping any silent lead-in or harsh pick click at the beginning.</li><li><strong>Raise stretch.</strong> Push <strong>stretch</strong> up to <code>20.0x</code>, <code>50.0x</code>, or even higher. A two-second chord quickly turns into a slow-moving, minute-long harmonic cloud.</li><li><strong>Keep phase rand high.</strong> Leaving <strong>phase rand</strong> near <code>1.00</code> blurs sharp edges so the stretched sound feels like a soft pad rather than a pulsing loop.</li><li><strong>Add voices with unison and detune.</strong> Increase <strong>unison</strong> from <code>1</code> up to <code>4</code> or <code>6</code> voices, then nudge <strong>detune</strong> up slightly. This stacks slightly offset copies of your sound for an immediate wide, choral shimmer.</li></ul>
+<p>You can also adjust <strong>pitch</strong> in semitones if you want to drop a bright chime an octave lower (<code>-12.0 st</code>) into a deep, warm drone.</p>
+<h2 id="4-soften-the-edges-with-audio-filter-and-an-lfo">4. Soften the edges with Audio Filter and an LFO</h2>
+<p>Stretched samples can sometimes carry bright upper frequencies that compete with vocals or lead melodies. <strong>Audio Filter</strong> tames that brightness and lets the pad breathe:</p>
+<ol><li>Keep <strong>type</strong> on a low-pass mode, then roll <strong>freq</strong> down until the harsh top end disappears and only a warm body remains.</li><li>Drop an <strong>LFO</strong> node above <strong>Audio Filter</strong>.</li><li>Drag a cable from the output of <strong>LFO</strong> onto the modulation dot next to the <strong>freq</strong> knob on <strong>Audio Filter</strong>.</li><li>Set the <strong>LFO</strong> rate to something very slow so the filter opens and closes gently over several bars, giving your pad slow, organic movement.</li></ol>
+<h2 id="5-widen-and-place-it-in-space-with-chorus-and-reverb">5. Widen and place it in space with Chorus and Reverb</h2>
+<p>To finish the sound, <strong>Chorus</strong> adds gentle stereo motion and <strong>Reverb</strong> places the pad in a wide room:</p>
+<ul><li>On <strong>Chorus</strong>, keep <strong>depth</strong> and <strong>spread</strong> moderate so the stereo image feels wide without wobbling out of tune.</li><li>On <strong>Reverb</strong>, bring up <strong>size</strong> and <strong>decay</strong> for a long tail, set <strong>damping</strong> to soften high frequencies as the tail fades, and adjust <strong>mix</strong> to taste.</li></ul>
+<p>If you want to explore more instruments and effects to pair with your pad, the <a href="https://infinitedevices.org/musicians.html">musicians guide</a> covers the rest of the audio nodes in Infinite.</p>
+<p>Ready to try this on your own recordings? <a href="https://infinitedevices.org/download.html">Download Infinite</a> for macOS, Windows, or Linux, or open a starter patch from the <a href="https://infinitedevices.org/library.html">preset library</a> to hear how ambient chains are put together.</p>
+<hr />
+<p><em>Originally published at <a href="https://infinitedevices.org/blog/stretch-a-sample-into-an-ambient-pad.html">https://infinitedevices.org/blog/stretch-a-sample-into-an-ambient-pad.html</a>. Infinite is a free, open-source DAW for visuals, music and code: <a href="https://infinitedevices.org">infinitedevices.org</a>.</em></p>]]></content:encoded>
+  </item>
   <item>
     <title>Chop and remix a drum loop with Slicer</title>
     <link>https://infinitedevices.org/blog/chop-and-remix-a-drum-loop-with-slicer.html</link>

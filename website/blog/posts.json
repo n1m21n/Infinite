@@ -1,5 +1,14 @@
 [
  {
+  "slug": "stretch-a-sample-into-an-ambient-pad",
+  "title": "Stretch any sample into an ambient pad",
+  "description": "Turn any short voice memo, guitar chord, or field recording into a lush ambient pad in Infinite using Paul Stretch, Audio Filter, Chorus, and Reverb.",
+  "date": "2026-11-28",
+  "updated": "2026-11-28",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/stretch-a-sample-into-an-ambient-pad.html"
+ },
+ {
   "slug": "chop-and-remix-a-drum-loop-with-slicer",
   "title": "Chop and remix a drum loop with Slicer",
   "description": "Load or record a drum loop in Infinite, chop it into playable slices with Slicer, sequence new grooves with Note Sequencer, and add Delay and Reverb.",
