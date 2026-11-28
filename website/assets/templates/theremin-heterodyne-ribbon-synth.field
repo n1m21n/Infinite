@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Theremin Heterodyne Ribbon Synth",
+    "author": "Infinite",
+    "description": "Continuous glide heterodyne oscillator with slow-attack vocal formant filtering, expressive vibrato, and warm triode saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float glide = 0.0025 [0.0004, 0.02];\nparam float vibratoHz = 5.2 [1.0, 9.0];\nparam float vibDepth = 0.014 [0.0, 0.04];\nparam float formantHz = 1850.0 [500.0, 4800.0];\nparam float decay = 0.9994 [0.996, 0.9997];\nstate float curF = 261.63; state float p0 = 0; state float vib = 0;\nstate float env = 0; state float bp1 = 0; state float lp1 = 0;\n\ncurF = curF + (clamp(freq, 65.0, 2400.0) - curF) * glide;\nenv = if(gate > 0.5, env + (1.0 - env) * 0.028, env * decay);\nvib = (vib + vibratoHz / sr) % 1.0;\n\nfMod = curF * (1.0 + vibDepth * sin(6.2831853 * vib) * env);\np0 = (p0 + fMod / sr) % 1.0;\n\n# Heterodyne warm-triode wave with subtle 2nd/3rd harmonics\nph = 6.2831853 * p0;\ntone = sin(ph) * 0.78 + sin(ph * 2.0 + 0.4) * 0.22 + sin(ph * 3.0) * 0.08;\nraw = tone * env;\n\ngF = clamp(2.0 * sin(3.14159265 * formantHz / sr), 0.04, 0.85);\nlp1 = lp1 + gF * (raw - lp1);\nbp1 = bp1 + gF * 0.35 * (lp1 - bp1);\n\ndrv = (lp1 * 0.82 + bp1 * 0.25) * 1.4;\nout = (drv / (1.0 + abs(drv))) * 0.74;\n",
+    "params": {
+      "glide": 0.0025,
+      "vibratoHz": 5.2,
+      "vibDepth": 0.014,
+      "formantHz": 1850.0,
+      "decay": 0.9994
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

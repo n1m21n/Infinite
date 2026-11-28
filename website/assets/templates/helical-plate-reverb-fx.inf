@@ -1,0 +1,73 @@
+infinite-patch 1
+# Helical Plate Reverb FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  i note1 52
+  i note2 55
+  i note3 59
+  i note4 60
+  i note5 59
+  i note6 55
+  i note7 52
+  i note8 48
+  i note9 55
+  i note10 59
+  i note11 64
+  i note12 59
+  i note13 55
+  i note14 52
+  i note15 48
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id src
+  pos 340 1024
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 680 1024
+  s code param float diffusion = 0.64 [0.2, 0.86];\nparam float feedback = 0.62 [0.0, 0.84];\nparam float dampHz = 2900.0 [700.0, 7500.0];\nparam float drive = 1.3 [0.8, 2.5];\nparam float mix = 0.58 [0.0, 1.0];\nstate float ap1 = 0; state float ap2 = 0; state float ap3 = 0; state float ap4 = 0;\nstate float lp1 = 0; state float fb = 0;\n\nsrc = in + fb * feedback;\ny1 = -diffusion * src + ap1; ap1 = src + diffusion * y1;\ny2 = -(diffusion * 0.84) * y1 + ap2; ap2 = y1 + (diffusion * 0.84) * y2;\ny3 = -(diffusion * 0.71) * y2 + ap3; ap3 = y2 + (diffusion * 0.71) * y3;\ny4 = -(diffusion * 0.58) * y3 + ap4; ap4 = y3 + (diffusion * 0.58) * y4;\n\ng = clamp(2.0 * sin(3.14159265 * dampHz / sr), 0.04, 0.85);\nlp1 = lp1 + g * (y4 - lp1);\n\ndrv = lp1 * drive;\nsat = drv / (1.0 + abs(drv));\nfb = sat;\n\nout = (in * (1.0 - mix) + sat * mix) * 0.50;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1040 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.30 0.36
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Helical Plate Reverb FX. Dense metallic plate dispersion effect using cascaded allpass diffusion cells, high-frequency air damping, and gentle transformer warmth.
+  f width 340
+  f height 120
+end
+note src 0 notes
+aud fx 0 src
+aud speakers 0 fx
+cable out 0 pic

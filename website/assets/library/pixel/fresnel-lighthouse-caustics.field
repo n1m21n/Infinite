@@ -1,0 +1,18 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Fresnel Lighthouse Caustics",
+    "author": "Infinite",
+    "description": "Stepped concentric Fresnel dioptric glass-prism lens refracting warm amber-gold beams and deep maritime indigo caustics.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "# Fresnel Lighthouse Caustics (Field Pixel)\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\na = atan2(p.y, p.x);\n\n# Stepped concentric Fresnel dioptric prism rings\nrings = 14.0;\nstepR = fract(r * rings) - 0.5;\nprismGroove = smoothstep(0.42, 0.12, abs(stepR));\n\n# Rotating dual-bulls-eye lighthouse beams\nbeam1 = pow(max(0.0, cos(a - t * 0.55)), 6.0);\nbeam2 = pow(max(0.0, cos(a - t * 0.55 + 3.14159)), 6.0);\nbeams = (beam1 + beam2) * exp(-r * 1.6);\n\n# Brass frame ribs & amber-gold refraction (#0E192E -> #C88B28 -> #FFE394)\nribs = smoothstep(0.04, 0.01, abs(sin(a * 4.0)));\nlensCore = smoothstep(0.44, 0.05, r);\n\ncNavy = vec3(0.055, 0.098, 0.180);\ncAmber = vec3(0.784, 0.545, 0.157);\ncGold = vec3(1.000, 0.890, 0.580);\ncBrass = vec3(0.28, 0.21, 0.10);\n\nenergy = clamp(prismGroove * lensCore * 0.78 + beams * 1.05, 0.0, 1.0);\ncol = mix(cNavy, cAmber, energy);\ncol = mix(col, cGold, clamp(beams * 0.9 + pow(energy, 3.0) * 0.6, 0.0, 1.0));\ncol = mix(col, cBrass, ribs * lensCore * 0.55);\n",
+    "params": {
+      "rings": 14.0,
+      "beam_speed": 0.55,
+      "dispersion": 0.42
+    }
+  }
+}

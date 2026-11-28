@@ -696,6 +696,14 @@
   "embeds/soto-kinetic-penetrable-moire.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/soap-film-lipid-interference.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/fresnel-lighthouse-caustics.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

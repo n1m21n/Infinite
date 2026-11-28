@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Casio CZ Phase Distortion Synth",
+    "author": "Infinite",
+    "description": "Dual-line phase-distortion synthesizer inspired by Casio CZ series with dynamic DCW cosine wave-shaping, detuned harmonic twin, and soft saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float dcwDepth = 0.72 [0.1, 0.95];\nparam float dcwEnv = 0.55 [0.0, 1.0];\nparam float detune = 0.005 [0.0005, 0.02];\nparam float brightHz = 3400.0 [700.0, 7500.0];\nparam float decay = 0.9992 [0.996, 0.9997];\nstate float p1 = 0; state float p2 = 0;\nstate float env = 0; state float dcw = 0;\nstate float lp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.14, env * decay);\ndcw = if(gate > 0.5, dcw + (1.0 - dcw) * 0.08, dcw * 0.9985);\n\nf0 = clamp(freq, 55.0, 2200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + f0 * (1.0 + detune) / sr) % 1.0;\n\n# Casio CZ phase-distortion wave-shaping with dynamic DCW index\nidx = dcwDepth * (0.3 + 0.7 * dcw * dcwEnv) * 0.42;\nw1 = p1 + idx * sin(6.2831853 * p1);\nw2 = p2 + idx * sin(6.2831853 * p2);\nraw = (-cos(6.2831853 * w1) * 0.6 - cos(6.2831853 * w2) * 0.4) * env;\n\ng = clamp(2.0 * sin(3.14159265 * brightHz / sr), 0.05, 0.88);\nlp1 = lp1 + g * (raw - lp1);\n\ndrv = lp1 * 1.45;\nout = (drv / (1.0 + abs(drv))) * 0.72;\n",
+    "params": {
+      "dcwDepth": 0.72,
+      "dcwEnv": 0.55,
+      "detune": 0.005,
+      "brightHz": 3400.0,
+      "decay": 0.9992
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

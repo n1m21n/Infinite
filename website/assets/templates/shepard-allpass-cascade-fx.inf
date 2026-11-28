@@ -1,0 +1,73 @@
+infinite-patch 1
+# Shepard Allpass Cascade FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  i note1 52
+  i note2 55
+  i note3 59
+  i note4 60
+  i note5 59
+  i note6 55
+  i note7 52
+  i note8 48
+  i note9 55
+  i note10 59
+  i note11 64
+  i note12 59
+  i note13 55
+  i note14 52
+  i note15 48
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id src
+  pos 340 1024
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 680 1024
+  s code param float rateHz = 0.42 [0.05, 3.0];\nparam float depth = 0.68 [0.1, 0.92];\nparam float feedback = 0.48 [0.0, 0.82];\nparam float dampHz = 4600.0 [800.0, 8000.0];\nparam float mix = 0.65 [0.0, 1.0];\nstate float ph = 0; state float ap1 = 0; state float ap2 = 0; state float ap3 = 0; state float ap4 = 0;\nstate float lp1 = 0; state float fb = 0;\n\nph = (ph + rateHz / sr) % 1.0;\nc1 = clamp(0.15 + depth * 0.72 * ((ph) % 1.0), 0.06, 0.89);\nc2 = clamp(0.15 + depth * 0.72 * ((ph + 0.5) % 1.0), 0.06, 0.89);\n\nsrc = in + fb * feedback;\ny1 = -c1 * src + ap1; ap1 = src + c1 * y1;\ny2 = -c1 * y1 + ap2; ap2 = y1 + c1 * y2;\ny3 = -c2 * y2 + ap3; ap3 = y2 + c2 * y3;\ny4 = -c2 * y3 + ap4; ap4 = y3 + c2 * y4;\n\ng = clamp(2.0 * sin(3.14159265 * dampHz / sr), 0.05, 0.88);\nlp1 = lp1 + g * (y4 - lp1);\ndrv = lp1 * 1.25;\nfb = drv / (1.0 + abs(drv));\n\nout = (in * (1.0 - mix) + fb * mix) * 0.76;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1040 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.30 0.36
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Shepard Allpass Cascade FX. Continuously rising quadrature allpass phaser network with cross-coupled feedback, silky notch sweep, and warm analog saturation.
+  f width 340
+  f height 120
+end
+note src 0 notes
+aud fx 0 src
+aud speakers 0 fx
+cable out 0 pic

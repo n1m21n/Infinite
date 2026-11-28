@@ -1,0 +1,18 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Soap Film Lipid Interference",
+    "author": "Infinite",
+    "description": "Thin-film optical wave interference across drifting lipid-island domains on obsidian ground with spectral RGB phase fringes.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "# Soap Film Lipid Interference (Field Pixel)\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n\n# Multi-bubble cellular lipid domains\nd1 = length(p - vec2(-0.18 + 0.04 * sin(t * 0.4), 0.10 + 0.03 * cos(t * 0.3))) - 0.24;\nd2 = length(p - vec2(0.16 - 0.03 * cos(t * 0.35), -0.06 + 0.04 * sin(t * 0.5))) - 0.29;\nd3 = length(p - vec2(0.02, 0.24 - 0.03 * sin(t * 0.45))) - 0.16;\nd4 = length(p - vec2(-0.14, -0.22)) - 0.18;\n\nfilmD = min(min(d1, d2), min(d3, d4));\nmask = smoothstep(0.015, -0.015, filmD);\n\n# Optical path difference (nm-scale thin-film thickness field)\nopd = (1.6 + 0.9 * sin(p.x * 7.5 + sin(p.y * 6.0 + t * 0.45)) + 0.6 * cos(length(p) * 14.0 - t * 0.6)) * 3.14159;\n\n# Physical RGB wavelength interference (650nm, 532nm, 460nm ratios)\nspec = vec3(0.5 + 0.5 * cos(opd * 1.00 + 0.2), 0.5 + 0.5 * cos(opd * 1.22 + 1.1), 0.5 + 0.5 * cos(opd * 1.41 + 2.3));\n\n# Obsidian Newton-black film rim + iridescent interior\nrim = smoothstep(0.03, 0.0, abs(filmD)) * 0.45;\nbg = vec3(0.018, 0.020, 0.026);\ncol = mix(bg, spec * 0.92 + vec3(0.06), mask) + vec3(0.45, 0.52, 0.60) * rim;\n",
+    "params": {
+      "film_scale": 3.4,
+      "drift": 0.45,
+      "thickness": 1.8
+    }
+  }
+}

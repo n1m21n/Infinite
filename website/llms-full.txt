@@ -429,6 +429,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Trautonium Subharmonic Synth](https://infinitedevices.org/library/trautonium-subharmonic-synth.html): Mixtur-Trautonium subharmonic frequency-divider oscillator blending /2, /3, and /4 subharmonics through twin resonant formants. (file: https://infinitedevices.org/assets/templates/trautonium-subharmonic-synth.inf)
 - [Leslie Doppler Horn FX](https://infinitedevices.org/library/leslie-doppler-horn-fx.html): Dual-rotor speaker emulator splitting lows and highs across Doppler allpass dispersion and warm tube overdrive. (file: https://infinitedevices.org/assets/templates/leslie-doppler-horn-fx.inf)
 - [Karplus Sympathetic Bridge FX](https://infinitedevices.org/library/karplus-sympathetic-bridge-fx.html): Tuned sympathetic string-bridge resonator bank with lowpass bridge damping and nonlinear inter-string feedback. (file: https://infinitedevices.org/assets/templates/karplus-sympathetic-bridge-fx.inf)
+- [Casio CZ Phase Distortion Synth](https://infinitedevices.org/library/casio-cz-phase-distortion-synth.html): Dual-line phase-distortion synthesizer inspired by Casio CZ series with dynamic DCW cosine wave-shaping, detuned harmonic twin, and soft saturation. (file: https://infinitedevices.org/assets/templates/casio-cz-phase-distortion-synth.inf)
+- [Theremin Heterodyne Ribbon Synth](https://infinitedevices.org/library/theremin-heterodyne-ribbon-synth.html): Continuous glide heterodyne oscillator with slow-attack vocal formant filtering, expressive vibrato, and warm triode saturation. (file: https://infinitedevices.org/assets/templates/theremin-heterodyne-ribbon-synth.inf)
+- [Helical Plate Reverb FX](https://infinitedevices.org/library/helical-plate-reverb-fx.html): Dense metallic plate dispersion effect using cascaded allpass diffusion cells, high-frequency air damping, and gentle transformer warmth. (file: https://infinitedevices.org/assets/templates/helical-plate-reverb-fx.inf)
+- [Shepard Allpass Cascade FX](https://infinitedevices.org/library/shepard-allpass-cascade-fx.html): Continuously rising quadrature allpass phaser network with cross-coupled feedback, silky notch sweep, and warm analog saturation. (file: https://infinitedevices.org/assets/templates/shepard-allpass-cascade-fx.inf)
 
 ## Library: Community
 
@@ -709,6 +713,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Vals Clerestory Caustics](https://infinitedevices.org/library/vals-clerestory-caustics.html): Layered Valser quartzite strata cut by narrow clerestory light slits over shimmering thermal water caustics. (file: https://infinitedevices.org/assets/library/pixel/vals-clerestory-caustics.field)
 - [Chladni Nodal Sand](https://infinitedevices.org/library/chladni-nodal-sand.html): Analytical Chladni plate standing-wave eigenmodes with fine quartz sand accumulating along zero-crossing nodal lines. (file: https://infinitedevices.org/assets/library/pixel/chladni-nodal-sand.field)
 - [Kintsugi Lacquer Fracture](https://infinitedevices.org/library/kintsugi-lacquer-fracture.html): Domain-warped urushi ceramic shard network joined by luminous molten-gold kintsugi seams and warm kiln relief. (file: https://infinitedevices.org/assets/library/pixel/kintsugi-lacquer-fracture.field)
+- [Soap Film Lipid Interference](https://infinitedevices.org/library/soap-film-lipid-interference.html): Thin-film optical wave interference across drifting lipid-island domains on obsidian ground with spectral RGB phase fringes. (file: https://infinitedevices.org/assets/library/pixel/soap-film-lipid-interference.field)
+- [Fresnel Lighthouse Caustics](https://infinitedevices.org/library/fresnel-lighthouse-caustics.html): Stepped concentric Fresnel dioptric glass-prism lens refracting warm amber-gold beams and deep maritime indigo caustics. (file: https://infinitedevices.org/assets/library/pixel/fresnel-lighthouse-caustics.field)
 
 ## Library: Sketch
 
@@ -858,6 +864,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Therme Vals Ashlar Strata](https://infinitedevices.org/library/therme-vals-ashlar-strata.html): Modular Valser quartzite masonry courses sliced by narrow clerestory light shafts over a quiet thermal mineral basin. (file: https://infinitedevices.org/assets/library/sketch/therme-vals-ashlar-strata.js)
 - [Nervi Ferrocement Ribs](https://infinitedevices.org/library/nervi-ferrocement-ribs.html): Corrugated ferrocement vault ribs and transverse diaphragm trusses with clerestory daylight bands. (file: https://infinitedevices.org/assets/library/sketch/nervi-ferrocement-ribs.js)
 - [Raku Glaze Craquelure](https://infinitedevices.org/library/raku-glaze-craquelure.html): Iron-oxide raku glaze pooling inside a raw stoneware rim with carbon-trapped hairline craquelure. (file: https://infinitedevices.org/assets/library/sketch/raku-glaze-craquelure.js)
+- [Girih Darb-i Imam Strapwork](https://infinitedevices.org/library/girih-darb-imam-strapwork.html): Decagonal girih star-polygon tessellation with interlaced charcoal strapwork ribbons, ochre ceramic facets, and lapis-cobalt medallions. (file: https://infinitedevices.org/assets/library/sketch/girih-darb-imam-strapwork.js)
+- [Muqarnas Corbel Projection](https://infinitedevices.org/library/muqarnas-corbel-projection.html): Orthographic geometric plan of a Persian muqarnas stalactite vault with concentric star tiers, sandstone ribs, and lapis-blue spandrels. (file: https://infinitedevices.org/assets/library/sketch/muqarnas-corbel-projection.js)
 
 ## Library: Sketch 3D
 
@@ -1002,6 +1010,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Vals Clerestory Monolith 3D](https://infinitedevices.org/library/vals-clerestory-monolith-3d.html): Cantilevered Valser quartzite bathhouse piers separated by narrow clerestory light-slit planes above a mineral pool. (file: https://infinitedevices.org/assets/library/sketch/vals-clerestory-monolith-3d.js)
 - [Gaudi Hyperbolic Vault 3D](https://infinitedevices.org/library/gaudi-hyperbolic-vault-3d.html): Fluted limestone columns branching into hyperbolic-paraboloid star ribs around an amber-gold oculus. (file: https://infinitedevices.org/assets/library/sketch/gaudi-hyperbolic-vault-3d.js)
 - [Munich Olympic Cable-Net 3D](https://infinitedevices.org/library/munich-olympic-cable-net-3d.html): Anticlastic hyperbolic-paraboloid cable-net canopy suspended from tilted steel compression masts and clevis rings. (file: https://infinitedevices.org/assets/library/sketch/munich-olympic-cable-net-3d.js)
+- [Candela Xochimilco Hypar 3D](https://infinitedevices.org/library/candela-xochimilco-hypar-3d.html): Eight-lobed thin-shell concrete hyperbolic paraboloid vault inspired by Felix Candela's Los Manantiales with ruled saddle ribs. (file: https://infinitedevices.org/assets/library/sketch/candela-xochimilco-hypar-3d.js)
+- [Candela Palmira Saddle 3D](https://infinitedevices.org/library/candela-palmira-saddle-3d.html): Sweeping anticlastic concrete saddle shell with ruled straight-line generators, cantilevered edge beams, and sculptural shadow ribs. (file: https://infinitedevices.org/assets/library/sketch/candela-palmira-saddle-3d.js)
 
 ## Library: Synths
 
@@ -1146,6 +1156,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Grotto Quartzite Resonator Synth](https://infinitedevices.org/library/grotto-quartzite-resonator-synth.html): Modal mineral-chamber resonator coupling fundamental, slightly stretched octave, and stone-plate partials with smooth thermal envelope. (file: https://infinitedevices.org/assets/templates/grotto-quartzite-resonator-synth.inf)
 - [Gamelan Pelog Bronze Synth](https://infinitedevices.org/library/gamelan-pelog-bronze-synth.html): Inharmonic bronze metallophone modes with ombak paired detuning and bamboo tube formant resonance. (file: https://infinitedevices.org/assets/templates/gamelan-pelog-bronze-synth.inf)
 - [Trautonium Subharmonic Synth](https://infinitedevices.org/library/trautonium-subharmonic-synth.html): Mixtur-Trautonium subharmonic frequency-divider oscillator blending /2, /3, and /4 subharmonics through twin resonant formants. (file: https://infinitedevices.org/assets/templates/trautonium-subharmonic-synth.inf)
+- [Casio CZ Phase Distortion Synth](https://infinitedevices.org/library/casio-cz-phase-distortion-synth.html): Dual-line phase-distortion synthesizer inspired by Casio CZ series with dynamic DCW cosine wave-shaping, detuned harmonic twin, and soft saturation. (file: https://infinitedevices.org/assets/templates/casio-cz-phase-distortion-synth.inf)
+- [Theremin Heterodyne Ribbon Synth](https://infinitedevices.org/library/theremin-heterodyne-ribbon-synth.html): Continuous glide heterodyne oscillator with slow-attack vocal formant filtering, expressive vibrato, and warm triode saturation. (file: https://infinitedevices.org/assets/templates/theremin-heterodyne-ribbon-synth.inf)
 
 ## Library: Audio Effects
 
@@ -1292,6 +1304,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Serge Variable-Q Phasor FX](https://infinitedevices.org/library/serge-variable-q-phasor-fx.html): Resonant state-variable bandpass-to-allpass dispersion cascade with LFO sweep and soft asymmetric saturation. (file: https://infinitedevices.org/assets/templates/serge-variable-q-phasor-fx.inf)
 - [Leslie Doppler Horn FX](https://infinitedevices.org/library/leslie-doppler-horn-fx.html): Dual-rotor speaker emulator splitting lows and highs across Doppler allpass dispersion and warm tube overdrive. (file: https://infinitedevices.org/assets/templates/leslie-doppler-horn-fx.inf)
 - [Karplus Sympathetic Bridge FX](https://infinitedevices.org/library/karplus-sympathetic-bridge-fx.html): Tuned sympathetic string-bridge resonator bank with lowpass bridge damping and nonlinear inter-string feedback. (file: https://infinitedevices.org/assets/templates/karplus-sympathetic-bridge-fx.inf)
+- [Helical Plate Reverb FX](https://infinitedevices.org/library/helical-plate-reverb-fx.html): Dense metallic plate dispersion effect using cascaded allpass diffusion cells, high-frequency air damping, and gentle transformer warmth. (file: https://infinitedevices.org/assets/templates/helical-plate-reverb-fx.inf)
+- [Shepard Allpass Cascade FX](https://infinitedevices.org/library/shepard-allpass-cascade-fx.html): Continuously rising quadrature allpass phaser network with cross-coupled feedback, silky notch sweep, and warm analog saturation. (file: https://infinitedevices.org/assets/templates/shepard-allpass-cascade-fx.inf)
 
 ## Nodes
 
@@ -1668,7 +1682,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 165 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 167 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -1834,3 +1848,5 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Vals Clerestory Caustics](https://infinitedevices.org/embeds/vals-clerestory-caustics.html): Layered Valser quartzite strata cut by narrow clerestory light slits over audio-reactive thermal water caustics.
 - [Chladni Nodal Sand](https://infinitedevices.org/embeds/chladni-nodal-sand.html): Analytical Chladni plate standing-wave eigenmodes with audio-reactive quartz sand accumulating along zero-crossing nodal lines.
 - [Kintsugi Lacquer Fracture](https://infinitedevices.org/embeds/kintsugi-lacquer-fracture.html): Domain-warped urushi ceramic shard network joined by audio-reactive molten-gold kintsugi seams and warm kiln relief.
+- [Soap Film Lipid Interference](https://infinitedevices.org/embeds/soap-film-lipid-interference.html): Audio-reactive thin-film soap bubble optical interference across drifting lipid islands.
+- [Fresnel Lighthouse Caustics](https://infinitedevices.org/embeds/fresnel-lighthouse-caustics.html): Audio-reactive stepped Fresnel dioptric lighthouse optics and amber-indigo caustics.

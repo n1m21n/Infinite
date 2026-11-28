@@ -14923,7 +14923,225 @@
       "file": "assets/library/sketch/munich-olympic-cable-net-3d.js",
       "preview": "assets/library/previews/munich-olympic-cable-net-3d.jpg",
       "bytes": 1811
+    },
+    {
+      "id": "girih-darb-imam-strapwork",
+      "name": "Girih Darb-i Imam Strapwork",
+      "kind": "Generator",
+      "tags": [
+        "girih",
+        "zellij",
+        "tessellation",
+        "islamic-geometry",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Decagonal girih star-polygon tessellation with interlaced charcoal strapwork ribbons, ochre ceramic facets, and lapis-cobalt medallions.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/girih-darb-imam-strapwork.js",
+      "preview": "assets/library/previews/girih-darb-imam-strapwork.jpg",
+      "bytes": 3150
+    },
+    {
+      "id": "muqarnas-corbel-projection",
+      "name": "Muqarnas Corbel Projection",
+      "kind": "Generator",
+      "tags": [
+        "muqarnas",
+        "vault",
+        "isfahan",
+        "geometric",
+        "architecture",
+        "sketch"
+      ],
+      "description": "Orthographic geometric plan of a Persian muqarnas stalactite vault with concentric star tiers, sandstone ribs, and lapis-blue spandrels.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/muqarnas-corbel-projection.js",
+      "preview": "assets/library/previews/muqarnas-corbel-projection.jpg",
+      "bytes": 2452
+    },
+    {
+      "id": "candela-xochimilco-hypar-3d",
+      "name": "Candela Xochimilco Hypar 3D",
+      "kind": "Generator",
+      "tags": [
+        "candela",
+        "hypar",
+        "concrete",
+        "shell",
+        "architecture",
+        "3d",
+        "sketch"
+      ],
+      "description": "Eight-lobed thin-shell concrete hyperbolic paraboloid vault inspired by Felix Candela's Los Manantiales with ruled saddle ribs.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 3,
+      "file": "assets/library/sketch/candela-xochimilco-hypar-3d.js",
+      "preview": "assets/library/previews/candela-xochimilco-hypar-3d.jpg",
+      "bytes": 1319
+    },
+    {
+      "id": "candela-palmira-saddle-3d",
+      "name": "Candela Palmira Saddle 3D",
+      "kind": "Generator",
+      "tags": [
+        "candela",
+        "saddle",
+        "hypar",
+        "parametric",
+        "concrete",
+        "3d",
+        "sketch"
+      ],
+      "description": "Sweeping anticlastic concrete saddle shell with ruled straight-line generators, cantilevered edge beams, and sculptural shadow ribs.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 3,
+      "file": "assets/library/sketch/candela-palmira-saddle-3d.js",
+      "preview": "assets/library/previews/candela-palmira-saddle-3d.jpg",
+      "bytes": 1239
+    },
+    {
+      "id": "casio-cz-phase-distortion-synth",
+      "name": "Casio CZ Phase Distortion Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "phase-distortion",
+        "heterodyne",
+        "casio",
+        "theremin",
+        "audio",
+        "dsp"
+      ],
+      "description": "Dual-line phase-distortion synthesizer inspired by Casio CZ series with dynamic DCW cosine wave-shaping, detuned harmonic twin, and soft saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/casio-cz-phase-distortion-synth.inf",
+      "preview": "assets/library/previews/casio-cz-phase-distortion-synth.jpg",
+      "bytes": 2078
+    },
+    {
+      "id": "theremin-heterodyne-ribbon-synth",
+      "name": "Theremin Heterodyne Ribbon Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "phase-distortion",
+        "heterodyne",
+        "casio",
+        "theremin",
+        "audio",
+        "dsp"
+      ],
+      "description": "Continuous glide heterodyne oscillator with slow-attack vocal formant filtering, expressive vibrato, and warm triode saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/theremin-heterodyne-ribbon-synth.inf",
+      "preview": "assets/library/previews/theremin-heterodyne-ribbon-synth.jpg",
+      "bytes": 2086
+    },
+    {
+      "id": "helical-plate-reverb-fx",
+      "name": "Helical Plate Reverb FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "barberpole",
+        "phaser",
+        "plate-reverb",
+        "allpass",
+        "audio",
+        "dsp"
+      ],
+      "description": "Dense metallic plate dispersion effect using cascaded allpass diffusion cells, high-frequency air damping, and gentle transformer warmth.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/helical-plate-reverb-fx.inf",
+      "preview": "assets/library/previews/helical-plate-reverb-fx.jpg",
+      "bytes": 1975
+    },
+    {
+      "id": "soap-film-lipid-interference",
+      "name": "Soap Film Lipid Interference",
+      "kind": "Generator",
+      "tags": [
+        "soap-film",
+        "interference",
+        "optics",
+        "iridescent",
+        "shader",
+        "pixel",
+        "audioreactive"
+      ],
+      "description": "Thin-film optical wave interference across drifting lipid-island domains on obsidian ground with spectral RGB phase fringes.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 3,
+      "file": "assets/library/pixel/soap-film-lipid-interference.field",
+      "preview": "assets/library/previews/soap-film-lipid-interference.jpg",
+      "bytes": 1516
+    },
+    {
+      "id": "fresnel-lighthouse-caustics",
+      "name": "Fresnel Lighthouse Caustics",
+      "kind": "Generator",
+      "tags": [
+        "fresnel",
+        "optics",
+        "caustics",
+        "prism",
+        "lighthouse",
+        "pixel",
+        "audioreactive"
+      ],
+      "description": "Stepped concentric Fresnel dioptric glass-prism lens refracting warm amber-gold beams and deep maritime indigo caustics.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 3,
+      "file": "assets/library/pixel/fresnel-lighthouse-caustics.field",
+      "preview": "assets/library/previews/fresnel-lighthouse-caustics.jpg",
+      "bytes": 1445
+    },
+    {
+      "id": "shepard-allpass-cascade-fx",
+      "name": "Shepard Allpass Cascade FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "barberpole",
+        "phaser",
+        "plate-reverb",
+        "allpass",
+        "audio",
+        "dsp"
+      ],
+      "description": "Continuously rising quadrature allpass phaser network with cross-coupled feedback, silky notch sweep, and warm analog saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/shepard-allpass-cascade-fx.inf",
+      "preview": "assets/library/previews/shepard-allpass-cascade-fx.jpg",
+      "bytes": 2028
     }
   ],
-  "count": 719
+  "count": 729
 }

@@ -429,6 +429,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Trautonium Subharmonic Synth](https://infinitedevices.org/library/trautonium-subharmonic-synth.html): Mixtur-Trautonium subharmonic frequency-divider oscillator blending /2, /3, and /4 subharmonics through twin resonant formants. (file: https://infinitedevices.org/assets/templates/trautonium-subharmonic-synth.inf)
 - [Leslie Doppler Horn FX](https://infinitedevices.org/library/leslie-doppler-horn-fx.html): Dual-rotor speaker emulator splitting lows and highs across Doppler allpass dispersion and warm tube overdrive. (file: https://infinitedevices.org/assets/templates/leslie-doppler-horn-fx.inf)
 - [Karplus Sympathetic Bridge FX](https://infinitedevices.org/library/karplus-sympathetic-bridge-fx.html): Tuned sympathetic string-bridge resonator bank with lowpass bridge damping and nonlinear inter-string feedback. (file: https://infinitedevices.org/assets/templates/karplus-sympathetic-bridge-fx.inf)
+- [Casio CZ Phase Distortion Synth](https://infinitedevices.org/library/casio-cz-phase-distortion-synth.html): Dual-line phase-distortion synthesizer inspired by Casio CZ series with dynamic DCW cosine wave-shaping, detuned harmonic twin, and soft saturation. (file: https://infinitedevices.org/assets/templates/casio-cz-phase-distortion-synth.inf)
+- [Theremin Heterodyne Ribbon Synth](https://infinitedevices.org/library/theremin-heterodyne-ribbon-synth.html): Continuous glide heterodyne oscillator with slow-attack vocal formant filtering, expressive vibrato, and warm triode saturation. (file: https://infinitedevices.org/assets/templates/theremin-heterodyne-ribbon-synth.inf)
+- [Helical Plate Reverb FX](https://infinitedevices.org/library/helical-plate-reverb-fx.html): Dense metallic plate dispersion effect using cascaded allpass diffusion cells, high-frequency air damping, and gentle transformer warmth. (file: https://infinitedevices.org/assets/templates/helical-plate-reverb-fx.inf)
+- [Shepard Allpass Cascade FX](https://infinitedevices.org/library/shepard-allpass-cascade-fx.html): Continuously rising quadrature allpass phaser network with cross-coupled feedback, silky notch sweep, and warm analog saturation. (file: https://infinitedevices.org/assets/templates/shepard-allpass-cascade-fx.inf)
 
 ## Library: Community
 
@@ -852,7 +856,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 165 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 167 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -869,4 +873,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 150 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 152 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
